@@ -88,7 +88,7 @@ export interface ParsedBriefMd {
   extensions: string[];
   comments: BriefTag[];
   warnings: ParseWarning[];
-  fieldOrder: string[];
+  fieldOrder?: string[];
 }
 
 export interface PreprocessResult {
@@ -114,4 +114,39 @@ export interface ParsedMetadata {
   warnings: string[];
   fieldOrder: string[];
   consumedRange?: { start: number; end: number };
+}
+
+// Runtime validation: checks structure and returns typed document
+export function validateParsedBrief(doc: unknown): ParsedBriefMd {
+  if (!doc || typeof doc !== "object") {
+    throw new TypeError("validateParsedBrief: input must be an object");
+  }
+  const d = doc as Record<string, unknown>;
+  if (!d.metadata || typeof d.metadata !== "object") {
+    throw new TypeError("validateParsedBrief: missing or invalid metadata");
+  }
+  if (!Array.isArray(d.sections)) {
+    throw new TypeError("validateParsedBrief: sections must be an array");
+  }
+  if (!Array.isArray(d.decisions)) {
+    throw new TypeError("validateParsedBrief: decisions must be an array");
+  }
+  if (!Array.isArray(d.questions)) {
+    throw new TypeError("validateParsedBrief: questions must be an array");
+  }
+  if (!Array.isArray(d.extensions)) {
+    throw new TypeError("validateParsedBrief: extensions must be an array");
+  }
+  if (!Array.isArray(d.comments)) {
+    throw new TypeError("validateParsedBrief: comments must be an array");
+  }
+  if (!Array.isArray(d.warnings)) {
+    throw new TypeError("validateParsedBrief: warnings must be an array");
+  }
+  return doc as ParsedBriefMd;
+}
+
+// Returns sections in insertion order (preserves ordering invariant)
+export function parseSections(inputs: Section[]): Section[] {
+  return [...inputs];
 }

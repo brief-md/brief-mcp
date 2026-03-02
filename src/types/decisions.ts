@@ -44,3 +44,21 @@ export interface ExternalToolSession {
   readonly summary?: string;
   readonly breadcrumb?: string;
 }
+
+let _decisionSeq = 0;
+
+// Factory that creates a minimal Decision from text + status
+export function parseDecision(input: {
+  text: string;
+  status: DecisionStatus;
+  rationale?: string;
+}): Decision {
+  _decisionSeq += 1;
+  return {
+    id: `d-${_decisionSeq}`,
+    text: input.text,
+    status: input.status,
+    format: "minimal",
+    rationale: input.rationale,
+  };
+}

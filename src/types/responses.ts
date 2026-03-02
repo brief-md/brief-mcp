@@ -49,3 +49,11 @@ export interface SuggestionsForAi {
     | "no_pack_data"
     | "no_type_guide";
 }
+
+// Factory for creating a typed error response
+export function createErrorResponse(
+  type: ErrorType,
+  message: string,
+): ErrorResponse {
+  return { type, message };
+}

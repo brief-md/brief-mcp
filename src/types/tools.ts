@@ -454,3 +454,438 @@ export interface SetTutorialDismissedInput {
 export interface SetTutorialDismissedOutput {
   readonly dismissed: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Runtime tool schema registry (OQ-255)
+// Exports 38+ runtime keys for type packaging and debug-mode validation.
+// ---------------------------------------------------------------------------
+
+export interface ToolFieldSchema {
+  readonly [field: string]: "required" | "optional";
+}
+
+export interface ToolSchema {
+  readonly input: ToolFieldSchema;
+  readonly output: ToolFieldSchema;
+}
+
+const BASE_OUTPUT: ToolFieldSchema = {
+  content: "required",
+  isError: "optional",
+};
+
+export const brief_list_projects: ToolSchema = {
+  input: { workspace: "optional" },
+  output: { ...BASE_OUTPUT, projects: "required", warnings: "required" },
+};
+
+export const brief_set_active_project: ToolSchema = {
+  input: { path: "required" },
+  output: {
+    ...BASE_OUTPUT,
+    projectName: "required",
+    filePath: "required",
+    confirmed: "required",
+  },
+};
+
+export const brief_create_project: ToolSchema = {
+  input: {
+    name: "required",
+    type: "required",
+    workspace: "optional",
+    extensions: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    projectPath: "required",
+    filePath: "required",
+    created: "required",
+  },
+};
+
+export const brief_create_sub_project: ToolSchema = {
+  input: { name: "required", type: "required", parentPath: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    projectPath: "required",
+    filePath: "required",
+    parentPath: "required",
+  },
+};
+
+export const brief_reenter_project: ToolSchema = {
+  input: { path: "optional" },
+  output: { ...BASE_OUTPUT, reenterySummary: "required" },
+};
+
+export const brief_add_workspace: ToolSchema = {
+  input: { path: "required" },
+  output: {
+    ...BASE_OUTPUT,
+    added: "required",
+    normalizedPath: "required",
+  },
+};
+
+export const brief_get_context: ToolSchema = {
+  input: {
+    scope: "optional",
+    includeHistory: "optional",
+    sections: "optional",
+  },
+  output: { ...BASE_OUTPUT, filePath: "required", sections: "required" },
+};
+
+export const brief_get_constraints: ToolSchema = {
+  input: { scope: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    constraints: "required",
+    filePath: "required",
+  },
+};
+
+export const brief_get_decisions: ToolSchema = {
+  input: { scope: "optional", status: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    activeDecisions: "required",
+    filePath: "required",
+  },
+};
+
+export const brief_get_questions: ToolSchema = {
+  input: { scope: "optional", category: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    toResolve: "required",
+    toKeepOpen: "required",
+    filePath: "required",
+  },
+};
+
+export const brief_add_decision: ToolSchema = {
+  input: {
+    title: "required",
+    why: "optional",
+    when: "optional",
+    alternativesConsidered: "optional",
+    replaces: "optional",
+    exceptionTo: "optional",
+    date: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    decision: "required",
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_add_constraint: ToolSchema = {
+  input: { constraint: "required", section: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_add_question: ToolSchema = {
+  input: {
+    text: "required",
+    category: "optional",
+    options: "optional",
+    impact: "optional",
+    priority: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    question: "required",
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_resolve_question: ToolSchema = {
+  input: { text: "required", decision: "optional", section: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    resolved: "required",
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_capture_external_session: ToolSchema = {
+  input: {
+    toolName: "required",
+    date: "optional",
+    summary: "required",
+    breadcrumb: "optional",
+    decisions: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    filePath: "required",
+    changesSummary: "required",
+    capturedDecisions: "required",
+  },
+};
+
+export const brief_update_section: ToolSchema = {
+  input: { section: "required", content: "required", extension: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_lint: ToolSchema = {
+  input: { path: "optional", verifyIntegrity: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    findings: "required",
+    isValid: "required",
+    isWellFormed: "required",
+    filePath: "required",
+  },
+};
+
+export const brief_check_conflicts: ToolSchema = {
+  input: { scope: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    conflicts: "required",
+    checkedDecisions: "required",
+  },
+};
+
+export const brief_search_ontology: ToolSchema = {
+  input: {
+    query: "required",
+    packs: "optional",
+    maxResults: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    results: "required",
+    totalSearched: "required",
+  },
+};
+
+export const brief_get_ontology_entry: ToolSchema = {
+  input: { ontology: "required", entryId: "required" },
+  output: { ...BASE_OUTPUT, entry: "required" },
+};
+
+export const brief_browse_ontology: ToolSchema = {
+  input: {
+    ontology: "required",
+    category: "optional",
+    maxResults: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    entries: "required",
+    total: "required",
+  },
+};
+
+export const brief_list_ontologies: ToolSchema = {
+  input: { installed: "optional" },
+  output: { ...BASE_OUTPUT, packs: "required", total: "required" },
+};
+
+export const brief_install_ontology: ToolSchema = {
+  input: { source: "required", name: "optional" },
+  output: { ...BASE_OUTPUT, installed: "required", pack: "required" },
+};
+
+export const brief_tag_entry: ToolSchema = {
+  input: {
+    ontology: "required",
+    entryId: "required",
+    section: "required",
+    paragraph: "optional",
+    labelOverride: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    tagged: "required",
+    qualifiedId: "required",
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_get_entry_references: ToolSchema = {
+  input: {
+    ontology: "required",
+    entryId: "required",
+    typeFilter: "optional",
+    extensionFilter: "optional",
+    maxResults: "optional",
+  },
+  output: { ...BASE_OUTPUT, references: "required", total: "required" },
+};
+
+export const brief_suggest_references: ToolSchema = {
+  input: { context: "required", existingReferences: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    suggestions: "required",
+    hasAiKnowledgeTier: "required",
+    hasWebSearchTier: "required",
+  },
+};
+
+export const brief_lookup_reference: ToolSchema = {
+  input: {
+    creator: "optional",
+    title: "optional",
+    typeFilter: "optional",
+  },
+  output: { ...BASE_OUTPUT, results: "required" },
+};
+
+export const brief_add_reference: ToolSchema = {
+  input: {
+    section: "required",
+    creator: "optional",
+    title: "required",
+    notes: "optional",
+    ontologyLinks: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_get_type_guide: ToolSchema = {
+  input: { type: "required" },
+  output: { ...BASE_OUTPUT, guide: "required" },
+};
+
+export const brief_create_type_guide: ToolSchema = {
+  input: {
+    type: "required",
+    typeAliases: "optional",
+    suggestedExtensions: "optional",
+    suggestedOntologies: "optional",
+    commonParentTypes: "optional",
+    commonChildTypes: "optional",
+    body: "required",
+    force: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    created: "required",
+    filePath: "required",
+  },
+};
+
+export const brief_suggest_extensions: ToolSchema = {
+  input: {
+    projectType: "required",
+    description: "optional",
+    activeExtensions: "optional",
+  },
+  output: { ...BASE_OUTPUT, suggestions: "required" },
+};
+
+export const brief_add_extension: ToolSchema = {
+  input: { extensionName: "required", subsections: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    added: "required",
+    filePath: "required",
+    changesSummary: "required",
+  },
+};
+
+export const brief_list_extensions: ToolSchema = {
+  input: {},
+  output: { ...BASE_OUTPUT, extensions: "required" },
+};
+
+export const brief_get_project_frameworks: ToolSchema = {
+  input: { project: "optional" },
+  output: { ...BASE_OUTPUT, frameworks: "required" },
+};
+
+export const brief_remove_ontology: ToolSchema = {
+  input: { ontology: "required", removeTags: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    removed: "required",
+    wasInherited: "required",
+    tagsRemoved: "required",
+    filePath: "required",
+  },
+};
+
+export const brief_search_registry: ToolSchema = {
+  input: { query: "optional", typeFilter: "optional" },
+  output: { ...BASE_OUTPUT, results: "required", total: "required" },
+};
+
+export const brief_start_tutorial: ToolSchema = {
+  input: {},
+  output: {
+    ...BASE_OUTPUT,
+    started: "required",
+    guideContent: "required",
+  },
+};
+
+export const brief_set_tutorial_dismissed: ToolSchema = {
+  input: { dismissed: "required" },
+  output: { ...BASE_OUTPUT, dismissed: "required" },
+};
+
+// Aggregate of all 38 tool schemas for iteration and packaging
+export const toolSchemas: Readonly<Record<string, ToolSchema>> = {
+  brief_list_projects,
+  brief_set_active_project,
+  brief_create_project,
+  brief_create_sub_project,
+  brief_reenter_project,
+  brief_add_workspace,
+  brief_get_context,
+  brief_get_constraints,
+  brief_get_decisions,
+  brief_get_questions,
+  brief_add_decision,
+  brief_add_constraint,
+  brief_add_question,
+  brief_resolve_question,
+  brief_capture_external_session,
+  brief_update_section,
+  brief_lint,
+  brief_check_conflicts,
+  brief_search_ontology,
+  brief_get_ontology_entry,
+  brief_browse_ontology,
+  brief_list_ontologies,
+  brief_install_ontology,
+  brief_tag_entry,
+  brief_get_entry_references,
+  brief_suggest_references,
+  brief_lookup_reference,
+  brief_add_reference,
+  brief_get_type_guide,
+  brief_create_type_guide,
+  brief_suggest_extensions,
+  brief_add_extension,
+  brief_list_extensions,
+  brief_get_project_frameworks,
+  brief_remove_ontology,
+  brief_search_registry,
+  brief_start_tutorial,
+  brief_set_tutorial_dismissed,
+};
