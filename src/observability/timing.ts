@@ -1,5 +1,4 @@
-// src/observability/timing.ts — stub for TASK-03
-// Replace with real implementation during build loop.
+// src/observability/timing.ts
 
 import type { Logger } from "./logger.js";
 
@@ -8,18 +7,28 @@ export interface TimerHandle {
   readonly label: string;
 }
 
-export function startTimer(_label: string): TimerHandle {
-  throw new Error("Not implemented: startTimer");
+export function startTimer(label: string): TimerHandle {
+  return { startMs: Date.now(), label };
 }
 
-export function stopTimer(_handle: TimerHandle): number {
-  throw new Error("Not implemented: stopTimer");
+export function stopTimer(handle: TimerHandle): number {
+  return Date.now() - handle.startMs;
 }
 
 export async function withTiming<T>(
-  _label: string,
-  _logger: Logger,
-  _fn: () => Promise<T>,
+  label: string,
+  logger: Logger,
+  fn: () => Promise<T>,
 ): Promise<T> {
-  throw new Error("Not implemented: withTiming");
+  const handle = startTimer(label);
+  try {
+    const result = await fn();
+    const ms = stopTimer(handle);
+    logger.debug(`${label} completed in ${ms}ms`);
+    return result;
+  } catch (e) {
+    const ms = stopTimer(handle);
+    logger.debug(`${label} failed in ${ms}ms`);
+    throw e;
+  }
 }
