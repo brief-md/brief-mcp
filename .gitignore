@@ -1,0 +1,19 @@
+# Ignore everything by default — whitelist package files only
+*
+
+# Package source
+!src/
+!src/**
+!tests/
+!tests/**
+!assets/
+!assets/**
+
+# Package config
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsup.config.ts
+!vitest.config.ts
+!biome.json
+!.gitignore

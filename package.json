@@ -1,0 +1,47 @@
+{
+  "name": "brief-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for brief-mcp project context management",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "brief-mcp": "./dist/cli.js"
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build:ts": "tsup",
+    "build:assets": "copyfiles -u 1 \"assets/**/*\" dist/",
+    "build": "npm run build:ts && npm run build:assets",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "latest",
+    "@types/node": "^25.3.3",
+    "@vitest/coverage-v8": "latest",
+    "copyfiles": "latest",
+    "fast-check": "latest",
+    "husky": "latest",
+    "tsup": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
