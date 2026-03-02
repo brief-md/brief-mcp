@@ -1,5 +1,4 @@
-// src/errors/error-types.ts — stub for TASK-04
-// Replace with real implementation during build loop.
+// src/errors/error-types.ts
 
 export class BriefError extends Error {
   constructor(
@@ -10,13 +9,15 @@ export class BriefError extends Error {
   ) {
     super(message);
     this.name = "BriefError";
+    // Restore prototype chain for correct instanceof checks
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
-export class UserError extends BriefError {
+export class InvalidInputError extends BriefError {
   constructor(message: string, suggestion?: string) {
     super(message, "invalid_input", suggestion);
-    this.name = "UserError";
+    this.name = "InvalidInputError";
   }
 }
 
@@ -27,10 +28,10 @@ export class NotFoundError extends BriefError {
   }
 }
 
-export class DataError extends BriefError {
+export class ParseWarningError extends BriefError {
   constructor(message: string, suggestion?: string) {
     super(message, "parse_warning", suggestion);
-    this.name = "DataError";
+    this.name = "ParseWarningError";
   }
 }
 
@@ -48,15 +49,17 @@ export class InternalError extends BriefError {
   }
 }
 
-export class SecurityLimitError extends UserError {
+export class SecurityLimitExceededError extends InvalidInputError {
+  readonly subtype = "security_limit_exceeded" as const;
+
   constructor(
-    message: string,
     public readonly limitName: string,
-    public readonly actualValue: unknown,
-    public readonly configuredLimit: unknown,
-    public readonly howToAdjust?: string,
+    public readonly actualValue: number,
+    public readonly configuredLimit: number,
   ) {
-    super(message, howToAdjust);
-    this.name = "SecurityLimitError";
+    const message = `Security limit exceeded: ${limitName} (actual: ${actualValue}, configured limit: ${configuredLimit})`;
+    const suggestion = `Reduce the value of ${limitName} to at most ${configuredLimit}.`;
+    super(message, suggestion);
+    this.name = "SecurityLimitExceededError";
   }
 }
