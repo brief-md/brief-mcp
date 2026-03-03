@@ -156,3 +156,6 @@ export function createLogger(config?: LoggerConfig): Logger {
 
   return _createLoggerFromConfig({ level, output, format, moduleName });
 }
+
+const _defaultLogger = createLogger({ module: "app" });
+export default _defaultLogger;
