@@ -159,3 +159,53 @@ export function createLogger(config?: LoggerConfig): Logger {
 
 const _defaultLogger = createLogger({ module: "app" });
 export default _defaultLogger;
+
+// ---------------------------------------------------------------------------
+// CI-facing helpers (OBS-09, OBS-10)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve log level from an options bag containing an env record.
+ * This allows tests to pass a simulated environment without touching process.env.
+ */
+export function resolveLogLevel(options: {
+  env?: Record<string, string | undefined>;
+}): LogLevel {
+  const envLevel = options.env?.BRIEF_LOG_LEVEL;
+  if (envLevel && LEVEL_ORDER[envLevel as LogLevel] !== undefined) {
+    return envLevel as LogLevel;
+  }
+  return "info";
+}
+
+/** Sensitive field names that must be redacted in info-level logs (OBS-10). */
+const SENSITIVE_FIELDS = new Set([
+  "token",
+  "secret",
+  "password",
+  "key",
+  "auth",
+  "credential",
+  "apiKey",
+  "filePath",
+  "briefContent",
+]);
+
+/**
+ * Sanitize a JSON log line by redacting values of sensitive fields.
+ * Returns valid JSON with sensitive values replaced by "[REDACTED]".
+ */
+export function sanitizeLogOutput(logLine: string): string {
+  try {
+    const obj = JSON.parse(logLine) as Record<string, unknown>;
+    for (const field of Object.keys(obj)) {
+      if (SENSITIVE_FIELDS.has(field)) {
+        obj[field] = "[REDACTED]";
+      }
+    }
+    return JSON.stringify(obj);
+  } catch {
+    // Not valid JSON — return as-is
+    return logLine;
+  }
+}

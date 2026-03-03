@@ -249,7 +249,7 @@ export function resolveAlias(
 export function classifySection(heading: string): SectionClassification {
   const lower = heading.trim().toLowerCase();
 
-  if (TOOL_SPECIFIC_RE.test(heading)) return "tool-specific";
+  if (TOOL_SPECIFIC_RE.test(heading)) return "project-specific";
   if (CANONICAL_MAP.has(lower)) return "core";
   if (ALIAS_MAP.has(lower)) return "core";
   if (LANG_MAP.has(lower)) return "core";
@@ -410,7 +410,7 @@ export function parseSections(
       return {
         rs,
         canonicalName: null,
-        classification: "tool-specific",
+        classification: "project-specific",
         toolName: toolMatch[1].trim(),
         isRefSubsection: false,
       };

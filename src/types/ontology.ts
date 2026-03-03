@@ -1,5 +1,7 @@
 // src/types/ontology.ts
 
+export type { PackConfig } from "./config.js";
+
 export interface OntologyPack {
   readonly id: string;
   readonly name: string;
@@ -16,6 +18,7 @@ export interface OntologyPack {
 export interface OntologyEntry {
   readonly id: string;
   readonly label: string;
+  readonly name?: string;
   readonly aliases?: string[];
   readonly description?: string;
   readonly relatedIds?: string[];

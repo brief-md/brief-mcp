@@ -21,11 +21,14 @@ export interface LintResult {
 }
 
 export interface ConflictResult {
+  readonly hasConflict: boolean;
+  readonly conflictingDecisions: string[];
+  readonly resolutionOptions: string[];
+  readonly message?: string;
   readonly type?: string;
   readonly source?: string;
-  readonly severity: LintSeverity;
+  readonly severity?: LintSeverity;
   readonly items?: Array<{ text: string; status: string }>;
-  readonly resolutionOptions?: string[];
   readonly description?: string;
   readonly suggestion?: string;
 }

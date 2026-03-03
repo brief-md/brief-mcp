@@ -1167,6 +1167,18 @@ export function getRegisteredTools(): Array<{
 }
 
 // ---------------------------------------------------------------------------
+// Child process configuration (T56-05)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the stdio configuration for spawning the MCP server as a child process.
+ * All three streams (stdin, stdout, stderr) are piped to prevent output mixing.
+ */
+export function getChildProcessConfig(): { stdio: [string, string, string] } {
+  return { stdio: ["pipe", "pipe", "pipe"] };
+}
+
+// ---------------------------------------------------------------------------
 // createServer — MCP Server instance (OQ-117)
 // ---------------------------------------------------------------------------
 

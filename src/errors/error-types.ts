@@ -15,8 +15,12 @@ export class BriefError extends Error {
 }
 
 export class InvalidInputError extends BriefError {
-  constructor(message: string, suggestion?: string) {
-    super(message, "invalid_input", suggestion);
+  constructor(message: string, suggestion?: string | { suggestion?: string }) {
+    const resolved =
+      typeof suggestion === "object" && suggestion !== null
+        ? suggestion.suggestion
+        : suggestion;
+    super(message, "invalid_input", resolved);
     this.name = "InvalidInputError";
   }
 }

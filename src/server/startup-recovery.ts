@@ -11,10 +11,6 @@ export async function cleanOrphanedTempFiles(_logger: Logger): Promise<number> {
   throw new Error("Not implemented: cleanOrphanedTempFiles");
 }
 
-export async function verifyGenericGuide(_logger: Logger): Promise<void> {
-  throw new Error("Not implemented: verifyGenericGuide");
-}
-
 export async function checkForMultipleInstances(
   _logger: Logger,
 ): Promise<boolean> {
