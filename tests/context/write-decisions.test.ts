@@ -214,13 +214,10 @@ describe("TASK-26: Property Tests", () => {
 
   it("forAll(title string): empty or whitespace-only always rejected [MCP-03]", async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.stringOf(fc.constantFrom(" ", "\t", "\n")),
-        async (title) => {
-          const result = await handleAddDecision({ title, why: "test" });
-          expect(result.isError).toBe(true);
-        },
-      ),
+      fc.asyncProperty(fc.stringMatching(/^[ \t\n]*$/), async (title) => {
+        const result = await handleAddDecision({ title, why: "test" });
+        expect(result.isError).toBe(true);
+      }),
       { numRuns: 5 },
     );
   });

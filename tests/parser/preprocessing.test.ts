@@ -358,14 +358,11 @@ describe("TASK-13: Property Tests", () => {
 
   it("forAll(empty or whitespace-only content): valid result with no sections and no metadata [PARSE-19]", () => {
     fc.assert(
-      fc.property(
-        fc.stringOf(fc.constantFrom(" ", "\t", "\n", "\r")),
-        (whitespace) => {
-          const result = preprocess(whitespace);
-          expect(result).toBeDefined();
-          expect(result.content.trim()).toBe("");
-        },
-      ),
+      fc.property(fc.stringMatching(/^[ \t\n\r]*$/), (whitespace) => {
+        const result = preprocess(whitespace);
+        expect(result).toBeDefined();
+        expect(result.content.trim()).toBe("");
+      }),
     );
   });
 
