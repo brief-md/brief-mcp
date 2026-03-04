@@ -1,9 +1,16 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { walkUpward } from "../../src/hierarchy/walker";
+import { isBriefFile, walkUpward } from "../../src/hierarchy/walker";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -12,7 +19,7 @@ import { walkUpward } from "../../src/hierarchy/walker";
 let testDir: string;
 
 beforeEach(async () => {
-  testDir = await mkdtemp(join(tmpdir(), "brief-hier-test-"));
+  testDir = await realpath(await mkdtemp(join(tmpdir(), "brief-hier-test-")));
 });
 
 afterEach(async () => {
@@ -114,15 +121,18 @@ describe("TASK-17: Hierarchy — Upward Traversal", () => {
   });
 
   describe("BRIEF.md detection [HIER-11, HIER-12]", () => {
-    it("directory has both BRIEF.md and brief.md: hard error listing both paths [HIER-12]", async () => {
-      const dir = join(testDir, "conflict");
-      await mkdir(dir);
-      await writeFile(join(dir, "BRIEF.md"), "content1");
-      await writeFile(join(dir, "brief.md"), "content2");
-      await expect(
-        walkUpward(dir, { workspaceRoots: [testDir] }),
-      ).rejects.toThrow(/BRIEF\.md|brief\.md|multiple/i);
-    });
+    it.skipIf(process.platform === "win32")(
+      "directory has both BRIEF.md and brief.md: hard error listing both paths [HIER-12]",
+      async () => {
+        const dir = join(testDir, "conflict");
+        await mkdir(dir);
+        await writeFile(join(dir, "BRIEF.md"), "content1");
+        await writeFile(join(dir, "brief.md"), "content2");
+        await expect(
+          walkUpward(dir, { workspaceRoots: [testDir] }),
+        ).rejects.toThrow(/BRIEF\.md|brief\.md|multiple/i);
+      },
+    );
 
     it("directory has project-brief.md but no BRIEF.md: level skipped [HIER-11]", async () => {
       const dir = join(testDir, "nobrief");
@@ -304,7 +314,6 @@ describe("TASK-17: Property Tests", () => {
           { minLength: 1, maxLength: 10 },
         ),
         (filenames) => {
-          const { isBriefFile } = require("../../src/hierarchy/walker");
           // Only files named BRIEF.md (case-insensitive) should be considered
           const briefFiles = filenames.filter((f: string) => isBriefFile(f));
           briefFiles.forEach((f: string) => {
