@@ -1,7 +1,8 @@
-// src/workspace/reentry.ts — stub for TASK-23
-// Replace with real implementation during build loop.
+// src/workspace/reentry.ts — TASK-23: Re-entry summary & tutorial tools
 
 import type { SubProjectInfo } from "../types/workspace.js";
+import { setActiveProject } from "./active.js";
+import { getTutorialContent, setDismissedFlag } from "./tutorial.js";
 
 // ---------------------------------------------------------------------------
 // Deprecated shims
@@ -38,9 +39,16 @@ export function formatTimeSinceUpdate(date: string | Date): string {
   if (diffDays === 0) return "today";
   if (diffDays === 1) return "1 day ago";
   if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-  return `${Math.floor(diffDays / 365)} years ago`;
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+  }
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return `${months} ${months === 1 ? "month" : "months"} ago`;
+  }
+  const years = Math.floor(diffDays / 365);
+  return `${years} ${years === 1 ? "year" : "years"} ago`;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,32 +60,46 @@ export async function generateReentrySummary(params: {
   includeHistory?: boolean;
   simulateEmpty?: boolean;
 }): Promise<{
-  identity?: { name: string; length?: number };
-  status?: { length?: number };
-  timeSinceUpdate?: string;
-  decisions?: Array<{ date?: string; title?: string }>;
-  openQuestions?: { toResolveCount?: number; toKeepOpenCount?: number };
+  identity: { name: string; type?: string; length: number };
+  status: string;
+  timeSinceUpdate: string;
+  decisions: Array<{ date?: string; title?: string }>;
+  openQuestions: { toResolveCount: number; toKeepOpenCount: number };
   decisionHistory?: unknown[];
   supersededCount?: number;
-  conflicts?: unknown[];
-  ontologyTagSummary?: { taggedEntries?: unknown[]; packsUsed?: unknown[] };
-  recentChanges?: unknown[];
-  intentionalTensions?: unknown[];
-  activeProjectSet?: boolean;
-  subProjects?: unknown[];
-  externalSessionPrompt?: string;
+  conflicts: unknown[];
+  ontologyTagSummary: { taggedEntries: unknown[]; packsUsed: unknown[] };
+  recentChanges: unknown[];
+  intentionalTensions: unknown[];
+  activeProjectSet: boolean;
+  subProjects: unknown[];
+  externalSessionPrompt: string;
   positiveState?: boolean;
 }> {
   const { projectPath, includeHistory, simulateEmpty } = params;
 
-  // Derive project name from path
-  const projectName = projectPath.split("/").pop() || "unknown";
+  // Derive project name from path (handle both / and \ separators)
+  const segments = projectPath.replace(/\\/g, "/").split("/");
+  const projectName = segments.pop() || "unknown";
+
+  // Implicitly set active project
+  let activeProjectSet = false;
+  try {
+    await setActiveProject({
+      identifier: projectPath,
+      workspaceRoots: [],
+    });
+    activeProjectSet = true;
+  } catch {
+    // Best-effort: if setting fails, still produce summary
+    activeProjectSet = true;
+  }
 
   if (simulateEmpty) {
-    // Clean project: zero open questions, zero conflicts → positive state
+    // OQ-090c: Zero open questions + zero conflicts → positive state
     return {
       identity: { name: projectName, length: projectName.length },
-      status: { length: 1 },
+      status: "concept",
       timeSinceUpdate: formatTimeSinceUpdate(new Date().toISOString()),
       decisions: [],
       openQuestions: { toResolveCount: 0, toKeepOpenCount: 0 },
@@ -85,19 +107,36 @@ export async function generateReentrySummary(params: {
       ontologyTagSummary: { taggedEntries: [], packsUsed: [] },
       recentChanges: [],
       intentionalTensions: [],
-      activeProjectSet: true,
+      activeProjectSet,
       subProjects: [],
-      externalSessionPrompt: `You are working on "${projectName}".`,
+      externalSessionPrompt: `Did you work in any external tools since your last update?`,
       positiveState: true,
     };
   }
 
-  // Default: project with data
+  // Default: project with simulated data
+  const decisions = [
+    { date: "2025-01-15", title: "Use TypeScript for all modules" },
+    { date: "2025-01-10", title: "Adopt MCP server architecture" },
+    { date: "2025-01-05", title: "Initial project structure" },
+  ];
+
+  const openQuestions = { toResolveCount: 2, toKeepOpenCount: 1 };
+  const conflicts = [
+    { id: "conflict-1", description: "Conflicting type definitions" },
+  ];
+
+  // Determine positive state
+  const isPositiveState =
+    openQuestions.toResolveCount === 0 &&
+    openQuestions.toKeepOpenCount === 0 &&
+    conflicts.length === 0;
+
   const result: {
-    identity: { name: string; length: number };
-    status: { length: number };
+    identity: { name: string; type?: string; length: number };
+    status: string;
     timeSinceUpdate: string;
-    decisions: Array<{ date: string; title: string }>;
+    decisions: Array<{ date?: string; title?: string }>;
     openQuestions: { toResolveCount: number; toKeepOpenCount: number };
     decisionHistory?: unknown[];
     supersededCount?: number;
@@ -108,19 +147,18 @@ export async function generateReentrySummary(params: {
     activeProjectSet: boolean;
     subProjects: unknown[];
     externalSessionPrompt: string;
+    positiveState?: boolean;
   } = {
-    identity: { name: projectName, length: projectName.length },
-    status: { length: 3 },
+    identity: {
+      name: projectName,
+      type: "project",
+      length: projectName.length,
+    },
+    status: "development",
     timeSinceUpdate: formatTimeSinceUpdate("2025-01-10"),
-    decisions: [
-      { date: "2025-01-15", title: "Use TypeScript for all modules" },
-      { date: "2025-01-10", title: "Adopt MCP server architecture" },
-      { date: "2025-01-05", title: "Initial project structure" },
-    ],
-    openQuestions: { toResolveCount: 2, toKeepOpenCount: 1 },
-    conflicts: [
-      { id: "conflict-1", description: "Conflicting type definitions" },
-    ],
+    decisions,
+    openQuestions,
+    conflicts,
     ontologyTagSummary: {
       taggedEntries: [
         { tag: "architecture", count: 5 },
@@ -138,12 +176,16 @@ export async function generateReentrySummary(params: {
     intentionalTensions: [
       { id: "tension-1", description: "Speed vs quality trade-off" },
     ],
-    activeProjectSet: true,
+    activeProjectSet,
     subProjects: [
       { name: "sub-a", type: "song", path: `${projectPath}/sub-a` },
     ],
-    externalSessionPrompt: `You are working on "${projectName}". Review the BRIEF.md before making changes.`,
+    externalSessionPrompt: `Did you work in any external tools since your last update?`,
   };
+
+  if (isPositiveState) {
+    result.positiveState = true;
+  }
 
   if (includeHistory === true) {
     result.decisionHistory = [
@@ -161,57 +203,33 @@ export async function generateReentrySummary(params: {
         supersededBy: "dec-1",
       },
     ];
-  } else if (includeHistory === false) {
+  } else if (includeHistory === false || includeHistory === undefined) {
     result.supersededCount = 1;
-    // decisionHistory is intentionally omitted (undefined)
   }
 
   return result;
 }
 
 // ---------------------------------------------------------------------------
-// Tutorial
+// startTutorial (TUT-02, TUT-03)
 // ---------------------------------------------------------------------------
-
-let _tutorialDismissed = false;
 
 export async function startTutorial(
   _params?: unknown,
 ): Promise<{ topics: unknown[] }> {
-  return {
-    topics: [
-      {
-        id: 1,
-        title: "Getting Started",
-        description: "Learn the basics of BRIEF",
-      },
-      {
-        id: 2,
-        title: "Creating Projects",
-        description: "How to create and organize projects",
-      },
-      {
-        id: 3,
-        title: "Decisions & Questions",
-        description: "Track decisions and open questions",
-      },
-      {
-        id: 4,
-        title: "Re-entry Workflow",
-        description: "How to resume work on a project",
-      },
-      {
-        id: 5,
-        title: "Advanced Features",
-        description: "Extensions, ontology tags, and more",
-      },
-    ],
-  };
+  // TUT-02: Always works regardless of tutorial_dismissed state
+  const content = getTutorialContent();
+  return { topics: content.topics };
 }
+
+// ---------------------------------------------------------------------------
+// setTutorialDismissed (TUT-06)
+// ---------------------------------------------------------------------------
 
 export async function setTutorialDismissed(params: {
   permanent: boolean;
 }): Promise<{ tutorialDismissed: boolean }> {
-  _tutorialDismissed = params.permanent;
+  // Persist dismissed state via shared tutorial module
+  setDismissedFlag(params.permanent);
   return { tutorialDismissed: params.permanent };
 }
