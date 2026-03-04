@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { scanDownward } from "../../src/hierarchy/discovery";
+import {
+  scanDownward,
+  shouldScanDirectory,
+} from "../../src/hierarchy/discovery";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -237,9 +240,6 @@ describe("TASK-19: Property Tests", () => {
           { minLength: 1, maxLength: 10 },
         ),
         (dirNames) => {
-          const {
-            shouldScanDirectory,
-          } = require("../../src/hierarchy/discovery");
           const hiddenDirs = dirNames.filter((d: string) => d.startsWith("."));
           hiddenDirs.forEach((dir: string) => {
             expect(shouldScanDirectory(dir)).toBe(false);
