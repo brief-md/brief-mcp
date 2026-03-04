@@ -116,7 +116,9 @@ describe("TASK-32a: Ontology — Index Building", () => {
       // Verify the match was found VIA synonym — the matched entry's label differs from query
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].label).not.toBe("joyful"); // matched via synonym, term differs from query
-      expect(results).toContain(expect.objectContaining({ label: "happy" }));
+      expect(results).toContainEqual(
+        expect.objectContaining({ label: "happy" }),
+      );
     });
 
     it("pack-level synonym overrides global synonym for same term [ONT-04]", () => {
