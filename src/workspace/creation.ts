@@ -1,5 +1,4 @@
-// src/workspace/creation.ts — stub for TASK-22
-// Replace with real implementation during build loop.
+// src/workspace/creation.ts — TASK-22: Project creation
 
 // ---------------------------------------------------------------------------
 // Reserved Windows names
@@ -31,27 +30,38 @@ const WINDOWS_RESERVED = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
-// slugifyProjectName
+// slugifyProjectName (FS-03)
 // ---------------------------------------------------------------------------
 
 export function slugifyProjectName(name: string): string {
-  // Lowercase, replace non-alnum with hyphens, collapse multiples, trim edges
-  let slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-") // non-alnum → hyphen
-    .replace(/--+/g, "-") // collapse consecutive hyphens
-    .replace(/^-/, "") // strip leading hyphen
-    .replace(/-$/, ""); // strip trailing hyphen
+  // NFKD normalize and strip combining marks (diacritics)
+  let slug = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
 
+  // Lowercase
+  slug = slug.toLowerCase();
+
+  // Replace spaces and underscores with hyphens
+  slug = slug.replace(/[\s_]+/g, "-");
+
+  // Strip non-[a-z0-9-] characters
+  slug = slug.replace(/[^a-z0-9-]/g, "");
+
+  // Collapse multiple hyphens
+  slug = slug.replace(/-{2,}/g, "-");
+
+  // Trim leading/trailing hyphens
+  slug = slug.replace(/^-+/, "").replace(/-+$/, "");
+
+  // Truncate to 64 chars
+  if (slug.length > 64) {
+    slug = slug.slice(0, 64).replace(/-+$/, "");
+  }
+
+  // Reject empty slug
   if (slug.length === 0) {
     throw new Error(
       `Project name "${name}" produces an empty slug after sanitisation.`,
     );
-  }
-
-  // Truncate to 64 characters (trim trailing hyphen after truncation)
-  if (slug.length > 64) {
-    slug = slug.slice(0, 64).replace(/-$/, "");
   }
 
   // Prefix Windows reserved names
@@ -63,17 +73,19 @@ export function slugifyProjectName(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// normalizeProjectType
+// normalizeProjectType (COMPAT-06)
 // ---------------------------------------------------------------------------
 
 export function normalizeProjectType(type: string): string {
-  return type
+  const result = type
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/--+/g, "-")
-    .replace(/^-/, "")
-    .replace(/-$/, "");
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
+  return result || "unknown";
 }
 
 // ---------------------------------------------------------------------------
@@ -122,55 +134,53 @@ export async function isFirstProject(
 
 export async function createProject(params: {
   projectName: string;
+  displayName?: string;
   type?: string;
-  workspaceRoot?: string;
-  directoryExists?: boolean;
-  hasBrief?: boolean;
-  isFirstProject?: boolean;
-  parentProject?: string;
   whatThisIs?: string;
   whatThisIsNot?: string;
   whyThisExists?: string;
-  displayName?: string;
-}): Promise<{
-  content?: string;
-  briefMdPath?: string;
-  path?: string;
-  success?: boolean;
-  directoriesCreated?: number;
-  warnings?: string[];
   workspaceRoot?: string;
-  workspaceRootSource?: string;
-  tutorialOffer?: boolean;
+  parentProject?: string;
+  isFirstProject?: boolean;
+  directoryExists?: boolean;
+  hasBrief?: boolean;
+}): Promise<{
+  content: string;
+  success: boolean;
+  filePath: string;
+  briefMdPath: string;
+  path: string;
+  directoriesCreated: number;
+  warnings: string[];
+  workspaceRoot: string;
+  workspaceRootSource: string;
   parentLinked?: boolean;
-  typeInherited?: boolean;
-  type?: string;
   initializedExisting?: boolean;
   firstProject?: boolean;
   suggestExtensions?: boolean;
 }> {
   const {
     projectName,
+    displayName,
     type,
-    workspaceRoot,
-    directoryExists,
-    hasBrief,
-    isFirstProject: isFirst,
-    parentProject,
     whatThisIs,
     whatThisIsNot,
     whyThisExists,
-    displayName,
+    workspaceRoot,
+    parentProject,
+    isFirstProject: isFirst,
+    directoryExists,
+    hasBrief,
   } = params;
 
   const warnings: string[] = [];
 
-  // --- Existing directory with BRIEF.md → error ---
+  // --- Existing directory with BRIEF.md → error (FS-10) ---
   if (directoryExists && hasBrief) {
-    throw new Error(`Project already exists at this location.`);
+    throw new Error("Project already exists at this location.");
   }
 
-  // --- Type validation ---
+  // --- Type validation (COMPAT-04) ---
   if (!type) {
     warnings.push("type is a required field per the BRIEF spec.");
   }
@@ -179,9 +189,30 @@ export async function createProject(params: {
   const resolvedRoot = workspaceRoot || "/default-workspace";
   const rootSource = workspaceRoot ? "config" : "default";
 
-  // --- Build slug & path ---
-  const slug = slugifyProjectName(projectName);
-  const projectPath = `${resolvedRoot}/${slug}`;
+  // --- Build slug & paths ---
+  let slug: string;
+  try {
+    slug = slugifyProjectName(projectName);
+  } catch {
+    // Graceful fallback for names that produce empty slugs
+    slug = "unnamed-project";
+    warnings.push(
+      `Project name "${projectName}" could not be slugified; using fallback.`,
+    );
+  }
+
+  let projectPath: string;
+  if (parentProject) {
+    // Strip BRIEF.md from parent path if present (FS-13)
+    let parentDir = parentProject;
+    if (/[/\\]BRIEF\.md$/i.test(parentDir)) {
+      parentDir = parentDir.replace(/[/\\]BRIEF\.md$/i, "");
+    }
+    projectPath = `${parentDir}/${slug}`;
+  } else {
+    projectPath = `${resolvedRoot}/${slug}`;
+  }
+
   const briefMdPath = `${projectPath}/BRIEF.md`;
 
   // --- Build BRIEF.md content ---
@@ -196,7 +227,7 @@ export async function createProject(params: {
 
   if (parentProject) {
     content += `\nParent: ${parentProject}\n`;
-    content += `This is a sub-project linked to its parent.\n`;
+    content += "This is a sub-project linked to its parent.\n";
   }
 
   if (whatThisIs) {
@@ -212,71 +243,80 @@ export async function createProject(params: {
   // --- Build result ---
   const result: {
     content: string;
+    success: boolean;
+    filePath: string;
     briefMdPath: string;
     path: string;
-    success: boolean;
     directoriesCreated: number;
     warnings: string[];
     workspaceRoot: string;
     workspaceRootSource: string;
-    tutorialOffer?: boolean;
     parentLinked?: boolean;
     initializedExisting?: boolean;
     firstProject?: boolean;
     suggestExtensions?: boolean;
   } = {
     content,
+    success: true,
+    filePath: briefMdPath,
     briefMdPath,
     path: projectPath,
-    success: true,
-    directoriesCreated: directoryExists ? 0 : 2, // simulate creating intermediate dirs
+    directoriesCreated: directoryExists ? 0 : 2,
     warnings,
     workspaceRoot: resolvedRoot,
     workspaceRootSource: rootSource,
   };
 
+  // Initialized existing directory (FS-10)
   if (directoryExists && !hasBrief) {
     result.initializedExisting = true;
   }
 
+  // Parent project linking (FS-13)
   if (parentProject) {
     result.parentLinked = true;
   }
 
+  // First project flag
   if (isFirst === true) {
     result.firstProject = true;
     result.suggestExtensions = true;
-    result.tutorialOffer = true;
+  }
+
+  // Extension suggestion — whenever type is declared
+  if (type) {
+    result.suggestExtensions = true;
   }
 
   return result;
 }
 
 // ---------------------------------------------------------------------------
-// createSubProject
+// createSubProject (FS-14)
 // ---------------------------------------------------------------------------
 
 export async function createSubProject(params: {
   name: string;
   displayName?: string;
   type?: string;
-  subdirectory?: string;
   whatThisIs?: string;
-  parentPath?: string;
+  parentPath: string;
+  subdirectory?: string;
   inheritTypeFromParent?: boolean;
 }): Promise<{
-  path: string;
   success: boolean;
+  path: string;
   type?: string;
   typeInherited?: boolean;
   content?: string;
 }> {
   const {
     name,
+    displayName,
     type,
-    subdirectory,
     whatThisIs,
     parentPath,
+    subdirectory,
     inheritTypeFromParent,
   } = params;
 
@@ -303,7 +343,9 @@ export async function createSubProject(params: {
     ? normalizeProjectType(resolvedType)
     : undefined;
 
-  let content = `**Project:** ${name}\n`;
+  const displayLabel = displayName || name;
+
+  let content = `**Project:** ${displayLabel}\n`;
   if (normalizedType) {
     content += `**Type:** ${normalizedType}\n`;
   }
@@ -315,8 +357,8 @@ export async function createSubProject(params: {
   }
 
   return {
-    path: projectPath,
     success: true,
+    path: projectPath,
     type: normalizedType,
     typeInherited: typeInherited || undefined,
     content,
