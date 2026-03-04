@@ -16,10 +16,11 @@ describe("TASK-18: Hierarchy — Context Assembly & Formatting", () => {
   describe("broadest-first ordering [HIER-03]", () => {
     it("three-level hierarchy output ordered broadest-first (artist → album → song) [HIER-03]", async () => {
       // G-117: pass levels in REVERSE order (bottom-to-top as walker returns them) and verify broadest-first output
+      // depth mirrors walker convention: 0=broadest, higher=more-specific (scope)
       const levels = [
-        { project: "Echo Valley", type: "song", sections: [] },
-        { project: "Midnight Train", type: "album", sections: [] },
-        { project: "The Wanderers", type: "artist", sections: [] },
+        { project: "Echo Valley", type: "song", depth: 2, sections: [] },
+        { project: "Midnight Train", type: "album", depth: 1, sections: [] },
+        { project: "The Wanderers", type: "artist", depth: 0, sections: [] },
       ];
       const result = await assembleContext(levels);
       // Output should be reordered broadest-first: artist → album → song
@@ -372,6 +373,8 @@ describe("TASK-18: Property Tests", () => {
         fc.string({ minLength: 1, maxLength: 100 }),
         fc.string({ minLength: 1, maxLength: 100 }),
         async (parentDecision, childDecision) => {
+          // Guard: indexOf can't distinguish identical strings
+          fc.pre(parentDecision !== childDecision);
           const { mergeHierarchyContext } = await import(
             "../../src/hierarchy/context"
           );
