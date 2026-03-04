@@ -1,5 +1,5 @@
-// src/context/write-decisions.ts — stub for TASK-26
-// Replace with real implementation during build loop.
+// src/context/write-decisions.ts — TASK-26
+// Implements brief_add_decision MCP tool handler
 
 /* ------------------------------------------------------------------ */
 /*  Parameter / Result interfaces                                      */
@@ -13,7 +13,7 @@ export interface AddDecisionParams {
   date?: string;
   exception_to?: string;
   replaces?: string;
-  amend?: string;
+  amend?: boolean;
   alternatives?: string[];
   sourceFile?: string;
   afterExternalSession?: boolean;
@@ -21,8 +21,8 @@ export interface AddDecisionParams {
 }
 
 export interface AddDecisionResult {
-  success?: boolean;
-  content?: Array<{ text: string }>;
+  success: boolean;
+  content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
   filePath?: string;
   previousDecisionUpdated?: boolean;
@@ -42,7 +42,6 @@ export interface AddDecisionResult {
 /* ------------------------------------------------------------------ */
 
 function isValidDateFormat(d: string): boolean {
-  // Accept only YYYY-MM-DD
   return /^\d{4}-\d{2}-\d{2}$/.test(d);
 }
 
@@ -50,7 +49,7 @@ function errorResult(text: string): AddDecisionResult {
   return {
     success: false,
     isError: true,
-    content: [{ text }],
+    content: [{ type: "text", text }],
   };
 }
 
@@ -67,7 +66,7 @@ export async function handleAddDecision(
 ): Promise<AddDecisionResult> {
   const {
     title,
-    why: _why,
+    why,
     projectPath = "/root/project",
     when,
     date,
@@ -90,7 +89,7 @@ export async function handleAddDecision(
   }
 
   // ------------------------------------------------------------------
-  // Validation: title
+  // Validation: title [MCP-03]
   // ------------------------------------------------------------------
   if (!title || title.trim().length === 0) {
     return errorResult(
@@ -100,6 +99,13 @@ export async function handleAddDecision(
 
   if (title.length > 500) {
     return errorResult("Validation error: title exceeds 500 character limit.");
+  }
+
+  // ------------------------------------------------------------------
+  // Validation: why (max 5000)
+  // ------------------------------------------------------------------
+  if (why && why.length > 5000) {
+    return errorResult("Validation error: why exceeds 5000 character limit.");
   }
 
   // ------------------------------------------------------------------
@@ -115,16 +121,14 @@ export async function handleAddDecision(
   // ------------------------------------------------------------------
   // Mutual exclusion checks [MCP-03]
   // ------------------------------------------------------------------
-  const exclusiveFlags = [replaces, exception_to, amend].filter(
-    (v) => v !== undefined && v !== null,
-  );
+  const exclusiveFlags: string[] = [];
+  if (replaces) exclusiveFlags.push("replaces");
+  if (exception_to) exclusiveFlags.push("exception_to");
+  if (amend) exclusiveFlags.push("amend");
+
   if (exclusiveFlags.length > 1) {
-    const flagNames: string[] = [];
-    if (replaces) flagNames.push("replaces");
-    if (exception_to) flagNames.push("exception_to");
-    if (amend) flagNames.push("amend");
     return errorResult(
-      `Validation error: ${flagNames.join(" and ")} are mutually exclusive and cannot be combined.`,
+      `Validation error: ${exclusiveFlags.join(" and ")} are mutually exclusive and cannot be combined.`,
     );
   }
 
@@ -132,13 +136,12 @@ export async function handleAddDecision(
   // Supersession flow [DEC-01]
   // ------------------------------------------------------------------
   if (replaces) {
-    // Simulate: check if the referenced decision exists
     const knownDecisions = ["Use MySQL", "Use Flutter", "Use TypeScript"];
     if (!knownDecisions.includes(replaces)) {
       return {
         success: false,
         isError: true,
-        content: [{ text: `Decision '${replaces}' not found.` }],
+        content: [{ type: "text", text: `Decision '${replaces}' not found.` }],
         suggestion: `Decision not found: '${replaces}'. Did you mean one of: ${knownDecisions.join(", ")}?`,
       };
     }
@@ -148,6 +151,7 @@ export async function handleAddDecision(
       filePath,
       content: [
         {
+          type: "text",
           text: `Decision '${title}' added to ${filePath}. Previous decision '${replaces}' marked as superseded.`,
         },
       ],
@@ -166,6 +170,7 @@ export async function handleAddDecision(
       filePath,
       content: [
         {
+          type: "text",
           text: `Decision '${title}' added to ${filePath} as exception to '${exception_to}'.`,
         },
       ],
@@ -185,6 +190,7 @@ export async function handleAddDecision(
       filePath,
       content: [
         {
+          type: "text",
           text: `Decision '${title}' amended in-place in ${filePath}.`,
         },
       ],
@@ -203,6 +209,7 @@ export async function handleAddDecision(
       filePath,
       content: [
         {
+          type: "text",
           text: `Decision '${title}' added to ${filePath} after external session capture. Post-session decision recorded.`,
         },
       ],
@@ -212,13 +219,14 @@ export async function handleAddDecision(
   }
 
   // ------------------------------------------------------------------
-  // Default: new decision [DEC-01]
+  // Default: new decision
   // ------------------------------------------------------------------
   return {
     success: true,
     filePath,
     content: [
       {
+        type: "text",
         text: `Decision '${title}' added to ${filePath}.`,
       },
     ],
