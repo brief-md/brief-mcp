@@ -263,7 +263,7 @@ describe("TASK-10: Parser — Sections & Headings", () => {
       expect(section).toBeDefined();
       expect(section!.subsections).toBeDefined();
       expect(
-        section!.subsections.some((s: any) => /references/i.test(s.type)),
+        section!.subsections!.some((s: any) => /references/i.test(s.type)),
       ).toBe(true);
     });
 
