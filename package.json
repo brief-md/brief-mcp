@@ -28,11 +28,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0"
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "stream-json": "^1.9.1"
   },
   "devDependencies": {
     "@biomejs/biome": "latest",
     "@types/node": "^25.3.3",
+    "@types/stream-json": "^1.7.8",
     "@vitest/coverage-v8": "latest",
     "copyfiles": "latest",
     "fast-check": "latest",
