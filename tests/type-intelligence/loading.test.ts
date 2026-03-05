@@ -11,11 +11,11 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
     it("exact type match: correct guide returned with source metadata [COMPAT-07]", async () => {
       const result = await getTypeGuide({ type: "album" });
       expect(result.guide).toBeDefined();
-      expect(result.guide.type).toBe("album");
+      expect((result.guide as any).type).toBe("album");
       // G-313: assert source equals one of the allowed values; T40-02: 'user' and 'project' are not valid spec values
-      expect(result.guide.source).toBeDefined();
+      expect((result.guide as any).source).toBeDefined();
       expect(["bundled", "ai_generated", "community", "user_edited"]).toContain(
-        result.guide.source,
+        (result.guide as any).source,
       );
     });
 
@@ -61,7 +61,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
   describe("YAML handling [COMPAT-15]", () => {
     it("invalid YAML frontmatter: file treated as markdown body only, no structured metadata [COMPAT-15]", async () => {
       const result = await getTypeGuide({ type: "bad-yaml-guide" });
-      expect(result.guide.body).toBeDefined();
+      expect(result.guide!.body).toBeDefined();
       expect(result.yamlFallback).toBe(true);
     });
   });
@@ -70,7 +70,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
     it("two guides exist for same type (bundled + ai_generated): user-created guide takes precedence [COMPAT-13]", async () => {
       const result = await getTypeGuide({ type: "dual-guide-type" });
       // G-303: T40-01: spec value is 'user_edited' not 'user'
-      expect(result.guide.source).toBe("user_edited");
+      expect(result.guide!.source).toBe("user_edited");
     });
   });
 
@@ -78,7 +78,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
     it("type name with mixed case: normalised to lowercase before matching [COMPAT-07]", async () => {
       const lower = await getTypeGuide({ type: "album" });
       const mixed = await getTypeGuide({ type: "Album" });
-      expect(lower.guide.type).toBe(mixed.guide.type);
+      expect(lower.guide!.type).toBe(mixed.guide!.type);
     });
   });
 
@@ -104,9 +104,9 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
   describe("provenance [COMPAT-10]", () => {
     it("guide response always includes source field: provenance always present [COMPAT-10]", async () => {
       const result = await getTypeGuide({ type: "album" });
-      expect(result.guide.source).toBeDefined();
+      expect(result.guide!.source).toBeDefined();
       expect(["bundled", "ai_generated", "community", "user_edited"]).toContain(
-        result.guide.source,
+        result.guide!.source,
       );
     });
   });
@@ -118,7 +118,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
         simulateMtimeChange: true,
       });
       // G-304: assert source is the specific expected value 'user_edited'
-      expect(result.guide.source).toBe("user_edited");
+      expect(result.guide!.source).toBe("user_edited");
     });
 
     it("guide file mtime unchanged: source field not modified [COMPAT-10]", async () => {
@@ -215,7 +215,7 @@ describe("TASK-40: Property Tests", () => {
         fc.constantFrom("album", "film", "xyzunknown"),
         async (type) => {
           const result = await getTypeGuide({ type });
-          expect(result.guide.source).toBeDefined();
+          expect(result.guide!.source).toBeDefined();
         },
       ),
       { numRuns: 3 },

@@ -18,8 +18,8 @@ describe("TASK-24: Context — Read Tools", () => {
       expect(result).toBeDefined();
       expect(result.levels).toBeDefined();
       // G-163: assert levels.length > 0 and each level has required fields
-      expect(result.levels.length).toBeGreaterThan(0);
-      for (const level of result.levels) {
+      expect(result.levels!.length).toBeGreaterThan(0);
+      for (const level of result.levels!) {
         expect(level.label).toBeDefined();
         expect(level.project).toBeDefined();
       }
@@ -33,8 +33,8 @@ describe("TASK-24: Context — Read Tools", () => {
       expect(result).toBeDefined();
       // G-164: use result.sections directly (no ?? fallback), assert exact section name match
       expect(result.sections).toBeDefined();
-      expect(result.sections.length).toBeGreaterThan(0);
-      result.sections.forEach((s: any) => {
+      expect(result.sections!.length).toBeGreaterThan(0);
+      result.sections!.forEach((s: any) => {
         // Section name must exactly match a decisions-related section
         expect(s.name).toMatch(/^Key Decisions$/i);
       });
@@ -61,7 +61,8 @@ describe("TASK-24: Context — Read Tools", () => {
       }
       // Safe to compare without if-guard since we asserted length > 1
       expect(
-        result.activeDecisions[0].date >= result.activeDecisions[1].date,
+        (result.activeDecisions[0] as any).date >=
+          (result.activeDecisions[1] as any).date,
       ).toBe(true);
     });
 
@@ -119,7 +120,7 @@ describe("TASK-24: Context — Read Tools", () => {
         simulateEmpty: true,
       });
       expect(result.activeDecisions).toBeDefined();
-      expect(result.activeDecisions.length).toBe(0);
+      expect(result.activeDecisions!.length).toBe(0);
       expect(result.suggestions).toBeDefined();
     });
   });

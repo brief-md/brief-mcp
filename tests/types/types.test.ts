@@ -152,6 +152,7 @@ describe("TASK-02: Shared Types & Interfaces", () => {
     it("constructing an ontology search result has entry, score, and match field accessible [CODE-02]", () => {
       const entry: OntologyEntry = {
         id: "ent-001",
+        label: "Test Entry",
         name: "Test Entry",
         aliases: [],
         description: "A test entry",
@@ -174,6 +175,9 @@ describe("TASK-02: Shared Types & Interfaces", () => {
   describe("type guide types [CODE-02]", () => {
     it("constructing a type guide has bootstrapping flag accessible from metadata [CODE-02]", () => {
       const metadata: TypeGuideMetadata = {
+        type: "game",
+        source: "bundled",
+        version: "1.0.0",
         bootstrapping: true,
       };
       const guide: TypeGuide = {
@@ -253,7 +257,7 @@ describe("TASK-02: Shared Types & Interfaces", () => {
         description: "A signal",
       };
       const response: ToolResponse = {
-        content: ["Some content"],
+        content: [{ type: "text", text: "Some content" }],
         signals: [signal],
         warnings: ["A warning"],
       };
@@ -267,7 +271,7 @@ describe("TASK-02: Shared Types & Interfaces", () => {
       const config: BriefConfig = {
         workspace_roots: ["~/projects", "~/work"],
         log_level: "info",
-      } as BriefConfig;
+      } as unknown as BriefConfig;
       expect(config.workspace_roots).toHaveLength(2);
       expect(Array.isArray(config.workspace_roots)).toBe(true);
     });
@@ -276,6 +280,8 @@ describe("TASK-02: Shared Types & Interfaces", () => {
   describe("extension types [CODE-02]", () => {
     it("constructing an Extension has slug, displayName, and sections accessible [CODE-02]", () => {
       const ext: Extension = {
+        name: "game-extension",
+        heading: "Game Extension",
         slug: "game-extension",
         displayName: "Game Extension",
         sections: ["Game Design", "Mechanics"],
@@ -289,19 +295,23 @@ describe("TASK-02: Shared Types & Interfaces", () => {
 
     it("constructing an ExtensionSuggestion has extensionSlug and reason accessible [CODE-02]", () => {
       const suggestion: ExtensionSuggestion = {
-        extensionSlug: "game-extension",
+        name: "game-extension",
         reason: "Project appears to be a game",
-        confidence: 0.9,
+        confidence: "high",
+        sourceTier: 1,
       };
-      expect(suggestion.extensionSlug).toBe("game-extension");
+      expect(suggestion.name).toBe("game-extension");
       expect(suggestion.reason).toBeDefined();
-      expect(suggestion.confidence).toBeGreaterThan(0);
+      expect(suggestion.confidence).toBeDefined();
     });
   });
 
   describe("reference types [CODE-02]", () => {
     it("constructing a Reference has id, creator, title accessible [CODE-02]", () => {
       const ref: Reference = {
+        fromId: "ent-001",
+        toId: "ent-002",
+        relationshipType: "related",
         id: "ref-001",
         creator: "Sean Penn",
         title: "Into the Wild",
@@ -315,6 +325,11 @@ describe("TASK-02: Shared Types & Interfaces", () => {
 
     it("constructing a ReferenceLink has pack and id accessible [CODE-02]", () => {
       const link: ReferenceLink = {
+        sourcePack: "cinema-pack",
+        sourceEntry: "ref-001",
+        targetPack: "cinema-pack",
+        targetEntry: "ref-002",
+        relationship: "related",
         pack: "cinema-pack",
         id: "ref-001",
       };
@@ -353,6 +368,7 @@ describe("TASK-02: Shared Types & Interfaces", () => {
   describe("PackConfig type [CODE-02, T02-05]", () => {
     it("constructing a PackConfig has id, path, and enabled fields [CODE-02, T02-05]", () => {
       const config: PackConfig = {
+        packId: "cinema-pack",
         id: "cinema-pack",
         path: "~/.brief/packs/cinema-pack",
         enabled: true,

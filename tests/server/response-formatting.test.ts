@@ -36,7 +36,7 @@ describe("TASK-46: MCP Server — Tool Response Formatting & Context Blocks", ()
         type: "read",
         data: { content: "test" },
       });
-      expect(response.modified).toBeUndefined();
+      expect((response as any).modified).toBeUndefined();
       expect(writeFileSpy).not.toHaveBeenCalled();
       writeFileSpy.mockRestore();
     });
@@ -85,8 +85,10 @@ describe("TASK-46: MCP Server — Tool Response Formatting & Context Blocks", ()
         ...separated.activeDecisions,
         ...separated.decisionHistory,
       ]) {
-        expect(d.status).toBeDefined();
-        expect(["active", "superseded", "exception"]).toContain(d.status);
+        expect((d as any).status).toBeDefined();
+        expect(["active", "superseded", "exception"]).toContain(
+          (d as any).status,
+        );
       }
     });
   });
@@ -245,10 +247,10 @@ describe("TASK-46: Property Tests", () => {
         (decisions) => {
           const separated = separateDecisions(decisions);
           for (const d of separated.activeDecisions) {
-            expect(d.status).toBe("active");
+            expect((d as any).status).toBe("active");
           }
           for (const d of separated.decisionHistory) {
-            expect(["superseded", "exception"]).toContain(d.status);
+            expect(["superseded", "exception"]).toContain((d as any).status);
           }
         },
       ),
@@ -267,7 +269,7 @@ describe("TASK-46: Property Tests", () => {
             ...separated.decisionHistory,
           ];
           for (const d of all) {
-            expect(d.status).toBeDefined();
+            expect((d as any).status).toBeDefined();
           }
         },
       ),

@@ -191,7 +191,7 @@ describe("TASK-29: Validation — Lint Tool", () => {
       expect(info.length).toBeGreaterThan(0);
       // Use canonical property `findings` — not `warnings`
       expect(
-        result.findings.find((w: any) => w.code === "DUPLICATE_ACTIVE")
+        result.findings.find((w: any) => w.code === "DUPLICATE_ACTIVE")!
           .severity,
       ).toBe("info");
     });
@@ -209,7 +209,7 @@ describe("TASK-29: Validation — Lint Tool", () => {
       expect(warnings.length).toBeGreaterThan(0);
       // Use canonical property `findings` — not `warnings`
       expect(
-        result.findings.find((w: any) => w.code === "INVALID_PACK_NAME")
+        result.findings.find((w: any) => w.code === "INVALID_PACK_NAME")!
           .severity,
       ).toBe("warning");
     });

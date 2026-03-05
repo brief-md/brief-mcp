@@ -158,6 +158,7 @@ export async function createProject(params: {
   initializedExisting?: boolean;
   firstProject?: boolean;
   suggestExtensions?: boolean;
+  tutorialOffer?: boolean;
 }> {
   const {
     projectName,
@@ -255,6 +256,7 @@ export async function createProject(params: {
     initializedExisting?: boolean;
     firstProject?: boolean;
     suggestExtensions?: boolean;
+    tutorialOffer?: boolean;
   } = {
     content,
     success: true,

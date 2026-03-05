@@ -167,7 +167,7 @@ describe("TASK-15b: Writer — Exceptions, Amendments & Question Resolution", ()
       // G-101: standardize to resolutionSummary as canonical camelCase property
       expect(result.resolutionSummary).toBeDefined();
       expect(typeof result.resolutionSummary).toBe("string");
-      expect(result.resolutionSummary.length).toBeGreaterThan(0);
+      expect(result.resolutionSummary!.length).toBeGreaterThan(0);
     });
   });
 

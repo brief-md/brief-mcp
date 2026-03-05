@@ -45,7 +45,7 @@ describe("TASK-39: Reference — Writing", () => {
         ontologyLinks: [{ pack: "theme-pack", entryId: "freedom" }],
       });
       expect(result.refLinkComments).toBeDefined();
-      expect(result.refLinkComments.length).toBe(1);
+      expect(result.refLinkComments!.length).toBe(1);
       // G-292: assert link content matches <!-- brief:ref-link {pack} {id} --> format [T39-03, T39-04]
       expect(result.refLinkComments[0].text).toContain("theme-pack");
       expect(result.refLinkComments[0].text).toContain("freedom");
@@ -64,7 +64,7 @@ describe("TASK-39: Reference — Writing", () => {
           { pack: "theme-pack", entryId: "nature" },
         ],
       });
-      expect(result.refLinkComments.length).toBe(2);
+      expect(result.refLinkComments!.length).toBe(2);
       // G-293: assert each link contains expected text
       expect(result.refLinkComments[0].text).toContain("freedom");
       expect(result.refLinkComments[1].text).toContain("nature");
@@ -148,7 +148,7 @@ describe("TASK-39: Reference — Writing", () => {
       expect(result.contentPreserved).toBe(true);
       expect(result.originalContent).toBeDefined();
       expect(result.afterContent).toContain(
-        result.originalContent.slice(0, 50),
+        (result.originalContent as any).slice(0, 50),
       );
     });
   });
@@ -190,7 +190,7 @@ describe("TASK-39: Property Tests", () => {
             ontologyLinks: [{ pack: "test-pack", entryId: "e1" }],
           });
           expect(result.refLinkComments).toBeDefined();
-          expect(result.refLinkComments.length).toBeGreaterThan(0);
+          expect(result.refLinkComments!.length).toBeGreaterThan(0);
         },
       ),
       { numRuns: 5 },

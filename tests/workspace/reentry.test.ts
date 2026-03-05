@@ -36,7 +36,9 @@ describe("TASK-23: Workspace — Re-Entry & Tutorial", () => {
       // G-156: ensure test data has at least 2 decisions to eliminate the conditional guard
       expect(result.decisions.length).toBeGreaterThan(1);
       // Now safe to compare without an if-guard
-      expect(result.decisions[0].date >= result.decisions[1].date).toBe(true);
+      expect(
+        (result.decisions[0] as any).date >= (result.decisions[1] as any).date,
+      ).toBe(true);
     });
 
     it("re-enter project with open questions: counts and items included [ARCH-06]", async () => {
@@ -57,7 +59,7 @@ describe("TASK-23: Workspace — Re-Entry & Tutorial", () => {
       });
       expect(result.decisionHistory).toBeDefined();
       expect(Array.isArray(result.decisionHistory)).toBe(true);
-      expect(result.decisionHistory.length).toBeGreaterThan(0);
+      expect(result.decisionHistory!.length).toBeGreaterThan(0);
     });
 
     it("without include_history: only active decisions, superseded count only [DEC-03]", async () => {
@@ -141,8 +143,10 @@ describe("TASK-23: Workspace — Re-Entry & Tutorial", () => {
       // Recent changes should include at least one entry with a timestamp
       expect(Array.isArray(result.recentChanges)).toBe(true);
       if (result.recentChanges.length > 0) {
-        expect(result.recentChanges[0].timestamp).toBeDefined();
-        expect(result.recentChanges[0].timestamp).toMatch(/\d{4}-\d{2}-\d{2}/);
+        expect((result.recentChanges[0] as any).timestamp).toBeDefined();
+        expect((result.recentChanges[0] as any).timestamp).toMatch(
+          /\d{4}-\d{2}-\d{2}/,
+        );
       }
     });
   });

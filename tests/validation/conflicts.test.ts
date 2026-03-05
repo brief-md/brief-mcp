@@ -218,7 +218,7 @@ describe("TASK-30: Validation — Conflict Detection", () => {
       // Verify get_context does not invoke conflict detection
       const spy = vi.spyOn(conflictModule, "checkConflicts");
       const { getContext } = await import("../../src/context/read");
-      const result = await getContext({ project: "test-project" });
+      const result = await getContext({ project: "test-project" } as any);
       expect(result).toBeDefined();
       expect(result.conflicts).toBeUndefined(); // conflicts not included unless explicitly requested
       expect(spy).not.toHaveBeenCalled();

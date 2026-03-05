@@ -435,3 +435,6 @@ export async function parseBriefMdFile(
 ): Promise<ParsedBriefMd> {
   throw new Error("Not implemented: parseBriefMdFile");
 }
+
+/** Alias for preprocess — used by performance benchmarks */
+export const parse = preprocess;

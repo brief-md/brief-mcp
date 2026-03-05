@@ -29,7 +29,7 @@ describe("TASK-36: Ontology — Tagging Tool", () => {
       // T36-02: label must also be present IN the HTML comment output (not just result.label)
       expect(result.label).toBeDefined();
       expect(typeof result.label).toBe("string");
-      expect(result.label.length).toBeGreaterThan(0);
+      expect(result.label!.length).toBeGreaterThan(0);
       expect(result.comment).toContain(result.label);
     });
 

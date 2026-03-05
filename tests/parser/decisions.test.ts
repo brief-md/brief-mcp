@@ -36,14 +36,14 @@ describe("TASK-11: Parser — Decisions & Questions", () => {
       expect(result[0].what).toContain("PostgreSQL");
       expect(result[0].why).toContain("JSON support");
       expect(result[0].when).toBe("2025-06-01");
-      expect(result[0].alternativesConsidered).toBeDefined();
+      expect(result[0]!.alternativesConsidered).toBeDefined();
       expect(
-        result[0].alternativesConsidered.some((a: any) =>
+        result[0]!.alternativesConsidered!.some((a: any) =>
           /MySQL/i.test(String(a)),
         ),
       ).toBe(true);
       expect(
-        result[0].alternativesConsidered.some((a: any) =>
+        result[0]!.alternativesConsidered!.some((a: any) =>
           /MongoDB/i.test(String(a)),
         ),
       ).toBe(true);

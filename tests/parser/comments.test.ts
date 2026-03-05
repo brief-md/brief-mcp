@@ -5,6 +5,7 @@ import {
   isInsideCodeBlock,
   parseComments,
 } from "../../src/parser/comments";
+import type { OntologyTag, RefLinkTag } from "../../src/types/parser";
 
 // ---------------------------------------------------------------------------
 // Unit Tests
@@ -18,16 +19,18 @@ describe("TASK-12: Parser — HTML Comments & Tags", () => {
       const result = parseComments(input);
       const tag = result.tags.find((t) => t.type === "ontology");
       expect(tag).toBeDefined();
-      expect(tag!.pack).toBe("theme-pack");
-      expect(tag!.entryId).toBe("entry-123");
-      expect(tag!.label).toBe("Dark Theme");
+      expect((tag! as OntologyTag).pack).toBe("theme-pack");
+      expect((tag! as OntologyTag).entryId).toBe("entry-123");
+      expect((tag! as OntologyTag).label).toBe("Dark Theme");
     });
 
     it("label containing spaces inside quotes extracts full quoted string intact [PARSE-07]", () => {
       const input =
         '<!-- brief:ontology pack id "Label With Many Spaces" -->\n';
       const result = parseComments(input);
-      expect(result.tags[0].label).toBe("Label With Many Spaces");
+      expect((result.tags[0] as OntologyTag).label).toBe(
+        "Label With Many Spaces",
+      );
     });
   });
 
@@ -37,8 +40,8 @@ describe("TASK-12: Parser — HTML Comments & Tags", () => {
       const result = parseComments(input);
       const tag = result.tags.find((t) => t.type === "ref-link");
       expect(tag).toBeDefined();
-      expect(tag!.pack).toBe("music-pack");
-      expect(tag!.entryId).toBe("coltrane-01");
+      expect((tag! as RefLinkTag).pack).toBe("music-pack");
+      expect((tag! as RefLinkTag).entryId).toBe("coltrane-01");
     });
   });
 
@@ -128,7 +131,7 @@ describe("TASK-12: Parser — HTML Comments & Tags", () => {
         '<!--\n  brief:ontology   pack\n  id   "Multi Line Label"\n-->\n';
       const result = parseComments(input);
       expect(result.tags).toHaveLength(1);
-      expect(result.tags[0].label).toBe("Multi Line Label");
+      expect((result.tags[0] as OntologyTag).label).toBe("Multi Line Label");
     });
 
     it("nested <!-- inside open comment is ignored, first opener/closer pair used [PARSE-20]", () => {
@@ -159,7 +162,7 @@ describe("TASK-12: Parser — HTML Comments & Tags", () => {
       // Parser should handle -- leniently — tag is extracted (not dropped)
       expect(result.tags.length).toBeGreaterThan(0);
       // The label should be preserved with its dashes intact
-      const tag = result.tags[0];
+      const tag = result.tags[0] as OntologyTag;
       expect(tag.label).toContain("Dashes");
     });
 
@@ -292,9 +295,9 @@ describe("TASK-12: Property Tests", () => {
           const input = `Paragraph\n<!-- brief:ontology ${pack} ${id} "${label}" -->\n`;
           const result = parseComments(input);
           expect(result.tags).toHaveLength(1);
-          expect(result.tags[0].pack).toBe(pack);
-          expect(result.tags[0].entryId).toBe(id);
-          expect(result.tags[0].label).toBe(label);
+          expect((result.tags[0] as OntologyTag).pack).toBe(pack);
+          expect((result.tags[0] as OntologyTag).entryId).toBe(id);
+          expect((result.tags[0] as OntologyTag).label).toBe(label);
         },
       ),
     );
@@ -314,7 +317,7 @@ describe("TASK-12: Property Tests", () => {
           expect(Array.isArray(result.tags)).toBe(true);
           expect(typeof result.content).toBe("string");
           if (result.tags.length > 0) {
-            const comment = result.tags[0];
+            const comment = result.tags[0] as OntologyTag;
             // G-077: whitespace normalization check (acceptable, leave as trim())
             if (comment.body !== undefined) {
               expect(comment.body).toBe(comment.body.trim());

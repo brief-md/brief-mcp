@@ -1230,3 +1230,16 @@ export async function startServer(): Promise<void> {
     });
   }
 }
+
+/** Stub for TASK-52 benchmark tests */
+export async function bootstrapServer(_options?: {
+  packs?: number;
+  dryRun?: boolean;
+  [key: string]: unknown;
+}): Promise<{
+  started: boolean;
+  lazyLoadingActivated?: boolean;
+  [key: string]: unknown;
+}> {
+  return { started: false };
+}

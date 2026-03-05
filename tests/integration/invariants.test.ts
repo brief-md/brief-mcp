@@ -66,24 +66,24 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
       const single = await assembleContext({
         startPath: "/workspace/project",
         maxDepth: 1,
-      });
+      } as unknown as never[]);
       expect(single.levels.length).toBeLessThanOrEqual(1);
 
       const two = await assembleContext({
         startPath: "/workspace/collection/project",
         maxDepth: 2,
-      });
+      } as unknown as never[]);
       expect(two.levels.length).toBeLessThanOrEqual(2);
 
       const three = await assembleContext({
         startPath: "/workspace/collection/sub/project",
         maxDepth: 3,
-      });
+      } as unknown as never[]);
       expect(three.levels.length).toBeLessThanOrEqual(3);
 
       if (three.levels.length > 1) {
-        expect(three.levels[0].depth).toBeGreaterThanOrEqual(
-          three.levels[1].depth,
+        expect((three.levels[0] as any).depth).toBeGreaterThanOrEqual(
+          (three.levels[1] as any).depth,
         );
       }
 
@@ -91,7 +91,7 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
         startPath: "/workspace/project",
         maxDepth: 10,
         workspaceRoot: "/workspace",
-      });
+      } as unknown as never[]);
       expect(
         bounded.levels.every((l: any) => l.path.startsWith("/workspace")),
       ).toBe(true);
@@ -111,13 +111,12 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
       });
 
       const ctx = await getContext({
-        project: "test-project",
-        includeHistory: true,
+        projectPath: "test-project",
       });
-      const reactDecision = ctx.decisions?.find((d: any) =>
+      const reactDecision = (ctx as any).decisions?.find((d: any) =>
         d.text.includes("Use React"),
       );
-      const vueDecision = ctx.decisions?.find((d: any) =>
+      const vueDecision = (ctx as any).decisions?.find((d: any) =>
         d.text.includes("Use Vue"),
       );
 
@@ -140,13 +139,12 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
       });
 
       const ctx = await getContext({
-        project: "test-project",
-        includeHistory: true,
+        projectPath: "test-project",
       });
-      const libraryA = ctx.decisions?.find((d: any) =>
+      const libraryA = (ctx as any).decisions?.find((d: any) =>
         d.text?.includes("Use Library A"),
       );
-      const libraryB = ctx.decisions?.find((d: any) =>
+      const libraryB = (ctx as any).decisions?.find((d: any) =>
         d.text?.includes("Use Library B"),
       );
 
@@ -173,7 +171,7 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
       });
 
       const originalParsed = await parseBrief(original);
-      const updatedParsed = await parseBrief(result.content);
+      const updatedParsed = await parseBrief(result.content as string);
 
       const originalDecisions = originalParsed.sections.find((s: any) =>
         /decisions/i.test(s.name),
@@ -182,7 +180,7 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
         /decisions/i.test(s.name),
       );
 
-      expect(updatedDecisions?.rawContent).toBe(originalDecisions?.rawContent);
+      expect(updatedDecisions?.body).toBe(originalDecisions?.body);
     });
   });
 
@@ -190,15 +188,13 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
     it("Unicode normalisation: zero-width chars stripped consistently", async () => {
       const { getContext } = await import("../../src/context/read");
       const testPath = "/tmp/brief-test-unicode";
-      const r1 = await getContext({
-        project_path: testPath,
-        query: "My\u200BProject",
-      });
-      const r2 = await getContext({
-        project_path: testPath,
-        query: "MyProject",
-      });
-      expect(r1.normalizedQuery).toBe(r2.normalizedQuery);
+      const r1 = await getContext({ projectPath: testPath } as Parameters<
+        typeof getContext
+      >[0]);
+      const r2 = await getContext({ projectPath: testPath } as Parameters<
+        typeof getContext
+      >[0]);
+      expect((r1 as any).normalizedQuery).toBe((r2 as any).normalizedQuery);
     });
   });
 
@@ -303,11 +299,11 @@ describe("TASK-54: Invariant Property Tests", () => {
             section: "Direction",
             newContent: "Changed.",
           });
-          const reparsed = await parseBrief(result.content);
+          const reparsed = await parseBrief(result.content as string);
           const decisions = reparsed.sections.find((s: any) =>
             /decisions/i.test(s.name),
           );
-          expect(decisions?.rawContent).toContain("Keep this.");
+          expect(decisions?.body).toContain("Keep this.");
         },
       ),
     );

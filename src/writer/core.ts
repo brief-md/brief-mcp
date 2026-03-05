@@ -126,7 +126,7 @@ function updateTimestamp(content: string, date: string): string {
 function formatSectionBody(newContent: string): string {
   const trimmed = newContent.trimEnd();
   if (!trimmed) return "\n";
-  return "\n\n" + trimmed + "\n";
+  return `\n\n${trimmed}\n`;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ export function detectLineEnding(content: string): "CRLF" | "LF" {
  * Collapses multiple trailing newline characters to a single \n.
  */
 export function ensureTrailingNewline(content: string): string {
-  return content.replace(/[\r\n]+$/, "") + "\n";
+  return `${content.replace(/[\r\n]+$/, "")}\n`;
 }
 
 /**
@@ -182,7 +182,7 @@ export async function writeSection(
       sectionName,
       target.headingText,
     );
-    const headingLine = "#".repeat(target.level) + " " + canonicalHeading;
+    const headingLine = `${"#".repeat(target.level)} ${canonicalHeading}`;
     const before = normalized.slice(0, target.headingStart);
     const after = normalized.slice(target.bodyEnd);
     const bodyContent = formatSectionBody(newContent);
@@ -190,10 +190,10 @@ export async function writeSection(
   } else {
     // Section not found — append as new section at end
     const canonicalHeading = resolveCanonicalName(sectionName);
-    const headingLine = "## " + canonicalHeading;
+    const headingLine = `## ${canonicalHeading}`;
     const trimmed = normalized.replace(/\n+$/, "");
     const bodyContent = formatSectionBody(newContent);
-    result = trimmed + "\n\n" + headingLine + bodyContent;
+    result = `${trimmed}\n\n${headingLine}${bodyContent}`;
   }
 
   // Update **Updated:** timestamp (WRITE-03)
@@ -254,7 +254,7 @@ export async function createNewFile(params: {
     for (const [sectionName, body] of Object.entries(params.sectionContent)) {
       const canonical = resolveCanonicalName(sectionName);
       const bodyContent = formatSectionBody(body);
-      content += "\n## " + canonical + bodyContent;
+      content += `\n## ${canonical}${bodyContent}`;
     }
   }
 
@@ -344,4 +344,11 @@ export function reassembleFile(
 /** @deprecated Use detectLineEnding instead */
 export function detectLineEndingStyle(content: string): "lf" | "crlf" {
   return detectLineEnding(content).toLowerCase() as "lf" | "crlf";
+}
+
+/** Stub: serialise a parsed BRIEF.md back to a string (to be implemented). */
+export async function writeBrief(
+  _parsed: import("../types/parser.js").ParsedBriefMd,
+): Promise<string> {
+  return "";
 }

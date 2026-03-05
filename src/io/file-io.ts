@@ -385,3 +385,16 @@ export async function readFileSafe(filePath: string): Promise<string> {
     release();
   }
 }
+
+/** Read a file with an optional timeout (stub — timeout is not yet enforced). */
+export async function readWithTimeout(
+  filePath: string,
+  _options?: {
+    timeoutMs?: number;
+    simulateSlowRead?: boolean;
+    [key: string]: unknown;
+  },
+): Promise<{ content: string }> {
+  const content = await readFileSafe(filePath);
+  return { content };
+}

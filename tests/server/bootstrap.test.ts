@@ -409,7 +409,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
   describe("rate limiting [MCP-03]", () => {
     it("50 read calls/sec succeed; burst exhausted + 1 more gets rate limit error [MCP-03]", async () => {
       // Simulate burst of read calls
-      const results = [];
+      const results: Promise<any>[] = [];
       for (let i = 0; i < 101; i++) {
         results.push(
           handleToolCall({ name: "brief_list_projects", arguments: {} }),
@@ -435,7 +435,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
     });
 
     it("10 write calls/sec succeed; burst exhausted + 1 more gets rate limit error [MCP-03]", async () => {
-      const results = [];
+      const results: Promise<any>[] = [];
       for (let i = 0; i < 21; i++) {
         results.push(
           handleToolCall({

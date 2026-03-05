@@ -211,7 +211,7 @@ describe("TASK-03: Logger & Observability", () => {
 
   describe("timing direct API [OBS-05]", () => {
     it("startTimer / stopTimer direct API returns elapsed ms [OBS-05]", () => {
-      const timer = startTimer();
+      const timer = startTimer("timing-test");
       expect(timer).toBeDefined();
       // Simulate some passage of time
       const elapsed = stopTimer(timer);
@@ -250,7 +250,7 @@ describe("TASK-03: Logger & Observability", () => {
       const metrics = createMetricsCollector();
       metrics.increment("toolCalls", "brief_get_context");
       metrics.increment("toolCalls", "brief_get_context");
-      const all = metrics.getAll();
+      const all = metrics.getAll() as any;
       expect(all.toolCalls.brief_get_context).toBe(2);
     });
 
@@ -258,7 +258,7 @@ describe("TASK-03: Logger & Observability", () => {
       const metrics = createMetricsCollector();
       metrics.increment("toolCalls", "brief_get_context");
       metrics.increment("toolCalls", "brief_lint");
-      const all = metrics.getAll();
+      const all = metrics.getAll() as any;
       expect(all.toolCalls.brief_get_context).toBe(1);
       expect(all.toolCalls.brief_lint).toBe(1);
     });
@@ -290,7 +290,7 @@ describe("TASK-03: Logger & Observability", () => {
       metrics.increment("fileWrites", "write-brief-md");
       metrics.increment("ontologySearches", "search-cinema-pack");
       metrics.increment("parseOperations", "parse-decisions");
-      const all = metrics.getAll();
+      const all = metrics.getAll() as any;
       expect(all.fileReads["read-brief-md"]).toBe(1);
       expect(all.fileWrites["write-brief-md"]).toBe(1);
       expect(all.ontologySearches["search-cinema-pack"]).toBe(1);

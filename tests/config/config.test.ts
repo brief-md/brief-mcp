@@ -135,7 +135,7 @@ describe("TASK-06: Configuration Manager", () => {
     it("runtime update adding workspace reflects in config.json on disk immediately [CONF-04]", async () => {
       const config = await loadConfig();
       const result = await updateConfig({
-        workspaces: [...(config.workspaces ?? []), "/new/root"],
+        workspaces: [...((config.workspaces as string[]) ?? []), "/new/root"],
       });
       expect(result).toBeDefined();
       expect(result.saved).toBe(true);

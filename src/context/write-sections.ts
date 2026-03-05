@@ -352,3 +352,10 @@ export async function handleCaptureExternalSession(
     ],
   };
 }
+
+/** Flexible alias for tests — accepts any param shape and forwards to handleUpdateSection. */
+export async function updateSection(
+  params: Record<string, unknown>,
+): Promise<UpdateSectionResult> {
+  return handleUpdateSection(params as unknown as UpdateSectionOptions);
+}

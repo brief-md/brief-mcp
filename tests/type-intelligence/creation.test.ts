@@ -253,7 +253,9 @@ describe("TASK-41: Property Tests", () => {
               body: "# Guide",
             });
             expect(result.aliases).toBeDefined();
-            expect(new Set(result.aliases).size).toBe(result.aliases.length);
+            expect(new Set(result.aliases as any).size).toBe(
+              (result.aliases as any).length,
+            );
           } catch (e: any) {
             // Collision errors are expected for conflicting aliases
             expect(e.message).toMatch(/alias|conflict|collision/i);

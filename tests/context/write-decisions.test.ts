@@ -52,7 +52,7 @@ describe("TASK-26: Context Write — Decisions", () => {
       const result = await handleAddDecision({
         title: "Use TypeScript",
         why: "Updated rationale",
-        amend: "Use TypeScript",
+        amend: true,
       });
       expect(result.success).toBe(true);
       expect(result.whenDatePreserved).toBe(true);
@@ -78,7 +78,7 @@ describe("TASK-26: Context Write — Decisions", () => {
       const result = await handleAddDecision({
         title: "Test",
         why: "Test",
-        amend: "Existing",
+        amend: true,
         replaces: "Other",
       });
       expect(result.isError).toBe(true);
@@ -89,7 +89,7 @@ describe("TASK-26: Context Write — Decisions", () => {
       const result = await handleAddDecision({
         title: "Test",
         why: "Test",
-        amend: "Existing Decision",
+        amend: true,
         exception_to: "Other Decision",
       });
       expect(result.isError).toBe(true);

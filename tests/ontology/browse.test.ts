@@ -102,7 +102,8 @@ describe("TASK-34: Ontology — Browsing & Entry Retrieval", () => {
       expect(
         result.entries.every(
           (e: any) =>
-            e.depth < result.queryDepth || e.level < result.queryLevel,
+            e.depth < (result as any).queryDepth ||
+            e.level < (result as any).queryLevel,
         ),
       ).toBe(true);
     });
@@ -122,7 +123,8 @@ describe("TASK-34: Ontology — Browsing & Entry Retrieval", () => {
       expect(
         result.entries.every(
           (e: any) =>
-            e.depth > result.queryDepth || e.level > result.queryLevel,
+            e.depth > (result as any).queryDepth ||
+            e.level > (result as any).queryLevel,
         ),
       ).toBe(true);
     });
@@ -152,12 +154,12 @@ describe("TASK-34: Ontology — Browsing & Entry Retrieval", () => {
       expect(result.entries.some((e: any) => e.isChild)).toBe(true);
       expect(result.entries.some((e: any) => e.isSibling)).toBe(true);
       // Structural check: at least one entry at each relationship level
-      expect(result.entries.some((e: any) => e.depth < result.queryDepth)).toBe(
-        true,
-      ); // parent
-      expect(result.entries.some((e: any) => e.depth > result.queryDepth)).toBe(
-        true,
-      ); // child
+      expect(
+        result.entries.some((e: any) => e.depth < (result as any).queryDepth),
+      ).toBe(true); // parent
+      expect(
+        result.entries.some((e: any) => e.depth > (result as any).queryDepth),
+      ).toBe(true); // child
     });
 
     it("circular parent chain: traversal breaks with warning, partial results returned [ONT-18]", async () => {

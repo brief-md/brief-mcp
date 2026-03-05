@@ -25,7 +25,7 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
       expect(result.success).toBe(true);
       // G-138: assert the active project is now set to the expected name
       expect(result.activeProject).toBeDefined();
-      expect(result.activeProject.name).toBe("My Project");
+      expect(result.activeProject!.name).toBe("My Project");
     });
 
     it("set active project by absolute path: project set successfully [ARCH-06]", async () => {
@@ -36,7 +36,7 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
       expect(result.success).toBe(true);
       // G-139: assert the active path is set correctly
       expect(result.activeProject).toBeDefined();
-      expect(result.activeProject.path).toContain("/root/my-project");
+      expect(result.activeProject!.path).toContain("/root/my-project");
     });
 
     it("set active project by name matching multiple: error listing all matches with paths [FS-08]", async () => {
@@ -127,7 +127,7 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
       const result = await requireActiveProject({ simulatePathDeleted: true });
       // G-142: assert result.isError === true and content contains "not found" or "deleted"
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toMatch(/not.found|deleted|missing/i);
+      expect(result.content![0].text).toMatch(/not.found|deleted|missing/i);
       expect(result.errorType).toBeDefined();
       expect(result.errorType).toMatch(/system_error|path_not_found/i);
       expect(result.activeProjectCleared).toBe(true);

@@ -42,13 +42,13 @@ describe("TASK-09: Parser — Metadata Extraction", () => {
       const result = parseMetadata(input);
       // consumedRange tells downstream parsers where frontmatter ends
       expect(result.consumedRange).toBeDefined();
-      expect(result.consumedRange.start).toBe(0);
-      expect(result.consumedRange.end).toBeGreaterThan(0);
+      expect(result.consumedRange!.start).toBe(0);
+      expect(result.consumedRange!.end).toBeGreaterThan(0);
       // End should be at or after the closing --- delimiter
-      expect(result.consumedRange.end).toBeLessThanOrEqual(input.length);
+      expect(result.consumedRange!.end).toBeLessThanOrEqual(input.length);
       // Body content should be outside the consumed range
       const bodyStart = input.indexOf("## What This Is");
-      expect(result.consumedRange.end).toBeLessThanOrEqual(bodyStart + 1);
+      expect(result.consumedRange!.end).toBeLessThanOrEqual(bodyStart + 1);
     });
 
     it("file without YAML frontmatter has consumed range of (0, 0) [PARSE-04]", () => {
@@ -56,8 +56,8 @@ describe("TASK-09: Parser — Metadata Extraction", () => {
       const result = parseMetadata(input);
       // No frontmatter consumed — both start and end at 0
       expect(result.consumedRange).toBeDefined();
-      expect(result.consumedRange.start).toBe(0);
-      expect(result.consumedRange.end).toBe(0);
+      expect(result.consumedRange!.start).toBe(0);
+      expect(result.consumedRange!.end).toBe(0);
     });
   });
 

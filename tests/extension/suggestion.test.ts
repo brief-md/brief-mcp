@@ -62,7 +62,7 @@ describe("TASK-42: Extension — Suggestion", () => {
         description: "",
       });
       expect(result.bootstrapSuggestions).toBeDefined();
-      expect(result.bootstrapSuggestions.length).toBeGreaterThan(0);
+      expect(result.bootstrapSuggestions!.length).toBeGreaterThan(0);
     });
   });
 
@@ -88,8 +88,8 @@ describe("TASK-42: Extension — Suggestion", () => {
       expect(result.suggestions.length).toBeGreaterThan(0);
       // T42-01: ontologyAvailable must be checked per-suggestion, not at response level
       for (const suggestion of result.suggestions) {
-        if (suggestion.suggestedOntologies?.length > 0) {
-          const availableOntologies = suggestion.suggestedOntologies.filter(
+        if ((suggestion.suggestedOntologies?.length ?? 0) > 0) {
+          const availableOntologies = suggestion.suggestedOntologies!.filter(
             (o: any) => o.available === true,
           );
           expect(availableOntologies.length).toBeGreaterThan(0);
@@ -105,8 +105,8 @@ describe("TASK-42: Extension — Suggestion", () => {
       expect(result.suggestions.length).toBeGreaterThan(0);
       // T42-01: per-suggestion availability check: uninstalled packs show "(not found in registry)"
       for (const suggestion of result.suggestions) {
-        if (suggestion.suggestedOntologies?.length > 0) {
-          const unavailable = suggestion.suggestedOntologies.find(
+        if ((suggestion.suggestedOntologies?.length ?? 0) > 0) {
+          const unavailable = suggestion.suggestedOntologies!.find(
             (o: any) => o.available === false,
           );
           if (unavailable) {
@@ -153,7 +153,7 @@ describe("TASK-42: Extension — Suggestion", () => {
       });
       expect(
         result.suggestions.length > 0 ||
-          result.bootstrapSuggestions?.length > 0,
+          (result.bootstrapSuggestions?.length ?? 0) > 0,
       ).toBe(true);
     });
 
@@ -162,7 +162,7 @@ describe("TASK-42: Extension — Suggestion", () => {
       // G-326: assert specific signal value matching expected format
       const hasContent =
         result.suggestions.length > 0 ||
-        result.bootstrapSuggestions?.length > 0 ||
+        (result.bootstrapSuggestions?.length ?? 0) > 0 ||
         result.signal;
       expect(hasContent).toBeTruthy();
       if (result.signal) {
@@ -188,7 +188,7 @@ describe("TASK-42: Property Tests", () => {
           const result = await suggestExtensions({ projectType });
           const hasOutput =
             result.suggestions.length > 0 ||
-            result.bootstrapSuggestions?.length > 0;
+            (result.bootstrapSuggestions?.length ?? 0) > 0;
           expect(hasOutput).toBe(true);
         },
       ),
@@ -245,7 +245,7 @@ describe("TASK-42: Property Tests", () => {
             // suggestedOntologies must always be present (even if empty array)
             expect(s.suggestedOntologies).toBeDefined();
             expect(Array.isArray(s.suggestedOntologies)).toBe(true);
-            for (const o of s.suggestedOntologies) {
+            for (const o of s.suggestedOntologies!) {
               expect(o.status).toBeDefined();
             }
           }

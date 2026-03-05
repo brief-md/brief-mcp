@@ -140,9 +140,9 @@ describe("TASK-31: Ontology — Pack Schema Validation & Loading", () => {
         const result = loadPack(maliciousJson);
         // If it doesn't throw, it must explicitly fail validation with a real error
         if (!result.isValid) {
-          expect(result.errors).toBeDefined();
-          expect(result.errors.length).toBeGreaterThan(0);
-          throw new Error(result.errors[0]);
+          expect((result as any).errors).toBeDefined();
+          expect((result as any).errors.length).toBeGreaterThan(0);
+          throw new Error((result as any).errors[0]);
         }
       }).toThrow(/__proto__|prototype|security/i);
     });
@@ -181,11 +181,11 @@ describe("TASK-31: Ontology — Pack Schema Validation & Loading", () => {
       const result = loadPack(JSON.stringify(maliciousPack));
       // Either rejected or HTML stripped from output
       if (result.isValid) {
-        const entry = result.pack?.entries[0];
+        const entry = result.pack?.entries[0] as any;
         expect(entry?.label).not.toContain("<script>");
         expect(entry?.description).not.toContain("<img");
       } else {
-        expect(result.errors.length).toBeGreaterThan(0);
+        expect((result as any).errors.length).toBeGreaterThan(0);
       }
     });
   });

@@ -73,7 +73,9 @@ describe("TASK-18: Hierarchy — Context Assembly & Formatting", () => {
       ];
       const result = await assembleContext(levels);
       // Child content should be primary
-      expect(result.levels[1].sections[0].body).toBe("Child desc");
+      expect(((result.levels[1]! as any).sections[0] as any).body).toBe(
+        "Child desc",
+      );
       // G-119: assert that parent entry is marked advisory
       expect(result.levels[0].isAdvisory).toBe(true);
     });
@@ -110,7 +112,7 @@ describe("TASK-18: Hierarchy — Context Assembly & Formatting", () => {
       // G-121: assert truncationSignal has a non-empty message string
       expect(result.truncationSignal).toBeDefined();
       expect(typeof result.truncationSignal).toBe("string");
-      expect(result.truncationSignal.length).toBeGreaterThan(0);
+      expect(result.truncationSignal!.length).toBeGreaterThan(0);
       // T18-01: truncation signal should guide user to brief_get_context to narrow the query
       expect(result.truncationSignal).toMatch(
         /brief_get_context|narrow.*query|use_scope|scope/i,
@@ -139,7 +141,7 @@ describe("TASK-18: Hierarchy — Context Assembly & Formatting", () => {
       ];
       const filtered = filterSections(sections, ["decisions"]);
       expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("Key Decisions");
+      expect((filtered[0] as any).name).toBe("Key Decisions");
     });
 
     it("sections filter with multiple values: all matching types included (OR logic) [HIER-15a]", () => {
@@ -202,10 +204,10 @@ describe("TASK-18: Hierarchy — Context Assembly & Formatting", () => {
         },
       ];
       const result = await assembleContext(levels);
-      const activeDecisions = result.levels[0].decisions.filter(
+      const activeDecisions = (result.levels[0]! as any).decisions.filter(
         (d: any) => d.status === "active",
       );
-      const superseded = result.levels[0].decisions.filter(
+      const superseded = (result.levels[0]! as any).decisions.filter(
         (d: any) => d.status === "superseded",
       );
       expect(activeDecisions.length).toBe(1);
@@ -225,7 +227,7 @@ describe("TASK-18: Hierarchy — Context Assembly & Formatting", () => {
         },
       ];
       const result = await assembleContext(levels, { includeSuperseded: true });
-      expect(result.levels[0].decisions.length).toBe(2);
+      expect((result.levels[0]! as any).decisions.length).toBe(2);
     });
   });
 
@@ -268,7 +270,7 @@ describe("TASK-18: Hierarchy — Context Assembly & Formatting", () => {
       if (ancestorLevel?.metadataOnly) {
         // Should include newest decisions (up to 3) even in metadata-only mode
         expect(ancestorLevel.recentDecisions).toBeDefined();
-        expect(ancestorLevel.recentDecisions.length).toBeLessThanOrEqual(3);
+        expect(ancestorLevel.recentDecisions!.length).toBeLessThanOrEqual(3);
       }
     });
   });

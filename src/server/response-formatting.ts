@@ -207,14 +207,14 @@ export function buildInsufficientDataSignal(scenario: string): {
 export function truncateResponse(
   data: string,
   options: { maxSize: number },
-): { truncated: boolean; signal?: string } {
+): { truncated: boolean; signal?: string; content?: string } {
   if (data.length > options.maxSize) {
     return {
       truncated: true,
       signal: `Response truncated: exceeded ${options.maxSize} byte limit.`,
     };
   }
-  return { truncated: false };
+  return { truncated: false, content: data };
 }
 
 /**

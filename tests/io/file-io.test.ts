@@ -604,8 +604,8 @@ describe("TASK-07: Property Tests", () => {
             "content",
             { dryRun: true, returnTempName: true },
           );
-          expect(result.tempFileName).toBeDefined();
-          expect(result.tempFileName).toMatch(/\.brief-tmp\./);
+          expect(result!.tempFileName).toBeDefined();
+          expect(result!.tempFileName).toMatch(/\.brief-tmp\./);
         },
       ),
       { numRuns: 10 },

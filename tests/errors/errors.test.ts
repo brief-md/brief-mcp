@@ -302,10 +302,9 @@ describe("TASK-04: Error Handling Framework", () => {
 
       const all = metrics.getAll();
       expect(all.errors).toBeDefined();
-      const totalErrors = Object.values(all.errors).reduce(
-        (sum: number, count: any) => sum + count,
-        0,
-      );
+      const totalErrors = Object.values(
+        all.errors as Record<string, unknown>,
+      ).reduce((sum: number, count: any) => sum + count, 0);
       expect(totalErrors).toBeGreaterThan(0);
     });
   });

@@ -105,7 +105,7 @@ describe("TASK-20: Workspace — Project Listing & Filtering", () => {
         typeFilter: "song",
       });
       expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("A");
+      expect((filtered[0] as any).name).toBe("A");
     });
 
     it("no filters: all projects returned [FS-08]", () => {
@@ -147,8 +147,8 @@ describe("TASK-20: Workspace — Project Listing & Filtering", () => {
       // G-133: assert result.projects is defined first before looping
       expect(result.projects).toBeDefined();
       for (const project of result.projects) {
-        expect(project.path).toMatch(/^[/A-Z]/); // Starts with / or drive letter
-        expect(project.path).not.toContain("~");
+        expect((project as any).path).toMatch(/^[/A-Z]/); // Starts with / or drive letter
+        expect((project as any).path).not.toContain("~");
       }
     });
   });
@@ -177,7 +177,7 @@ describe("TASK-20: Workspace — Project Listing & Filtering", () => {
       expect(proj).toHaveProperty("decisionCount");
       expect(proj).toHaveProperty("questionCount");
       // Verify the entry actually has values (not just properties)
-      expect(proj.name.length).toBeGreaterThan(0);
+      expect((proj as any).name.length).toBeGreaterThan(0);
     });
   });
 
@@ -189,8 +189,8 @@ describe("TASK-20: Workspace — Project Listing & Filtering", () => {
         typeFilter: "song",
       });
       expect(result.appliedFilters).toBeDefined();
-      expect(result.appliedFilters.statusFilter).toBe("active");
-      expect(result.appliedFilters.typeFilter).toBe("song");
+      expect(result.appliedFilters!.statusFilter).toBe("active");
+      expect(result.appliedFilters!.typeFilter).toBe("song");
     });
   });
 
@@ -285,7 +285,7 @@ describe("TASK-20: Property Tests", () => {
           const result = await listProjects({ workspaceRoots: roots });
           expect(result.projects).toBeDefined();
           for (const proj of result.projects) {
-            expect(proj.path).toMatch(/^[/A-Z]/);
+            expect((proj as any).path).toMatch(/^[/A-Z]/);
           }
         },
       ),

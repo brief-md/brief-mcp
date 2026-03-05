@@ -105,7 +105,7 @@ describe("TASK-13: Parser — Pre-Processing & Edge Cases", () => {
       expect(result.content).toContain("~~Old Decision~~");
       expect(result.strikethroughSegments).toBeDefined();
       expect(Array.isArray(result.strikethroughSegments)).toBe(true);
-      expect(result.strikethroughSegments.length).toBeGreaterThan(0);
+      expect(result.strikethroughSegments!.length).toBeGreaterThan(0);
     });
 
     it("GFM tables in content are preserved, not misinterpreted as structure [PARSE-18]", () => {
@@ -126,7 +126,7 @@ describe("TASK-13: Parser — Pre-Processing & Edge Cases", () => {
       // H4 should be recognized as structural
       expect(result.structuralHeadings).toBeDefined();
       // H5/H6 should NOT be structural
-      const structuralTexts = result.structuralHeadings.map(
+      const structuralTexts = result.structuralHeadings!.map(
         (h: any) => h.text ?? h,
       );
       expect(structuralTexts.length).toBeGreaterThan(0);

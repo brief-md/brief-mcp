@@ -410,7 +410,7 @@ export function parseSections(
       return {
         rs,
         canonicalName: null,
-        classification: "project-specific",
+        classification: "tool-specific",
         toolName: toolMatch[1].trim(),
         isRefSubsection: false,
       };
@@ -514,7 +514,7 @@ export function parseSections(
     // never collapsed, satisfying the PARSE-09 property test invariant.
     const key = info.canonicalName
       ? info.canonicalName.toLowerCase()
-      : info.rs.strippedText;
+      : `${info.rs.strippedText}:${info.rs.lineIdx}`;
 
     const existing = mergedMap.get(key);
     if (existing) {
@@ -560,7 +560,7 @@ export function parseSections(
         canonicalName: other.rs.strippedText,
       },
       {
-        type: "reference-list",
+        type: "references",
         // Full heading text e.g. "References: Musical" so /references/i matches
         typeLabel: other.rs.strippedText,
       },

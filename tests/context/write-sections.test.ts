@@ -79,7 +79,7 @@ describe("TASK-28: Context Write — Sections & External Sessions", () => {
         content: "# Top Level Heading\nBody text",
       });
       expect(result.warnings).toBeDefined();
-      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings!.length).toBeGreaterThan(0);
     });
 
     it("section name not matching any known section or alias: created as project-specific [PARSE-06]", async () => {
@@ -184,7 +184,9 @@ describe("TASK-28: Context Write — Sections & External Sessions", () => {
         _noActiveProject: true,
       } as any);
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toMatch(/active.*project|no project/i);
+      expect((result.content as any)[0].text).toMatch(
+        /active.*project|no project/i,
+      );
     });
   });
 });
@@ -279,7 +281,9 @@ describe("TASK-28: Property Tests", () => {
           });
           expect(result.success).toBe(true);
           // RESP-04 + RESP-05: file path must appear in MCP content text and be absolute
-          expect(result.content[0].text).toMatch(/\/.*BRIEF\.md|file.*path/i);
+          expect((result.content as any)[0].text).toMatch(
+            /\/.*BRIEF\.md|file.*path/i,
+          );
         },
       ),
       { numRuns: 5 },

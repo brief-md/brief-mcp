@@ -207,7 +207,7 @@ describe("TASK-27: Context Write — Questions & Constraints", () => {
         _noActiveProject: true,
       } as any);
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toMatch(/active.*project|no project/i);
+      expect(result.content![0].text).toMatch(/active.*project|no project/i);
     });
 
     it("handleResolveQuestion with no active project: requireActiveProject guard error [ARCH-06]", async () => {
@@ -217,7 +217,7 @@ describe("TASK-27: Context Write — Questions & Constraints", () => {
         _noActiveProject: true,
       } as any);
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toMatch(/active.*project|no project/i);
+      expect(result.content![0].text).toMatch(/active.*project|no project/i);
     });
 
     it("handleAddConstraint with no active project: requireActiveProject guard error [ARCH-06]", async () => {

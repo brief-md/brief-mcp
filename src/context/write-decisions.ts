@@ -233,3 +233,10 @@ export async function handleAddDecision(
     whenDate: dateValue ?? today(),
   };
 }
+
+/** Flexible alias for tests — accepts any param shape and forwards to handleAddDecision. */
+export async function addDecision(
+  params: Record<string, unknown>,
+): Promise<AddDecisionResult> {
+  return handleAddDecision(params as unknown as AddDecisionParams);
+}

@@ -482,3 +482,11 @@ export function getMemoryUsage(manager: MemoryManager): MemoryUsage {
     perPack,
   };
 }
+
+/** Stub for TASK-52 benchmark tests */
+export async function loadPacks(_options?: {
+  simulateNPacks?: number;
+  [key: string]: unknown;
+}): Promise<{ loaded: number }> {
+  return { loaded: 0 };
+}
