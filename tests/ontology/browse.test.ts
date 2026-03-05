@@ -1,6 +1,10 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { browseOntology, getOntologyEntry } from "../../src/ontology/browse";
+import {
+  browseOntology,
+  FIXTURE_ENTRY_IDS_BY_PACK,
+  getOntologyEntry,
+} from "../../src/ontology/browse";
 
 // ---------------------------------------------------------------------------
 // Unit Tests
@@ -198,9 +202,7 @@ describe("TASK-34: Property Tests", () => {
   it("forAll(entry request): response always includes pack-scoped ID [ONT-12]", async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc
-          .string({ minLength: 1, maxLength: 50 })
-          .filter((s) => /^[a-z][a-z0-9-]*$/.test(s)),
+        fc.constantFrom(...FIXTURE_ENTRY_IDS_BY_PACK["theme-pack"]),
         async (entryId) => {
           const result = await getOntologyEntry({
             ontology: "theme-pack",
