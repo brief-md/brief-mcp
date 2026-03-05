@@ -59,7 +59,7 @@ const DIRECT_MATCH_MULTIPLIER = 1.5;
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
 
-function tokenize(text: string): string[] {
+export function tokenize(text: string): string[] {
   if (!text || typeof text !== "string") return [];
   const segments = segmenter.segment(text);
   const tokens: string[] = [];
