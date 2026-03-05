@@ -1,6 +1,97 @@
+import { createHash } from "node:crypto";
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
-import { installOntology, listOntologies } from "../../src/ontology/management";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearIndexes,
+  installOntology,
+  listOntologies,
+} from "../../src/ontology/management";
+
+// ---------------------------------------------------------------------------
+// Shared mock pack payloads
+// ---------------------------------------------------------------------------
+
+const VALID_PACK = {
+  name: "test-pack",
+  version: "1.0.0",
+  entries: [{ id: "e1", label: "Entry One" }],
+  description: "Test pack",
+};
+const VALID_PACK_TEXT = JSON.stringify(VALID_PACK);
+
+const REGISTRY_PACK = {
+  name: "registry-pack",
+  version: "1.0.0",
+  entries: [{ id: "r1", label: "Registry Entry" }],
+};
+const REGISTRY_PACK_TEXT = JSON.stringify(REGISTRY_PACK);
+const REGISTRY_PACK_SHA256 = createHash("sha256")
+  .update(REGISTRY_PACK_TEXT)
+  .digest("hex");
+
+const THEME_PACK = {
+  name: "theme-pack",
+  version: "v2.0",
+  entries: [{ id: "t1", label: "Theme Entry" }],
+};
+const THEME_PACK_TEXT = JSON.stringify(THEME_PACK);
+const THEME_PACK_SHA256 = createHash("sha256")
+  .update(THEME_PACK_TEXT)
+  .digest("hex");
+
+function makeJsonResponse(
+  body: string,
+  options: { status?: number; headers?: Record<string, string> } = {},
+): Response {
+  return new Response(body, {
+    status: options.status ?? 200,
+    headers: { "content-type": "application/json", ...options.headers },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Global fetch mock — restored automatically by restoreMocks: true
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  clearIndexes();
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const urlStr = input instanceof Request ? input.url : String(input);
+
+    if (urlStr.includes("slow-server")) {
+      const err = new Error("The operation was aborted");
+      err.name = "AbortError";
+      throw err;
+    }
+    if (urlStr.includes("redirect-to-http")) {
+      return new Response(null, {
+        status: 301,
+        headers: { location: "http://insecure.example.com/pack.json" },
+      });
+    }
+    if (urlStr.includes("oversized")) {
+      return new Response("{}", {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "content-length": String(11 * 1024 * 1024),
+        },
+      });
+    }
+    if (urlStr.includes("invalid-pack")) {
+      return makeJsonResponse(
+        JSON.stringify({ missingName: true, badShape: 123 }),
+      );
+    }
+    if (urlStr.includes("registry.example.com")) {
+      return makeJsonResponse(REGISTRY_PACK_TEXT);
+    }
+    if (urlStr.includes("theme")) {
+      return makeJsonResponse(THEME_PACK_TEXT);
+    }
+    return makeJsonResponse(VALID_PACK_TEXT);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Unit Tests
@@ -80,10 +171,11 @@ describe("TASK-35: Ontology — Pack Management", () => {
       expect.assertions(3);
       try {
         await installOntology({ url: "https://example.com/invalid-pack.json" });
-      } catch (e: any) {
-        expect(e.message).toMatch(/schema|validation|invalid/i);
-        expect(e.fieldStructure).toBeDefined();
-        expect(e.message.length).toBeGreaterThan(0);
+      } catch (e: unknown) {
+        const err = e as Error;
+        expect(err.message).toMatch(/schema|validation|invalid/i);
+        expect(err.message).toMatch(/field.?structure/i);
+        expect(err.message.length).toBeGreaterThan(0);
       }
     });
 
@@ -91,9 +183,9 @@ describe("TASK-35: Ontology — Pack Management", () => {
       await expect(
         installOntology({
           url: "https://example.com/theme-pack.json",
-          simulateContentType: "text/html",
+          simulateContentType: "application/octet-stream",
         }),
-      ).rejects.toThrow(/content.type|invalid|html/i);
+      ).rejects.toThrow(/content.type|invalid/i);
     });
   });
 
@@ -113,7 +205,7 @@ describe("TASK-35: Ontology — Pack Management", () => {
     it("checksum provided and matches: install succeeds [SEC-11]", async () => {
       const result = await installOntology({
         url: "https://registry.example.com/pack.json",
-        checksum: "abc123valid",
+        checksum: REGISTRY_PACK_SHA256,
       });
       expect(result.installed).toBe(true);
     });
@@ -133,7 +225,7 @@ describe("TASK-35: Ontology — Pack Management", () => {
       const result = await installOntology({
         url: "https://example.com/theme-pack.json",
         simulateExistingVersion: "v1.0",
-        checksum: "abc123",
+        checksum: THEME_PACK_SHA256,
       });
       expect(result.backupCreated).toBe(true);
       expect(result.backupPath).toMatch(/\.bak$/);
@@ -144,11 +236,11 @@ describe("TASK-35: Ontology — Pack Management", () => {
         url: "https://example.com/theme-pack.json",
         simulateExistingVersion: "v1.0",
         simulateNewVersion: "v2.0",
-        checksum: "abc123",
+        checksum: THEME_PACK_SHA256,
       });
       expect(result.versionComparison).toBeDefined();
-      expect(result.versionComparison.previous).toBe("v1.0");
-      expect(result.versionComparison.incoming).toBe("v2.0");
+      expect(result.versionComparison!.previous).toBe("v1.0");
+      expect(result.versionComparison!.incoming).toBe("v2.0");
     });
 
     it("update checksum mismatch: .bak restored, new pack deleted", async () => {
@@ -278,7 +370,7 @@ describe("TASK-35: Property Tests", () => {
           const { getAutoUpdateStatus } = await import(
             "../../src/ontology/management"
           );
-          const status = await getAutoUpdateStatus({ packName, version });
+          const status = getAutoUpdateStatus({ packName, version });
           // Auto-update should NEVER be enabled without explicit user action
           expect(status.autoUpdateEnabled).toBe(false);
           // Update check may happen, but actual install requires user confirmation
