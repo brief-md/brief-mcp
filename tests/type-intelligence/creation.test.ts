@@ -1,6 +1,16 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
-import { createTypeGuide } from "../../src/type-intelligence/creation";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  _resetState,
+  createTypeGuide,
+} from "../../src/type-intelligence/creation";
+import { _resetState as _resetLoadingState } from "../../src/type-intelligence/loading";
+
+afterEach(() => {
+  _resetState();
+  _resetLoadingState();
+  vi.clearAllMocks();
+});
 
 // ---------------------------------------------------------------------------
 // Unit Tests
@@ -78,7 +88,7 @@ describe("TASK-41: Type Intelligence — Type Guide Creation", () => {
         body: "# New guide",
       });
       expect(result.existingGuide).toBe(true);
-      expect(result.overwritten).toBeFalsy();
+      expect(result.overwritten).toBe(false);
     });
 
     it("existing guide for same type, force: true: original backed up as .bak, new guide written [COMPAT-14]", async () => {
@@ -112,9 +122,6 @@ describe("TASK-41: Type Intelligence — Type Guide Creation", () => {
     });
 
     it("guide at exactly 100 KB → accepted (boundary condition) [SEC-13]", async () => {
-      const { createTypeGuide } = await import(
-        "../../src/type-intelligence/creation"
-      );
       const exactlyLimit = "a".repeat(100 * 1024);
       const result = await createTypeGuide({
         type: "test-boundary",
@@ -177,9 +184,6 @@ describe("TASK-41: Type Intelligence — Type Guide Creation", () => {
 
 describe("YAML security hardening during guide creation [SEC-09]", () => {
   it("guide body containing __proto__ in YAML → prototype pollution prevented on read-back [SEC-09]", async () => {
-    const { createTypeGuide } = await import(
-      "../../src/type-intelligence/creation"
-    );
     const result = await createTypeGuide({
       type: "test-security",
       body: "# Test\n\nSome content.",
@@ -195,9 +199,6 @@ describe("YAML security hardening during guide creation [SEC-09]", () => {
   });
 
   it("guide with embedded script content → content stored but not executed [SEC-09]", async () => {
-    const { createTypeGuide } = await import(
-      "../../src/type-intelligence/creation"
-    );
     const result = await createTypeGuide({
       type: "test-safety",
       body: '# Test\n\n<script>alert("xss")</script>\n\nSome valid content.',
@@ -266,17 +267,15 @@ describe("TASK-41: Property Tests", () => {
     );
   });
 
-  // G-320: make async and await fc.assert; replace fc.constant with fc.string
+  // G-320: use fc.constantFrom with known existing fixture types
   it("forAll(existing guide, force=false): never overwritten [COMPAT-14]", async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc
-          .string({ minLength: 3, maxLength: 20 })
-          .filter((s) => /^[a-z-]+$/.test(s)),
+        fc.constantFrom("album", "fiction", "film", "existing-type"),
         async (type) => {
           const result = await createTypeGuide({ type, body: "# New" });
           expect(result.existingGuide).toBe(true);
-          expect(result.overwritten).toBeFalsy();
+          expect(result.overwritten).toBe(false);
         },
       ),
       { numRuns: 3 },
@@ -296,6 +295,40 @@ describe("TASK-41: Property Tests", () => {
           expect(result.filePath).toMatch(/type-guides/);
           // G-321: spec says .md files, not .yaml
           expect(result.filePath).toMatch(/\.md$/);
+        },
+      ),
+      { numRuns: 5 },
+    );
+  });
+
+  it("forAll(invalid input): oversized body always rejected [SEC-13]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 2, maxLength: 20 })
+          .filter((s) => /^[a-z-]+$/.test(s)),
+        async (type) => {
+          const oversized = "x".repeat(100 * 1024 + 1);
+          await expect(
+            createTypeGuide({ type, body: oversized }),
+          ).rejects.toThrow(/size|limit/i);
+        },
+      ),
+      { numRuns: 5 },
+    );
+  });
+
+  it("forAll(created guide): structural invariant — result shape always valid", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 2, maxLength: 20 })
+          .filter((s) => /^[a-z-]+$/.test(s)),
+        async (type) => {
+          const result = await createTypeGuide({ type, body: "# Guide" });
+          expect(Object.keys(result)).toEqual(
+            expect.arrayContaining(["created", "filePath", "source"]),
+          );
         },
       ),
       { numRuns: 5 },

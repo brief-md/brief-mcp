@@ -63,6 +63,21 @@ User-created and community type guides are markdown files with YAML frontmatter 
 - File size limit for type guides: configurable, default 100 KB per file
 - The server MUST NOT render or execute any embedded HTML, scripts, or active content in type guides
 
+## Test Fixtures
+
+The creation module needs internal fixture guides (similar to loading's FIXTURE_GUIDES) to support alias collision and existing guide detection tests:
+
+1. **`collider-bundled`** — `type: collider-bundled`, `source: bundled`, `type_aliases: ["colliding-alias"]`
+   Used by: alias collision with lower-precedence test (ai_generated > bundled → warning)
+
+2. **`user-owned-type`** — `type: user-owned-type`, `source: user_edited`, `type_aliases: ["user-owned-alias"]`
+   Used by: alias collision with higher-precedence test (ai_generated < user_edited → error/throw)
+
+3. **`existing-type`** — `type: existing-type`, `source: ai_generated`
+   Used by: existing guide detection tests (no force → existingGuide: true; force → backup + overwrite)
+
+These fixtures must be loaded/registered before alias uniqueness checks run. The creation module should register them into the loading module's guide state on initialization, or maintain its own alias/existence index seeded from both loading module state and these fixtures.
+
 ## Test Specification
 
 ### Unit Tests (specific input → expected output)
