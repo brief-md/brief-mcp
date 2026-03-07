@@ -1,6 +1,9 @@
 # Ignore everything by default — whitelist package files only
 *
 
+# Runtime state — never commit these
+.loop-signal
+
 # Package source
 !src/
 !src/**
@@ -8,6 +11,11 @@
 !tests/**
 !assets/
 !assets/**
+
+# Task specs and shared docs (loop infrastructure)
+!tasks/
+!tasks/**
+!ERROR_CONVENTIONS.md
 
 # Package config
 !package.json
