@@ -36,7 +36,7 @@ Implement two MCP tools: `brief_add_extension` and `brief_list_extensions`. The 
 
 Export from `src/extension/creation.ts`:
 - `addExtension(params: { extensionName: string; targetSubsection?: string; simulateAmbiguous?: boolean; subsections?: string[]; simulateOrphanHeading?: boolean }) → { created: boolean; alreadyExists?: boolean; subsections: string[]; metadataUpdated?: boolean; metadataFormat: string; headingFormat: string; metadataKey: string; success?: boolean; content?: string }`
-  Default subsections: `Direction`, `References`, `Constraints`, `Open Questions`. `metadataFormat`: `snake_case` (e.g., `sonic_arts`). `headingFormat`: `ALL CAPS` (e.g., `SONIC ARTS`).
+  Default subsections: `Direction/Intent`, `Constraints`, `References`, `Open Questions`. `metadataFormat`: `snake_case` (e.g., `sonic_arts`). `headingFormat`: `ALL CAPS` (e.g., `SONIC ARTS`).
 - `listExtensions(options?: { includeProject?: boolean }) → { extensions: Array<{ name: string; description: string; subsections: string[]; associatedOntologies: string[] }> }`
 - `resolveSubsectionTarget(target: string) → { extensionName: string; subsectionName: string }`
   Parses `"EXTENSION > Subsection"` format.

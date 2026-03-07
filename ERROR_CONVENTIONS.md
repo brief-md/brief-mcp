@@ -45,6 +45,10 @@
 - `new Error("Alias '{x}' conflicts with existing guide '{name}'...")` — matches `/alias|conflict|collision/i` — THROWN (alias collision with higher-precedence guide)
 - `new Error("Guide exceeds size limit...")` — matches `/size|limit/i` — THROWN (guide > 100 KB)
 
+## extension/creation
+- `new Error("Invalid extension name: {name} — only [A-Z0-9 ] characters allowed")` — matches `/character|invalid|name/i` — THROWN (WRITE-16b: invalid chars in extension name)
+- `new Error("Ambiguous subsection '{subsection}' found in multiple extensions: ...")` — matches `/ambiguous|multiple/i` — THROWN (WRITE-17: bare subsection name matches multiple extensions)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

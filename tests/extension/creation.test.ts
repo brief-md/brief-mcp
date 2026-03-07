@@ -1,12 +1,21 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
-import { addExtension, listExtensions } from "../../src/extension/creation";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  _resetState,
+  addExtension,
+  listExtensions,
+  resolveSubsectionTarget,
+} from "../../src/extension/creation";
 
 // ---------------------------------------------------------------------------
 // Unit Tests
 // ---------------------------------------------------------------------------
 
 describe("TASK-43: Extension — Creation & Listing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("add extension [WRITE-16b]", () => {
     it("add spec-defined extension: heading created with correct subsections [COMPAT-05]", async () => {
       const result = await addExtension({ extensionName: "SONIC ARTS" });
@@ -156,7 +165,6 @@ describe("TASK-43: Extension — Creation & Listing", () => {
 
 describe("metadata key format [WRITE-08]", () => {
   it("extension metadata key: always lowercase_underscore format in config [WRITE-08]", async () => {
-    const { addExtension } = await import("../../src/extension/creation");
     const result = await addExtension({ extensionName: "SONIC ARTS" });
     expect(result.metadataKey).toBe("sonic_arts");
   });
@@ -164,11 +172,10 @@ describe("metadata key format [WRITE-08]", () => {
 
 describe("subsection convention [COMPAT-12, T43-03]", () => {
   it("custom extension subsections follow Direction/Constraints/References/Questions convention [COMPAT-12, T43-03]", async () => {
-    const { addExtension } = await import("../../src/extension/creation");
     const result = await addExtension({ extensionName: "MY CUSTOM EXT" });
     const subsections = result.subsections || [];
-    // T43-03: all four standard subsections must be present (not just Direction and References)
-    expect(subsections).toContain("Direction");
+    // T43-03: all four standard subsections must be present (not just Direction/Intent and References)
+    expect(subsections).toContain("Direction/Intent");
     expect(subsections).toContain("References");
     expect(subsections).toContain("Constraints");
     expect(
@@ -179,10 +186,7 @@ describe("subsection convention [COMPAT-12, T43-03]", () => {
 
 describe("subsection targeting [WRITE-17]", () => {
   it('subsection targeting via "EXTENSION > Subsection" format → correct subsection addressed [WRITE-17]', async () => {
-    const { resolveSubsectionTarget } = await import(
-      "../../src/extension/creation"
-    );
-    const target = await resolveSubsectionTarget("SONIC ARTS > References");
+    const target = resolveSubsectionTarget("SONIC ARTS > References");
     expect(target.extensionName).toBe("SONIC ARTS");
     expect(target.subsectionName).toBe("References");
   });
@@ -193,6 +197,11 @@ describe("subsection targeting [WRITE-17]", () => {
 // ---------------------------------------------------------------------------
 
 describe("TASK-43: Property Tests", () => {
+  beforeEach(() => {
+    _resetState();
+    vi.clearAllMocks();
+  });
+
   // G-335: make async and await fc.assert; G-334: assert metadataUpdated explicitly
   it("forAll(add extension): metadata field always updated [WRITE-05]", async () => {
     await fc.assert(
@@ -251,6 +260,45 @@ describe("TASK-43: Property Tests", () => {
         expect(result.extensions.length).toBeGreaterThanOrEqual(6);
       }),
       { numRuns: 3 },
+    );
+  });
+
+  it("forAll(invalid name): always rejects with appropriate error [WRITE-16b]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => !/^[A-Z0-9 ]+$/.test(s) && s.trim().length > 0),
+        async (name) => {
+          await expect(addExtension({ extensionName: name })).rejects.toThrow(
+            /character|invalid|name/i,
+          );
+        },
+      ),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(add extension): return always has required fields [WRITE-08]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .stringMatching(/^[A-Z][A-Z0-9 ]{1,20}$/)
+          .filter((s) => s.trim().length > 1),
+        async (name) => {
+          const result = await addExtension({ extensionName: name.trim() });
+          expect(Object.keys(result)).toEqual(
+            expect.arrayContaining([
+              "created",
+              "subsections",
+              "metadataFormat",
+              "headingFormat",
+              "metadataKey",
+            ]),
+          );
+        },
+      ),
+      { numRuns: 5 },
     );
   });
 });
