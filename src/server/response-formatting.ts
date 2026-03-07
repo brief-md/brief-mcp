@@ -69,24 +69,14 @@ export function formatResponse(params: {
   filePath?: string;
   simulateLargeData?: boolean;
 }): { content: Array<{ type: "text"; text: string }> } {
-  // Handle signal-based responses
-  if (params.signal === "no_pack_data") {
+  // Handle signal-based responses (RESP-02)
+  if (params.signal) {
+    const signalInfo = buildInsufficientDataSignal(params.signal);
     return {
       content: [
         {
           type: "text" as const,
-          text: "Signal: no_pack_data — No ontology pack data found. Please install an ontology pack to enable knowledge lookups.",
-        },
-      ],
-    };
-  }
-
-  if (params.signal === "no_type_guide") {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: "Signal: no_type_guide — No type guide found for this file type. Please check available type guides.",
+          text: `Signal: ${params.signal} — ${signalInfo.suggestionsForAI}`,
         },
       ],
     };
@@ -138,12 +128,15 @@ export function formatWriteConfirmation(params: {
   filePath: string;
   changes: string[];
 }): { content: Array<{ type: "text"; text: string }> } {
+  const absPath = path.isAbsolute(params.filePath)
+    ? params.filePath
+    : path.resolve("/", params.filePath);
   const changesSummary = params.changes.join(", ");
   return {
     content: [
       {
         type: "text" as const,
-        text: `Write confirmed: ${params.filePath}\nChanges: ${changesSummary}`,
+        text: `Write confirmed: ${absPath}\nChanges: ${changesSummary}`,
       },
     ],
   };
@@ -208,13 +201,19 @@ export function truncateResponse(
   data: string,
   options: { maxSize: number },
 ): { truncated: boolean; signal?: string; content?: string } {
-  if (data.length > options.maxSize) {
-    return {
-      truncated: true,
-      signal: `Response truncated: exceeded ${options.maxSize} byte limit.`,
-    };
+  if (data.length <= options.maxSize) {
+    return { truncated: false, content: data };
   }
-  return { truncated: false, content: data };
+  // Count items (lines) to report how many were omitted (PERF-11)
+  const allLines = data.split("\n");
+  const truncatedContent = data.slice(0, options.maxSize);
+  const keptLines = truncatedContent.split("\n");
+  const omitted = Math.max(1, allLines.length - keptLines.length);
+  return {
+    truncated: true,
+    signal: `Response truncated. ${omitted} additional items not shown.`,
+    content: truncatedContent,
+  };
 }
 
 /**
