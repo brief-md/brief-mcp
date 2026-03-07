@@ -242,7 +242,7 @@ $(cat LEARNINGS.md 2>/dev/null || echo '(not found)')
 
       if [ "$AUDIT_VERDICT" = "AUDIT_BLOCKED" ]; then
         # Save any partial audit work so a reset can't wipe it
-        _AUDIT_PARTIAL=$(git status --porcelain src/ tests/ tasks/ ERROR_CONVENTIONS.md 2>/dev/null | grep -v '^\?\?' | head -1 || true)
+        _AUDIT_PARTIAL=$(git status --porcelain src/ tests/ tasks/ ERROR_CONVENTIONS.md 2>/dev/null | grep -vF '??' | head -1 || true)
         _AUDIT_PARTIAL_NEW=$(git ls-files --others --exclude-standard src/ tests/ tasks/ 2>/dev/null | head -1 || true)
         if [ -n "$_AUDIT_PARTIAL" ] || [ -n "$_AUDIT_PARTIAL_NEW" ]; then
           echo "  -> Saving partial audit work before blocking"
@@ -265,7 +265,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>" || true
       else
         echo "  -> AUDIT READY: $NEXT_TASK cleared for implementation"
         # Commit any fixes the audit agent made (agent no longer does this itself)
-        AUDIT_CHANGES=$(git status --porcelain src/ tests/ tasks/ ERROR_CONVENTIONS.md 2>/dev/null | grep -v '^\?\?' | head -1 || true)
+        AUDIT_CHANGES=$(git status --porcelain src/ tests/ tasks/ ERROR_CONVENTIONS.md 2>/dev/null | grep -vF '??' | head -1 || true)
         AUDIT_UNTRACKED=$(git ls-files --others --exclude-standard src/ tests/ tasks/ 2>/dev/null | head -1 || true)
         if [ -n "$AUDIT_CHANGES" ] || [ -n "$AUDIT_UNTRACKED" ]; then
           echo "  -> Committing audit fixes for $NEXT_TASK"
@@ -337,11 +337,11 @@ $TYPE_CONTENT
   printf '%s' "$DYNAMIC_PROMPT" > "$PROMPT_FILE"
   export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000
   cat "$PROMPT_FILE" | claude \
-    --model claude-opus-4-6 \
+    --model claude-sonnet-4-6 \
     --dangerously-skip-permissions \
     --output-format stream-json \
     --verbose \
-    --max-turns 25 \
+    --max-turns 30 \
     2>&1 | tee "$ITER_LOG" | node scripts/format-log.js || true
 
   EXIT_CODE=${PIPESTATUS[0]}
@@ -411,11 +411,11 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
     printf '%s' "$CONT_PROMPT" > "$CONT_PROMPT_FILE"
     export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000
     cat "$CONT_PROMPT_FILE" | claude \
-      --model claude-opus-4-6 \
+      --model claude-sonnet-4-6 \
       --dangerously-skip-permissions \
       --output-format stream-json \
       --verbose \
-      --max-turns 20 \
+      --max-turns 25 \
       2>&1 | tee "$CONT_LOG" | node scripts/format-log.js || true
 
     EXIT_CODE=${PIPESTATUS[0]}
