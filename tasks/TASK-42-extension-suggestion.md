@@ -90,6 +90,23 @@ When a tool has insufficient local data to fully answer, it MUST include a struc
 - forAll(active extension): never included in suggestions
 - forAll(suggested ontology): availability always checked and indicated
 
+## Test Fixtures
+
+The test mocks `../../src/type-intelligence/loading` (TASK-40 dependency) because the
+bundled fixture guides for "album", "song", "film" do not include `suggestedExtensions`
+in their YAML frontmatter. The mock returns:
+
+- **"album", "song", "film"**: `{ guide: { metadata: { suggestedExtensions: ["sonic_arts", "lyrical_craft"] } }, isGeneric: false }`
+- **All other types**: `{ guide: { metadata: { type: "_generic" } }, isGeneric: true }` (generic fallback, no suggestedExtensions)
+
+Six known extension slugs: `sonic_arts`, `narrative_creative`, `lyrical_craft`, `visual_storytelling`, `strategic_planning`, `system_design`.
+
+Project types used in tests:
+- `"album"` — Tier 1 test, deduplication, property tests (has type guide with suggestedExtensions)
+- `"song"` — ontology availability tests (has type guide with suggestedExtensions)
+- `"film"` — ontology property test (has type guide with suggestedExtensions)
+- `"unknown"`, `"unknown-type-xyz"`, `"completely-novel-type"`, `"xyznoguide"`, `"anything"`, `"everything"` — generic fallback types (no type guide)
+
 ## Tier 4 Criteria
 
 Tier 4 criteria: JC-01, JC-02, JC-07, JC-09

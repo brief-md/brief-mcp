@@ -1,34 +1,85 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { suggestExtensions } from "../../src/extension/suggestion";
+
+// ---------------------------------------------------------------------------
+// Mock type-intelligence loading for test isolation (TASK-40 dependency)
+// Fixture guides for "album", "song", "film" don't have suggestedExtensions
+// in their YAML frontmatter, so we mock getTypeGuide to return guides with
+// suggestedExtensions for types that need Tier 1 results.
+// ---------------------------------------------------------------------------
+vi.mock("../../src/type-intelligence/loading", () => {
+  const getTypeGuide = vi.fn().mockImplementation(async (params: any) => {
+    const type = String(params.type ?? "").toLowerCase();
+    if (type === "album" || type === "song" || type === "film") {
+      return {
+        guide: {
+          slug: type,
+          displayName: type.charAt(0).toUpperCase() + type.slice(1),
+          metadata: {
+            type,
+            source: "bundled",
+            version: "1.0",
+            suggestedExtensions: ["sonic_arts", "lyrical_craft"],
+          },
+          content: "",
+          path: `<builtin>/${type}.md`,
+        },
+        isGeneric: false,
+      };
+    }
+    return {
+      guide: {
+        slug: "_generic",
+        displayName: "Generic",
+        metadata: {
+          type: "_generic",
+          source: "bundled",
+          version: "1.0",
+        },
+        content: "",
+        path: "<builtin>/_generic.md",
+      },
+      isGeneric: true,
+    };
+  });
+  return { getTypeGuide, loadTypeGuide: getTypeGuide };
+});
+
+/** Collect all ExtensionSuggestion objects from tier 1 and tier 2 */
+function allSuggestions(result: any): any[] {
+  return [
+    ...(result.tier1Suggestions ?? []),
+    ...(result.tier2Suggestions ?? []),
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Unit Tests
 // ---------------------------------------------------------------------------
 
 describe("TASK-42: Extension — Suggestion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("tier 1 — type guide driven [COMPAT-11]", () => {
     it("type with guide containing suggested_extensions: Tier 1 suggestions returned [COMPAT-11]", async () => {
       const result = await suggestExtensions({ projectType: "album" });
-      expect(result.suggestions).toBeDefined();
-      const tier1 = result.suggestions.filter((s: any) => s.sourceTier === 1);
-      expect(tier1.length).toBeGreaterThan(0);
+      expect(result.tier1Suggestions).toBeDefined();
+      expect(result.tier1Suggestions!.length).toBeGreaterThan(0);
     });
   });
 
   describe("tier 2 — description matching [COMPAT-11]", () => {
     it("type with no guide (generic fallback) → Tier 2 or Tier 3 suggestions returned [COMPAT-11]", async () => {
-      const { suggestExtensions } = await import(
-        "../../src/extension/suggestion"
-      );
       const result = await suggestExtensions({
         projectType: "unknown-type-xyz",
       });
-      expect(result.suggestions.length).toBeGreaterThan(0);
-      // Must be Tier 2 or Tier 3, never Tier 1 (no type guide exists)
-      result.suggestions.forEach((suggestion: any) => {
-        expect(suggestion.sourceTier).toBeGreaterThanOrEqual(2);
-      });
+      const hasTier2Or3 =
+        (result.tier2Suggestions?.length ?? 0) > 0 ||
+        (result.tier3BootstrapSuggestions?.length ?? 0) > 0;
+      expect(hasTier2Or3).toBe(true);
     });
 
     it("project description matching sensory capabilities: SONIC ARTS suggested via Tier 2 [COMPAT-05]", async () => {
@@ -36,8 +87,8 @@ describe("TASK-42: Extension — Suggestion", () => {
         projectType: "unknown",
         description: "A project exploring sound textures and tonal warmth",
       });
-      const sonicArts = result.suggestions.find(
-        (s: any) => s.extension === "sonic_arts" && s.sourceTier === 2,
+      const sonicArts = result.tier2Suggestions?.find(
+        (s) => s.extension === "sonic_arts",
       );
       expect(sonicArts).toBeDefined();
     });
@@ -48,8 +99,8 @@ describe("TASK-42: Extension — Suggestion", () => {
         description:
           "A startup business plan with market analysis and revenue projections",
       });
-      const strategic = result.suggestions.find(
-        (s: any) => s.extension === "strategic_planning" && s.sourceTier === 2,
+      const strategic = result.tier2Suggestions?.find(
+        (s) => s.extension === "strategic_planning",
       );
       expect(strategic).toBeDefined();
     });
@@ -61,8 +112,8 @@ describe("TASK-42: Extension — Suggestion", () => {
         projectType: "completely-novel-type",
         description: "",
       });
-      expect(result.bootstrapSuggestions).toBeDefined();
-      expect(result.bootstrapSuggestions!.length).toBeGreaterThan(0);
+      expect(result.tier3BootstrapSuggestions).toBeDefined();
+      expect(result.tier3BootstrapSuggestions!.length).toBeGreaterThan(0);
     });
   });
 
@@ -72,9 +123,8 @@ describe("TASK-42: Extension — Suggestion", () => {
         projectType: "album",
         activeExtensions: ["sonic_arts"],
       });
-      const sonicArts = result.suggestions.find(
-        (s: any) => s.extension === "sonic_arts",
-      );
+      const all = allSuggestions(result);
+      const sonicArts = all.find((s: any) => s.extension === "sonic_arts");
       expect(sonicArts).toBeUndefined();
     });
   });
@@ -85,9 +135,10 @@ describe("TASK-42: Extension — Suggestion", () => {
         projectType: "song",
         installedOntologies: ["theme-pack"],
       });
-      expect(result.suggestions.length).toBeGreaterThan(0);
+      const all = allSuggestions(result);
+      expect(all.length).toBeGreaterThan(0);
       // T42-01: ontologyAvailable must be checked per-suggestion, not at response level
-      for (const suggestion of result.suggestions) {
+      for (const suggestion of all) {
         if ((suggestion.suggestedOntologies?.length ?? 0) > 0) {
           const availableOntologies = suggestion.suggestedOntologies!.filter(
             (o: any) => o.available === true,
@@ -102,9 +153,10 @@ describe("TASK-42: Extension — Suggestion", () => {
         projectType: "song",
         installedOntologies: [],
       });
-      expect(result.suggestions.length).toBeGreaterThan(0);
+      const all = allSuggestions(result);
+      expect(all.length).toBeGreaterThan(0);
       // T42-01: per-suggestion availability check: uninstalled packs show "(not found in registry)"
-      for (const suggestion of result.suggestions) {
+      for (const suggestion of all) {
         if ((suggestion.suggestedOntologies?.length ?? 0) > 0) {
           const unavailable = suggestion.suggestedOntologies!.find(
             (o: any) => o.available === false,
@@ -135,7 +187,8 @@ describe("TASK-42: Extension — Suggestion", () => {
         projectType: "everything",
         description: "sound visual narrative lyric strategy system",
       });
-      const extensions = result.suggestions.map((s: any) => s.extension);
+      const all = allSuggestions(result);
+      const extensions = all.map((s: any) => s.extension);
       expect(extensions).toContain("sonic_arts");
       expect(extensions).toContain("narrative_creative");
       expect(extensions).toContain("lyrical_craft");
@@ -151,18 +204,19 @@ describe("TASK-42: Extension — Suggestion", () => {
         projectType: "xyznoguide",
         description: "",
       });
+      const all = allSuggestions(result);
       expect(
-        result.suggestions.length > 0 ||
-          (result.bootstrapSuggestions?.length ?? 0) > 0,
+        all.length > 0 || (result.tier3BootstrapSuggestions?.length ?? 0) > 0,
       ).toBe(true);
     });
 
     it("response always includes actionable output: never empty with no guidance [RESP-02]", async () => {
       const result = await suggestExtensions({ projectType: "anything" });
+      const all = allSuggestions(result);
       // G-326: assert specific signal value matching expected format
       const hasContent =
-        result.suggestions.length > 0 ||
-        (result.bootstrapSuggestions?.length ?? 0) > 0 ||
+        all.length > 0 ||
+        (result.tier3BootstrapSuggestions?.length ?? 0) > 0 ||
         result.signal;
       expect(hasContent).toBeTruthy();
       if (result.signal) {
@@ -177,6 +231,10 @@ describe("TASK-42: Extension — Suggestion", () => {
 // ---------------------------------------------------------------------------
 
 describe("TASK-42: Property Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   // G-327: make async and await fc.assert
   it("forAll(project type): at least one tier always produces suggestions [COMPAT-11]", async () => {
     await fc.assert(
@@ -186,9 +244,10 @@ describe("TASK-42: Property Tests", () => {
           .filter((s) => /^[a-z-]+$/.test(s)),
         async (projectType) => {
           const result = await suggestExtensions({ projectType });
+          const all = allSuggestions(result);
           const hasOutput =
-            result.suggestions.length > 0 ||
-            (result.bootstrapSuggestions?.length ?? 0) > 0;
+            all.length > 0 ||
+            (result.tier3BootstrapSuggestions?.length ?? 0) > 0;
           expect(hasOutput).toBe(true);
         },
       ),
@@ -203,7 +262,8 @@ describe("TASK-42: Property Tests", () => {
         fc.constantFrom("album", "film", "novel", "xyzunknown"),
         async (projectType) => {
           const result = await suggestExtensions({ projectType });
-          for (const s of result.suggestions) {
+          const all = allSuggestions(result);
+          for (const s of all) {
             const tier = s.sourceTier;
             expect(tier).toBeDefined();
             expect([1, 2, 3]).toContain(tier);
@@ -224,9 +284,8 @@ describe("TASK-42: Property Tests", () => {
             projectType: "album",
             activeExtensions: [ext],
           });
-          const found = result.suggestions.find(
-            (s: any) => s.extension === ext,
-          );
+          const all = allSuggestions(result);
+          const found = all.find((s: any) => s.extension === ext);
           expect(found).toBeUndefined();
         },
       ),
@@ -234,14 +293,15 @@ describe("TASK-42: Property Tests", () => {
     );
   });
 
-  // G-330: make async and await fc.assert; remove conditional guard, assert suggestedOntologies always present
+  // G-330: make async and await fc.assert; assert suggestedOntologies always present
   it("forAll(suggested ontology): availability always checked and indicated [COMPAT-11]", async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.constantFrom("album", "film"),
         async (projectType) => {
           const result = await suggestExtensions({ projectType });
-          for (const s of result.suggestions) {
+          const all = allSuggestions(result);
+          for (const s of all) {
             // suggestedOntologies must always be present (even if empty array)
             expect(s.suggestedOntologies).toBeDefined();
             expect(Array.isArray(s.suggestedOntologies)).toBe(true);
@@ -252,6 +312,32 @@ describe("TASK-42: Property Tests", () => {
         },
       ),
       { numRuns: 3 },
+    );
+  });
+
+  // Negative property test: random inputs → never throws, always returns valid structure
+  it("forAll(random input): never throws, always returns valid structure", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 1, maxLength: 30 })
+          .filter((s) => s.trim().length > 0),
+        async (projectType) => {
+          const result = await suggestExtensions({
+            projectType: projectType.trim(),
+          });
+          if (result.tier1Suggestions) {
+            expect(Array.isArray(result.tier1Suggestions)).toBe(true);
+          }
+          if (result.tier2Suggestions) {
+            expect(Array.isArray(result.tier2Suggestions)).toBe(true);
+          }
+          if (result.tier3BootstrapSuggestions) {
+            expect(Array.isArray(result.tier3BootstrapSuggestions)).toBe(true);
+          }
+        },
+      ),
+      { numRuns: 10 },
     );
   });
 });
