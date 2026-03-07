@@ -1,20 +1,27 @@
-export async function suggestReference(
-  _params: Record<string, unknown>,
-): Promise<{
-  results: Array<Record<string, unknown>>;
-  tierAvailability?: Record<string, unknown>;
-  [key: string]: unknown;
+// src/reference/suggestion.ts — Suggestion & entry reference tools (TASK-38)
+
+import type { ReferenceSuggestionResult } from "../types/references.js";
+
+export async function getEntryReferences(_params: {
+  ontology: string;
+  entryId: string;
+  typeFilter?: string;
+  extensionFilter?: string;
+  maxResults?: number;
+}): Promise<{
+  references: Array<{ type: string; extension?: string }>;
 }> {
-  return { results: [] };
+  throw new Error("Not implemented");
 }
 
-export const suggestReferences = suggestReference;
+export async function suggestReferences(_params: {
+  context: { section: string; activeExtensions: string[] };
+  existingReferences?: Array<{ ontology: string; entryId: string }>;
+}): Promise<ReferenceSuggestionResult> {
+  throw new Error("Not implemented");
+}
 
-export async function getEntryReferences(
-  _params: Record<string, unknown>,
-): Promise<{
-  references: Array<Record<string, unknown>>;
-  [key: string]: unknown;
-}> {
-  return { references: [] };
+/** @internal Reset module-level state for test isolation */
+export function _resetState(): void {
+  // Reset any module-level state
 }

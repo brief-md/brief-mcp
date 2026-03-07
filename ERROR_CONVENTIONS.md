@@ -23,6 +23,13 @@
 - Schema errors use `makeSchemaError(message, fieldStructure?)` — type: `"user_error"` — THROWN
 - Pattern: `new Error(message)` with `.type = "user_error"` and optional `.fieldStructure`
 
+## reference/lookup
+- `new Error("At least one of creator or title is required")` — matches `/at least one|required/i` — THROWN (both params missing)
+
+## reference/suggestion
+- `new NotFoundError("Pack '{pack}' not found")` — matches `/not.?found/i` — THROWN (non-existent pack)
+- `new NotFoundError("Entry '{pack}:{id}' not found")` — matches `/not.?found/i` — THROWN (non-existent entry)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN
