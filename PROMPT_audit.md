@@ -322,6 +322,8 @@ BLOCKED — N items need human input before implementation can start
 - Tests are authoritative for expected behaviour — fix the implementation side if tests and code disagree.
 - Do NOT write implementation logic. Stubs remain as stubs (throw new Error("Not implemented")).
 - Do NOT run git add or git commit — the loop handles all git operations after you exit.
+- Do NOT use the Agent tool — it wastes turns and pollutes context.
+- Do NOT re-read files after editing to verify — trust your edits and move straight to Phase 8.
 - NEVER mark READY FOR IMPLEMENTATION if any human-needed item remains unresolved.
 
 ---

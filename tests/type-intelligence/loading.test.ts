@@ -1,6 +1,11 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
-import { getTypeGuide } from "../../src/type-intelligence/loading";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { _resetState, getTypeGuide } from "../../src/type-intelligence/loading";
+
+afterEach(() => {
+  _resetState();
+  vi.clearAllMocks();
+});
 
 // ---------------------------------------------------------------------------
 // Unit Tests
@@ -11,11 +16,11 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
     it("exact type match: correct guide returned with source metadata [COMPAT-07]", async () => {
       const result = await getTypeGuide({ type: "album" });
       expect(result.guide).toBeDefined();
-      expect((result.guide as any).type).toBe("album");
+      expect(result.guide.metadata.type).toBe("album");
       // G-313: assert source equals one of the allowed values; T40-02: 'user' and 'project' are not valid spec values
-      expect((result.guide as any).source).toBeDefined();
+      expect(result.guide.metadata.source).toBeDefined();
       expect(["bundled", "ai_generated", "community", "user_edited"]).toContain(
-        (result.guide as any).source,
+        result.guide.metadata.source,
       );
     });
 
@@ -43,7 +48,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
       expect(result.isGeneric).toBe(true);
       expect(result.guide).toBeDefined();
       // G-301: assert source is bundled (recovery used bundled guide)
-      expect(result.source).toBe("bundled");
+      expect(result.guide.metadata.source).toBe("bundled");
     });
 
     it("generic guide corrupted: regenerated from defaults, then returned [COMPAT-08]", async () => {
@@ -54,7 +59,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
       expect(result.isGeneric).toBe(true);
       expect(result.guide).toBeDefined();
       // G-302: assert source is bundled (recovery used bundled guide)
-      expect(result.source).toBe("bundled");
+      expect(result.guide.metadata.source).toBe("bundled");
     });
   });
 
@@ -70,7 +75,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
     it("two guides exist for same type (bundled + ai_generated): user-created guide takes precedence [COMPAT-13]", async () => {
       const result = await getTypeGuide({ type: "dual-guide-type" });
       // G-303: T40-01: spec value is 'user_edited' not 'user'
-      expect(result.guide!.source).toBe("user_edited");
+      expect(result.guide.metadata.source).toBe("user_edited");
     });
   });
 
@@ -78,7 +83,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
     it("type name with mixed case: normalised to lowercase before matching [COMPAT-07]", async () => {
       const lower = await getTypeGuide({ type: "album" });
       const mixed = await getTypeGuide({ type: "Album" });
-      expect(lower.guide!.type).toBe(mixed.guide!.type);
+      expect(lower.guide.metadata.type).toBe(mixed.guide.metadata.type);
     });
   });
 
@@ -104,9 +109,9 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
   describe("provenance [COMPAT-10]", () => {
     it("guide response always includes source field: provenance always present [COMPAT-10]", async () => {
       const result = await getTypeGuide({ type: "album" });
-      expect(result.guide!.source).toBeDefined();
+      expect(result.guide.metadata.source).toBeDefined();
       expect(["bundled", "ai_generated", "community", "user_edited"]).toContain(
-        result.guide!.source,
+        result.guide.metadata.source,
       );
     });
   });
@@ -118,7 +123,7 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
         simulateMtimeChange: true,
       });
       // G-304: assert source is the specific expected value 'user_edited'
-      expect(result.guide!.source).toBe("user_edited");
+      expect(result.guide.metadata.source).toBe("user_edited");
     });
 
     it("guide file mtime unchanged: source field not modified [COMPAT-10]", async () => {
@@ -133,16 +138,13 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
         simulateFirstRun: true,
       });
       expect(result.mtimeIndexPopulated).toBe(true);
-      expect(result.sourceModified).toBeFalsy();
+      expect(result.sourceModified).toBe(false);
     });
   });
 });
 
 describe("YAML security hardening [SEC-09]", () => {
   it("YAML with JavaScript execution attempt → rejected safely [SEC-09]", async () => {
-    const { getTypeGuide } = await import(
-      "../../src/type-intelligence/loading"
-    );
     // A guide file with YAML that attempts JS execution should be handled safely
     const result = await getTypeGuide({
       type: "test-type",
@@ -156,9 +158,6 @@ describe("YAML security hardening [SEC-09]", () => {
   });
 
   it("YAML billion-laughs DoS attempt (deep alias nesting) → rejected safely [SEC-09]", async () => {
-    const { getTypeGuide } = await import(
-      "../../src/type-intelligence/loading"
-    );
     const result = await getTypeGuide({
       type: "test-type",
       simulateYamlContent:
@@ -172,9 +171,6 @@ describe("YAML security hardening [SEC-09]", () => {
   });
 
   it("YAML with __proto__ key → prototype pollution prevented [SEC-09]", async () => {
-    const { getTypeGuide } = await import(
-      "../../src/type-intelligence/loading"
-    );
     const result = await getTypeGuide({
       type: "test-type",
       simulateYamlContent: "__proto__:\n  admin: true\ntype: test-type\n",
@@ -215,7 +211,7 @@ describe("TASK-40: Property Tests", () => {
         fc.constantFrom("album", "film", "xyzunknown"),
         async (type) => {
           const result = await getTypeGuide({ type });
-          expect(result.guide!.source).toBeDefined();
+          expect(result.guide.metadata.source).toBeDefined();
         },
       ),
       { numRuns: 3 },
@@ -252,6 +248,30 @@ describe("TASK-40: Property Tests", () => {
         },
       ),
       { numRuns: 5 },
+    );
+  });
+
+  it("forAll(random type): structural invariant — guide shape always valid [COMPAT-07]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom("album", "novel", "xyzunknown", "ep"),
+        async (type) => {
+          const result = await getTypeGuide({ type });
+          expect(Object.keys(result.guide)).toEqual(
+            expect.arrayContaining([
+              "slug",
+              "displayName",
+              "metadata",
+              "content",
+              "path",
+            ]),
+          );
+          expect(Object.keys(result.guide.metadata)).toEqual(
+            expect.arrayContaining(["type", "source"]),
+          );
+        },
+      ),
+      { numRuns: 4 },
     );
   });
 });

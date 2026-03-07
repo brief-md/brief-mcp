@@ -34,6 +34,17 @@
 - `new Error("No active project")` — matches `/active.*project|no project/i` — THROWN (noActiveProject guard)
 - `duplicateWarning: string` — RETURNED in result (same-section exact duplicate, write NOT blocked)
 
+## type-intelligence/loading
+- No errors thrown — module NEVER returns empty or error (COMPAT-07)
+- Invalid YAML → `yamlFallback: true` in result, warning logged — NOT THROWN
+- Missing/corrupted generic guide → regenerated silently — NOT THROWN
+- Circular parent_type → `circularDetected: true` in result — NOT THROWN
+- `signal` field matches `/no type guide|generic|adaptive/i` on generic fallback — RETURNED
+
+## type-intelligence/creation
+- `new Error("Alias '{x}' conflicts with existing guide '{name}'...")` — matches `/alias|conflict|collision/i` — THROWN (alias collision with higher-precedence guide)
+- `new Error("Guide exceeds size limit...")` — matches `/size|limit/i` — THROWN (guide > 100 KB)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

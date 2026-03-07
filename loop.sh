@@ -218,7 +218,7 @@ $(cat LEARNINGS.md 2>/dev/null || echo '(not found)')
         --dangerously-skip-permissions \
         --output-format stream-json \
         --verbose \
-        --max-turns 25 \
+        --max-turns 30 \
         2>&1 | tee "$AUDIT_LOG" | node scripts/format-log.js || true
       unset AUDIT_MODE
 
@@ -226,6 +226,7 @@ $(cat LEARNINGS.md 2>/dev/null || echo '(not found)')
 
       # Read audit verdict from .loop-signal
       AUDIT_VERDICT="AUDIT_BLOCKED"  # default: fail-safe — agent must write explicit AUDIT_READY
+      BLOCKED_REASON=""              # always defined — set to detail only if signal file says so
       if [ -f ".loop-signal" ]; then
         SIGNAL=$(cat .loop-signal)
         if echo "$SIGNAL" | grep -q "AUDIT_READY"; then
@@ -240,8 +241,18 @@ $(cat LEARNINGS.md 2>/dev/null || echo '(not found)')
       fi
 
       if [ "$AUDIT_VERDICT" = "AUDIT_BLOCKED" ]; then
+        # Save any partial audit work so a reset can't wipe it
+        _AUDIT_PARTIAL=$(git status --porcelain src/ tests/ tasks/ ERROR_CONVENTIONS.md 2>/dev/null | grep -v '^\?\?' | head -1 || true)
+        _AUDIT_PARTIAL_NEW=$(git ls-files --others --exclude-standard src/ tests/ tasks/ 2>/dev/null | head -1 || true)
+        if [ -n "$_AUDIT_PARTIAL" ] || [ -n "$_AUDIT_PARTIAL_NEW" ]; then
+          echo "  -> Saving partial audit work before blocking"
+          git add -A
+          git commit -m "audit: partial fixes for $NEXT_TASK (blocked/incomplete)
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>" || true
+        fi
         echo "  -> AUDIT BLOCKED: $NEXT_TASK cannot proceed — human input required"
-        echo "  -> Reason: $BLOCKED_REASON"
+        echo "  -> Reason: ${BLOCKED_REASON:-(audit crashed or hit max turns without writing signal)}"
         echo "  -> Marking $NEXT_TASK as needs-human-review"
         sed -i "s/| $NEXT_TASK | \([0-9]*\) | pending /| $NEXT_TASK | \1 | needs-human-review /" TASK_INDEX.md
         SKIPPED_TASKS="$SKIPPED_TASKS $NEXT_TASK"
