@@ -59,6 +59,10 @@
 - Exit code `2` — usage error (invalid arguments, missing required args) — RETURNED (not thrown)
 - `errorIfInteractive: string` — matches `/terminal|interactive/i` — RETURNED in detectTTY result (not thrown)
 
+## cli/setup-wizard
+- `new Error("interactive mode requires a terminal")` — matches `/terminal|interactive/i` — THROWN (non-TTY without --yes)
+- `new Error("...directory...invalid path...")` — matches `/directory|not.*dir|invalid.*path/i` — THROWN (workspace root is file, not directory)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

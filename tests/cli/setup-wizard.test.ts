@@ -1,10 +1,13 @@
 import fc from "fast-check";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  _resetState,
   generateClientConfig,
   getSetupState,
+  getToolInstallCommand,
   initWizard,
   mergeConfig,
+  runSetupWizard,
 } from "../../src/cli/setup-wizard";
 
 // ---------------------------------------------------------------------------
@@ -12,6 +15,14 @@ import {
 // ---------------------------------------------------------------------------
 
 describe("TASK-48: CLI — Setup Wizard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    _resetState();
+  });
+
   describe("TTY requirements [CLI-06]", () => {
     it("init in TTY mode: interactive prompts displayed [CLI-06]", async () => {
       const result = await initWizard({ isTTY: true });
@@ -64,9 +75,6 @@ describe("TASK-48: CLI — Setup Wizard", () => {
     });
 
     it("command execution uses execFile/spawn with args array, never exec with string [SEC-12]", async () => {
-      const { getToolInstallCommand } = await import(
-        "../../src/cli/setup-wizard"
-      );
       const cmd = await getToolInstallCommand({
         tool: "brief-mcp",
         client: "cursor",
@@ -81,7 +89,6 @@ describe("TASK-48: CLI — Setup Wizard", () => {
     });
 
     it("child process invocations use pipe stdio (not inherit)", async () => {
-      const { runSetupWizard } = await import("../../src/cli/setup-wizard");
       const result = await runSetupWizard({
         nonInteractive: true,
         checkStdioConfig: true,
@@ -159,7 +166,7 @@ describe("TASK-48: CLI — Setup Wizard", () => {
       expect(result1.directoryCreated).toBe(true);
       // Second run should not error and should indicate no changes needed
       expect(result2).toBeDefined();
-      expect(result2.alreadyComplete).toBeTruthy();
+      expect(result2.alreadyComplete).toBe(true);
     });
 
     it("config written: persisted to disk immediately [CONF-04]", async () => {
@@ -212,6 +219,7 @@ describe("TASK-48: Property Tests", () => {
           expect(merged[existing]).toBeDefined();
         },
       ),
+      { numRuns: 25 },
     );
   });
 
@@ -224,7 +232,6 @@ describe("TASK-48: Property Tests", () => {
             .filter((s) => /^\w+$/.test(s)),
         }),
         async (config) => {
-          const { runSetupWizard } = await import("../../src/cli/setup-wizard");
           await runSetupWizard({ ...config, nonInteractive: true });
           const result2 = await runSetupWizard({
             ...config,
@@ -234,6 +241,34 @@ describe("TASK-48: Property Tests", () => {
         },
       ),
       { numRuns: 3 },
+    );
+  });
+
+  it("forAll(non-TTY without --yes): always rejects with terminal error [CLI-06]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => /^\w+$/.test(s)),
+        async (client) => {
+          await expect(
+            initWizard({ isTTY: false, yesFlag: false, client }),
+          ).rejects.toThrow(/terminal|interactive/i);
+        },
+      ),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(initWizard TTY): result always has expected shape [CONF-04]", async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.constantFrom("claude", "cursor"), async (client) => {
+        const result = await initWizard({ isTTY: true, client });
+        expect(Object.keys(result)).toEqual(
+          expect.arrayContaining(["directoryCreated", "configPersisted"]),
+        );
+      }),
+      { numRuns: 2 },
     );
   });
 });

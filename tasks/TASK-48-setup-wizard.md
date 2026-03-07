@@ -47,6 +47,16 @@ Export from `src/cli/setup-wizard.ts`:
 - `mergeConfig(existing: object, incoming: object) → object` — deep merge, existing values preserved
 - `getSetupState() → { lastCompletedStep?: number }`
 - `getToolInstallCommand(params: { tool: string; client: string }) → { args: string[]; executable: string }` — no shell metacharacters in executable
+- `runSetupWizard(params?: { nonInteractive?: boolean; checkStdioConfig?: boolean; [key: string]: unknown }) → { completed: boolean; childProcessStdioConfig?: string; alreadyComplete?: boolean }` — internal entry point; child process stdio MUST be `pipe` (never `inherit`). Used for idempotency and stdio-config checks.
+- `_resetState() → void` — @internal, resets module-level state for test isolation
+
+## Test Fixtures
+
+- AI clients: `"claude"`, `"cursor"` — used in `generateClientConfig` and `initWizard` client param
+- Tool names: `"tool-a"`, `"tool-b"`, `"tool-c"` — mock tool identifiers for `selectedTools` and property tests
+- Tool install target: `"brief-mcp"` — used in `getToolInstallCommand` tests
+- Valid workspace path: `"/valid/path"` — accepted absolute path
+- Invalid workspace path: `"/etc/hosts"` — file (not directory), triggers validation error
 
 ## Rules
 
