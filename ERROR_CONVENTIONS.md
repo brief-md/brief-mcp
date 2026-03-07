@@ -49,6 +49,10 @@
 - `new Error("Invalid extension name: {name} — only [A-Z0-9 ] characters allowed")` — matches `/character|invalid|name/i` — THROWN (WRITE-16b: invalid chars in extension name)
 - `new Error("Ambiguous subsection '{subsection}' found in multiple extensions: ...")` — matches `/ambiguous|multiple/i` — THROWN (WRITE-17: bare subsection name matches multiple extensions)
 
+## visibility/frameworks
+- `new NotFoundError("Pack '{pack}' not found")` — matches `/not found/i` — THROWN (nonexistent pack)
+- `new Error("No active project")` — matches `/active.*project|no project/i` — THROWN (noActiveProject guard)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

@@ -17,17 +17,17 @@ export interface ActiveOntology {
 }
 
 export interface ProjectFrameworks {
-  readonly projectPath: string;
+  readonly projectPath?: string;
   readonly extensions: ActiveExtension[];
   readonly ontologies: ActiveOntology[];
 }
 
 export interface OntologyRemovalResult {
-  readonly removed: boolean;
-  readonly wasInherited: boolean;
-  readonly excludeAdded: boolean;
-  readonly tagsRemoved: number;
-  readonly filePath: string;
+  readonly removed?: boolean;
+  readonly wasInherited?: boolean;
+  readonly excludeAdded?: boolean;
+  readonly tagsRemoved?: number;
+  readonly filePath?: string;
   readonly parentModified?: boolean;
   readonly contentPreserved?: boolean;
   readonly afterContent?: string;

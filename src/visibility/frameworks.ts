@@ -1,29 +1,28 @@
 // src/visibility/frameworks.ts — stub for TASK-44
 
-export async function getProjectFrameworks(
-  _params: Record<string, unknown>,
-): Promise<{
-  extensions: Array<{ source: string; [key: string]: unknown }>;
-  ontologies: Array<{ source: string; [key: string]: unknown }>;
-  [key: string]: unknown;
-}> {
-  return { extensions: [], ontologies: [] };
+import type {
+  OntologyRemovalResult,
+  ProjectFrameworks,
+} from "../types/visibility.js";
+
+export async function getProjectFrameworks(_params: {
+  project: string;
+}): Promise<ProjectFrameworks> {
+  throw new Error("Not implemented");
 }
 
-export async function detectOrphanedTags(
-  _params: Record<string, unknown>,
-): Promise<{
+export async function detectOrphanedTags(_params: {
+  content: string;
+}): Promise<{
   orphanedTags: string[];
-  [key: string]: unknown;
 }> {
-  return { orphanedTags: [] };
+  throw new Error("Not implemented");
 }
 
-export async function removeOntology(
-  _params: Record<string, unknown>,
-): Promise<{
-  removed: boolean;
-  [key: string]: unknown;
-}> {
-  return { removed: false };
+export async function removeOntology(_params: {
+  ontology: string;
+  removeTags?: boolean;
+  noActiveProject?: boolean;
+}): Promise<OntologyRemovalResult> {
+  throw new Error("Not implemented");
 }

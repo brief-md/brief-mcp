@@ -92,7 +92,7 @@ describe("TASK-44: Visibility — Framework Visibility & Ontology Management", (
       });
       // G-342: assert contentPreserved explicitly
       expect(result.contentPreserved).toBe(true);
-      expect(result.afterContent).not.toContain("<!-- brief:tag");
+      expect(result.afterContent).not.toContain("<!-- brief:ontology");
     });
 
     it("remove_tags: false: HTML comments preserved [ONT-20]", async () => {
@@ -108,7 +108,7 @@ describe("TASK-44: Visibility — Framework Visibility & Ontology Management", (
     it("pack not found in project: error returned [ONT-20]", async () => {
       await expect(
         removeOntology({ ontology: "nonexistent-pack" }),
-      ).rejects.toThrow(/not found|not_found/i);
+      ).rejects.toThrow(/not found/i);
     });
 
     it("no active project: guard error [ARCH-06]", async () => {
@@ -120,15 +120,15 @@ describe("TASK-44: Visibility — Framework Visibility & Ontology Management", (
     it("detects orphaned tags", async () => {
       // G-344: use specific tag ID so check is against the actual tag reference, not just text content
       const result = await detectOrphanedTags({
-        content: "<!-- brief:tag:theme-pack:orphaned-entry-123 -->",
+        content:
+          '<!-- brief:ontology theme-pack orphaned-entry-123 "Orphaned Label" -->',
       });
       expect(result.orphanedTags.length).toBeGreaterThan(0);
-      // Check specific tag ID appears in orphanedTags array rather than matching word "orphaned" in content
+      // Check specific tag ID appears in orphanedTags array (qualified {pack}:{id} format)
       expect(
         result.orphanedTags.some(
           (t: string) =>
-            t.includes("theme-pack:orphaned-entry-123") ||
-            t.includes("orphaned-entry-123"),
+            t.includes("theme-pack") && t.includes("orphaned-entry-123"),
         ),
       ).toBe(true);
     });
@@ -201,6 +201,48 @@ describe("TASK-44: Property Tests", () => {
         },
       ),
       { numRuns: 2 },
+    );
+  });
+
+  it("forAll(invalid input): always rejects for nonexistent pack removal", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 1, maxLength: 30 })
+          .filter(
+            (s) =>
+              ![
+                "local-pack",
+                "inherited-pack",
+                "inherited-pack-a",
+                "inherited-pack-b",
+                "pack-a",
+                "pack-b",
+              ].includes(s),
+          ),
+        async (badPack) => {
+          await expect(removeOntology({ ontology: badPack })).rejects.toThrow(
+            /not found/i,
+          );
+        },
+      ),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(framework listing): output structure always has extensions and ontologies arrays", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom("test-project", "child-project", "mixed-project"),
+        async (project) => {
+          const result = await getProjectFrameworks({ project });
+          expect(result).toHaveProperty("extensions");
+          expect(result).toHaveProperty("ontologies");
+          expect(Array.isArray(result.extensions)).toBe(true);
+          expect(Array.isArray(result.ontologies)).toBe(true);
+        },
+      ),
+      { numRuns: 3 },
     );
   });
 });

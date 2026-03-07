@@ -10,6 +10,27 @@
 - Test file: tests/visibility/frameworks.test.ts
 - Estimated context KB: 35
 
+## Test Fixtures
+
+### Project Names (testing seams — implementation must recognise these)
+- `"test-project"` — project with local extensions and local ontologies (with tag counts, versions)
+- `"child-project"` — project that inherits parent extensions (source: inherited)
+- `"mixed-project"` — project with both local and inherited ontologies
+- `"excluding-project"` — project that uses `(excludes: ...)` to opt out of packs: `excluded-pack`, `excluded-pack-b`, `excluded-pack-c`
+
+### Pack Names (testing seams)
+- `"local-pack"` — locally declared ontology pack (removable, has tags in content)
+- `"inherited-pack"` — inherited ontology pack (removal adds excludes, not direct removal)
+- `"inherited-pack-a"`, `"inherited-pack-b"` — inherited packs for property tests (parentModified always false)
+- `"pack-a"`, `"pack-b"` — packs for remove_tags property test (otherPacksPreserved)
+- `"excluded-pack"`, `"excluded-pack-b"`, `"excluded-pack-c"` — excluded packs (never in active frameworks for excluding-project)
+- `"nonexistent-pack"` — pack not found in any project (triggers NotFoundError)
+
+### Tag Format
+- Ontology tags use canonical format: `<!-- brief:ontology {pack} {id} "{label}" -->`
+- Example orphaned tag: `<!-- brief:ontology theme-pack orphaned-entry-123 "Orphaned Label" -->`
+- Orphaned tag detection returns qualified IDs in `{pack}:{id}` format
+
 ## What To Build
 
 Implement two MCP tools: `brief_get_project_frameworks` and `brief_remove_ontology`. The frameworks tool returns all extensions and ontologies active for a project, distinguishing local declarations from inherited ones, including version and tag count for each. Inheritance is computed via the hierarchy walker. The remove ontology tool handles local packs (removes from `**Ontologies:**` metadata) and inherited packs (adds `(excludes: pack-name)` per additive inheritance opt-out). It includes an optional `remove_tags` flag to strip all `brief:ontology` HTML comments for that pack while preserving free text. It never modifies parent files. It also supports orphaned tag detection on pack update.
