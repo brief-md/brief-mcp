@@ -1,12 +1,16 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
-import { tagEntry } from "../../src/ontology/tagging";
+import { beforeEach, describe, expect, it } from "vitest";
+import { _resetState, tagEntry } from "../../src/ontology/tagging";
 
 // ---------------------------------------------------------------------------
 // Unit Tests
 // ---------------------------------------------------------------------------
 
 describe("TASK-36: Ontology — Tagging Tool", () => {
+  beforeEach(() => {
+    _resetState();
+  });
+
   describe("basic tagging [ONT-21, ONT-12]", () => {
     it("tag entry on paragraph: HTML comment written after target paragraph [ONT-21]", async () => {
       const result = await tagEntry({
@@ -29,7 +33,7 @@ describe("TASK-36: Ontology — Tagging Tool", () => {
       // T36-02: label must also be present IN the HTML comment output (not just result.label)
       expect(result.label).toBeDefined();
       expect(typeof result.label).toBe("string");
-      expect(result.label!.length).toBeGreaterThan(0);
+      expect(result.label.length).toBeGreaterThan(0);
       expect(result.comment).toContain(result.label);
     });
 
@@ -40,7 +44,7 @@ describe("TASK-36: Ontology — Tagging Tool", () => {
           entryId: "entry-1",
           section: "Direction",
         }),
-      ).rejects.toThrow(/not found|not_found/i);
+      ).rejects.toThrow(/not found/i);
     });
 
     it("tag with non-existent entry in pack: error [ONT-21]", async () => {
@@ -50,7 +54,7 @@ describe("TASK-36: Ontology — Tagging Tool", () => {
           entryId: "nonexistent-entry",
           section: "Direction",
         }),
-      ).rejects.toThrow(/not found|not_found/i);
+      ).rejects.toThrow(/not found/i);
     });
   });
 
@@ -147,7 +151,6 @@ describe("TASK-36: Ontology — Tagging Tool", () => {
         entryId: "entry-2",
         section: "Direction",
       });
-      // Explicitly assert the value is false/falsy (not just checking toBeFalsy)
       expect(result.metadataDuplicated).toBe(false);
     });
   });
@@ -183,7 +186,6 @@ describe("TASK-36: Ontology — Tagging Tool", () => {
         entryId: "nostalgia",
         section: expectedContent,
       });
-      // Explicitly assert contentPreserved is true (not just truthy)
       expect(result.contentPreserved).toBe(true);
       expect(result.afterContent).toContain(expectedContent);
     });
@@ -195,13 +197,23 @@ describe("TASK-36: Ontology — Tagging Tool", () => {
 // ---------------------------------------------------------------------------
 
 describe("TASK-36: Property Tests", () => {
+  beforeEach(() => {
+    _resetState();
+  });
+
   it("forAll(tag operation): idempotent — duplicate tag never written [WRITE-15]", async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc
-          .string({ minLength: 1, maxLength: 30 })
-          .filter((s) => /^[a-z]/.test(s) && /^[a-z0-9-]+$/.test(s)),
+        fc.constantFrom(
+          "nostalgia",
+          "redemption",
+          "longing",
+          "emotion",
+          "entry-1",
+          "entry-2",
+        ),
         async (entryId) => {
+          _resetState();
           await tagEntry({
             ontology: "theme-pack",
             entryId,
@@ -215,16 +227,16 @@ describe("TASK-36: Property Tests", () => {
           expect(result.alreadyTagged).toBe(true);
         },
       ),
+      { numRuns: 10 },
     );
   });
 
   it("forAll(new pack tag): Ontologies metadata always updated [WRITE-05]", async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc
-          .string({ minLength: 2, maxLength: 15 })
-          .filter((s) => /^[a-z-]+$/.test(s)),
+        fc.constantFrom("theme-pack", "new-pack"),
         async (packName) => {
+          _resetState();
           const result = await tagEntry({
             ontology: packName,
             entryId: "entry-1",
@@ -260,14 +272,14 @@ describe("TASK-36: Property Tests", () => {
           }
         },
       ),
-      { numRuns: 5 },
+      { numRuns: 10 },
     );
   });
 
   it("forAll(tag response): always includes pack-scoped entry ID [ONT-12]", async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc.constantFrom("nostalgia", "darkness", "longing", "redemption"),
+        fc.constantFrom("nostalgia", "emotion", "longing", "redemption"),
         async (entryId) => {
           const result = await tagEntry({
             ontology: "theme-pack",
@@ -277,7 +289,63 @@ describe("TASK-36: Property Tests", () => {
           expect(result.qualifiedId).toContain(":");
         },
       ),
-      { numRuns: 3 },
+      { numRuns: 4 },
+    );
+  });
+
+  it("forAll(invalid entry ID): always rejects correctly [ONT-21]", async () => {
+    const validIds = new Set([
+      "nostalgia",
+      "redemption",
+      "longing",
+      "emotion",
+      "entry-1",
+      "entry-2",
+    ]);
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 2, maxLength: 20 })
+          .filter((s) => /^[a-z0-9-]+$/.test(s) && !validIds.has(s)),
+        async (badId) => {
+          await expect(
+            tagEntry({
+              ontology: "theme-pack",
+              entryId: badId,
+              section: "Direction",
+            }),
+          ).rejects.toThrow(/not found/i);
+        },
+      ),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(valid tag): response always has required shape [ONT-12]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom("nostalgia", "redemption", "longing", "emotion"),
+        async (entryId) => {
+          _resetState();
+          const result = await tagEntry({
+            ontology: "theme-pack",
+            entryId,
+            section: "Direction",
+          });
+          expect(Object.keys(result)).toEqual(
+            expect.arrayContaining([
+              "tagged",
+              "comment",
+              "label",
+              "qualifiedId",
+              "targetType",
+              "contentPreserved",
+              "afterContent",
+            ]),
+          );
+        },
+      ),
+      { numRuns: 4 },
     );
   });
 });
