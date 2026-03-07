@@ -39,6 +39,30 @@ export interface ReverseReferenceIndexEntry {
   readonly title: string;
 }
 
+export interface LookupReferenceParams {
+  readonly creator?: string;
+  readonly title?: string;
+  readonly type_filter?: string;
+}
+
+export interface LookupReferenceResult {
+  readonly label?: string;
+  readonly name?: string;
+  readonly creator?: string;
+  readonly title?: string;
+  readonly type: string;
+  readonly pack: string;
+}
+
+export interface LookupReferenceResponse {
+  readonly results: LookupReferenceResult[];
+  readonly groupedByType?: Record<string, LookupReferenceResult[]>;
+  readonly aiKnowledgePrimary?: boolean;
+  readonly indexRebuilt?: boolean;
+  readonly discoverabilityUpdated?: boolean;
+  readonly removed?: boolean;
+}
+
 export type ReferenceSourceTier = 1 | 2 | 3;
 
 export interface SuggestedReference {
