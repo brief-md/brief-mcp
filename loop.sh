@@ -423,6 +423,67 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
     ITER_DURATION=$((ITER_END - ITER_START))
     extract_tokens "$CONT_LOG" "CONTINUATION"
     echo "  Continuation agent finished (exit: $EXIT_CODE, total ${ITER_DURATION}s)"
+
+    # --- Second continuation: if first continuation also hit max turns with uncommitted changes ---
+    HIT_MAX_TURNS_CONT=$(grep -c '"subtype":"error_max_turns"' "$CONT_LOG" 2>/dev/null) || HIT_MAX_TURNS_CONT=0
+    HAS_CHANGES_CONT=$(git diff --name-only 2>/dev/null | head -1)
+    if [ -z "$HAS_CHANGES_CONT" ]; then
+      HAS_CHANGES_CONT=$(git ls-files --others --exclude-standard src/ 2>/dev/null | head -1)
+    fi
+    LATEST_COMMIT_TIME_CONT=$(git log -1 --format=%ct 2>/dev/null || echo "0")
+
+    if [ "$HIT_MAX_TURNS_CONT" -gt 0 ] && [ -n "$HAS_CHANGES_CONT" ] && [ "$LATEST_COMMIT_TIME_CONT" -lt "$ITER_START" ]; then
+      echo "  -> Continuation also hit max turns — spawning second continuation agent"
+      CONT2_LOG="$LOG_DIR/iteration-${ITERATION}-continue2-$(date '+%Y%m%d-%H%M%S').log"
+
+      CONT2_PROMPT="$(cat PROMPT_continue_v2.md)
+
+========================================
+PRE-LOADED CONTEXT
+========================================
+
+=== TASK_INDEX.md ===
+$(cat TASK_INDEX.md)
+
+=== Task Packet ===
+$(cat "$TASK_FILE" 2>/dev/null | sed \
+  's/^- Module path: .*/- Module path: (pre-loaded)/' | sed \
+  's/^- Also read: .*/- Also read: (pre-loaded)/' \
+  || echo '(task file not found)')
+
+=== BUGS.md ===
+$(cat BUGS.md)
+
+=== LEARNINGS.md ===
+$(cat LEARNINGS.md)
+
+=== LOCKED_FILES.txt ===
+$(cat LOCKED_FILES.txt 2>/dev/null || echo '(no locked files)')
+
+=== Uncommitted changes (tracked files) ===
+$(git diff 2>/dev/null | head -400)
+
+=== New untracked src/ files (new implementations not yet in git) ===
+$(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r f; do echo "--- $f ---"; cat "$f"; done | head -400)
+"
+
+      CONT2_PROMPT_FILE="$LOG_DIR/prompt-${ITERATION}-continue2.txt"
+      printf '%s' "$CONT2_PROMPT" > "$CONT2_PROMPT_FILE"
+      export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000
+      cat "$CONT2_PROMPT_FILE" | claude \
+        --model claude-opus-4-6 \
+        --dangerously-skip-permissions \
+        --output-format stream-json \
+        --verbose \
+        --max-turns 20 \
+        2>&1 | tee "$CONT2_LOG" | node scripts/format-log.js || true
+
+      EXIT_CODE=${PIPESTATUS[0]}
+      ITER_END=$(date +%s)
+      ITER_DURATION=$((ITER_END - ITER_START))
+      extract_tokens "$CONT2_LOG" "CONTINUATION2"
+      echo "  Second continuation agent finished (exit: $EXIT_CODE, total ${ITER_DURATION}s)"
+    fi
   fi
 
   echo "=== Iteration $ITERATION finished in ${ITER_DURATION}s (exit: $EXIT_CODE) ==="
