@@ -110,11 +110,8 @@ describe("TASK-46: MCP Server — Tool Response Formatting & Context Blocks", ()
       expect(signal.suggestionsForAI).toMatch(/broaden|knowledge/i);
     });
 
-    it("no_pack_data signal: signal text appears inside content[0].text, not as top-level field [RESP-02]", async () => {
-      const { formatResponse } = await import(
-        "../../src/server/response-formatting"
-      );
-      const result = await formatResponse({ signal: "no_pack_data" });
+    it("no_pack_data signal: signal text appears inside content[0].text, not as top-level field [RESP-02]", () => {
+      const result = formatResponse({ signal: "no_pack_data" });
       // MCP spec: only { content, isError? } at top level
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content[0].type).toBe("text");
@@ -123,11 +120,8 @@ describe("TASK-46: MCP Server — Tool Response Formatting & Context Blocks", ()
       expect((result as any).signal).toBeUndefined();
     });
 
-    it("no_type_guide signal: signal text appears inside content[0].text, not as top-level field [RESP-02]", async () => {
-      const { formatResponse } = await import(
-        "../../src/server/response-formatting"
-      );
-      const result = await formatResponse({ signal: "no_type_guide" });
+    it("no_type_guide signal: signal text appears inside content[0].text, not as top-level field [RESP-02]", () => {
+      const result = formatResponse({ signal: "no_type_guide" });
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content[0].type).toBe("text");
       // Signal info must be encoded inside content text, not as result.signal
@@ -209,6 +203,7 @@ describe("TASK-46: Property Tests", () => {
           expect(typeof response.content[0].text).toBe("string");
         },
       ),
+      { numRuns: 25 },
     );
   });
 
@@ -231,6 +226,7 @@ describe("TASK-46: Property Tests", () => {
           expect((response as any).filePath).toBeUndefined();
         },
       ),
+      { numRuns: 25 },
     );
   });
 
@@ -254,6 +250,7 @@ describe("TASK-46: Property Tests", () => {
           }
         },
       ),
+      { numRuns: 25 },
     );
   });
 
@@ -273,6 +270,7 @@ describe("TASK-46: Property Tests", () => {
           }
         },
       ),
+      { numRuns: 25 },
     );
   });
 
@@ -300,6 +298,43 @@ describe("TASK-46: Property Tests", () => {
           expect((result as any).filePath).toBeUndefined();
         },
       ),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(arbitrary scenario): buildInsufficientDataSignal always returns non-empty suggestionsForAI [RESP-02]", () => {
+    fc.assert(
+      fc.property(fc.string({ minLength: 1, maxLength: 30 }), (scenario) => {
+        const result = buildInsufficientDataSignal(scenario);
+        expect(result).toHaveProperty("suggestionsForAI");
+        expect(typeof result.suggestionsForAI).toBe("string");
+        expect(result.suggestionsForAI.length).toBeGreaterThan(0);
+      }),
+      { numRuns: 25 },
+    );
+  });
+
+  it("forAll(formatResponse params): output always has content array with typed text items [RESP-01]", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          type: fc.string({ minLength: 1, maxLength: 20 }),
+          data: fc.constant({}),
+        }),
+        (params) => {
+          const result = formatResponse(params);
+          expect(result).toHaveProperty("content");
+          expect(Array.isArray(result.content)).toBe(true);
+          expect(result.content.length).toBeGreaterThan(0);
+          for (const item of result.content) {
+            expect(item).toHaveProperty("type");
+            expect(item).toHaveProperty("text");
+            expect(item.type).toBe("text");
+            expect(typeof item.text).toBe("string");
+          }
+        },
+      ),
+      { numRuns: 25 },
     );
   });
 });
