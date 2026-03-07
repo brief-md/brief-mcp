@@ -135,15 +135,18 @@ describe("TASK-48: CLI — Setup Wizard", () => {
       expect(result.workspaceRootValid).toBe(true);
     });
 
-    it("workspace root path is a file (not directory): validation error [CLI-08, T48-02]", async () => {
-      await expect(
-        initWizard({
-          isTTY: false,
-          yesFlag: true,
-          workspaceRoot: "/etc/hosts",
-        }),
-      ).rejects.toThrow(/directory|not.*dir|invalid.*path/i);
-    });
+    it.skipIf(process.platform === "win32")(
+      "workspace root path is a file (not directory): validation error [CLI-08, T48-02]",
+      async () => {
+        await expect(
+          initWizard({
+            isTTY: false,
+            yesFlag: true,
+            workspaceRoot: "/etc/hosts",
+          }),
+        ).rejects.toThrow(/directory|not.*dir|invalid.*path/i);
+      },
+    );
   });
 
   describe("resumable state [CONF-04]", () => {
