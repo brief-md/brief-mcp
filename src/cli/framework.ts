@@ -1,18 +1,13 @@
 // src/cli/framework.ts — stub for TASK-47
 
-export function detectTTY(options?: {
-  isTTY?: boolean;
-  yesFlag?: boolean;
-  [key: string]: unknown;
-}): {
+export function detectTTY(options: { isTTY: boolean; yesFlag?: boolean }): {
   interactive: boolean;
   errorIfInteractive?: string;
   acceptDefaults?: boolean;
-  progressMode?: string;
-  [key: string]: unknown;
+  progressMode: "spinner" | "status-lines";
 } {
-  const isTTY = options?.isTTY ?? process.stdout.isTTY === true;
-  const yesFlag = options?.yesFlag ?? false;
+  const isTTY = options.isTTY;
+  const yesFlag = options.yesFlag ?? false;
 
   if (isTTY) {
     return { interactive: true, progressMode: "spinner" };
@@ -32,17 +27,25 @@ export function detectTTY(options?: {
   };
 }
 
-export function resolveLogLevel(_options?: Record<string, unknown>): string {
+export function resolveLogLevel(_options?: {
+  verbose?: boolean;
+  quiet?: boolean;
+  env?: Record<string, string>;
+}): string {
   return "info";
 }
 
-export function resolveColorMode(_options?: Record<string, unknown>): string {
+export function resolveColorMode(_options: {
+  env?: Record<string, string>;
+  noColor?: boolean;
+  isTTY: boolean;
+}): string {
   return "auto";
 }
 
 export async function parseArgs(
   _argv?: string[],
-): Promise<{ exitCode: number; [key: string]: unknown }> {
+): Promise<{ exitCode: 0 | 1 | 2; output?: string; workspaceRoot?: string }> {
   return { exitCode: 0 };
 }
 

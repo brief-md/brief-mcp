@@ -1,17 +1,24 @@
 import fc from "fast-check";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectTTY,
+  getLogTarget,
   parseArgs,
   resolveColorMode,
   resolveLogLevel,
 } from "../../src/cli/framework";
+import * as serverLogger from "../../src/server/logger";
+import { captureStdout } from "../../src/server/stdout-guard";
 
 // ---------------------------------------------------------------------------
 // Unit Tests
 // ---------------------------------------------------------------------------
 
 describe("TASK-47: CLI — Framework", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("exit codes [CLI-01]", () => {
     it("valid command: exit code 0 [CLI-01]", async () => {
       const result = await parseArgs(["--version"]);
@@ -142,9 +149,6 @@ describe("TASK-47: CLI — Framework", () => {
 
   describe("stdout/stderr discipline [CLI-05]", () => {
     it("stdout: never contains logs or progress indicators [CLI-05]", async () => {
-      const { captureStdout } = await import("../../src/server/stdout-guard");
-      const { resolveLogLevel } = await import("../../src/cli/framework");
-
       const captured = await captureStdout(async () => {
         // Calling CLI utilities should not write to stdout
         resolveLogLevel({ env: { BRIEF_LOG_LEVEL: "debug" } });
@@ -152,10 +156,7 @@ describe("TASK-47: CLI — Framework", () => {
       expect(captured).toBe("");
     });
 
-    it("log output routes to stderr not stdout [CLI-05]", async () => {
-      const { resolveLogLevel } = await import("../../src/cli/framework");
-      const logger = await import("../../src/server/logger");
-
+    it("log output routes to stderr not stdout [CLI-05]", () => {
       const stdoutSpy = vi
         .spyOn(process.stdout, "write")
         .mockImplementation(() => true);
@@ -163,9 +164,8 @@ describe("TASK-47: CLI — Framework", () => {
         .spyOn(process.stderr, "write")
         .mockImplementation(() => true);
 
-      const info = (logger as any).info ?? (logger as any).default?.info;
-      expect(info).toBeDefined();
-      info("test message");
+      expect(serverLogger.info).toBeDefined();
+      serverLogger.info("test message");
 
       expect(stderrSpy).toHaveBeenCalled();
       expect(stdoutSpy).not.toHaveBeenCalledWith(
@@ -188,7 +188,7 @@ describe("TASK-47: Property Tests", () => {
         const result = await parseArgs([flag]);
         expect(result.exitCode).toBe(0);
       }),
-      { numRuns: 5 }, // G3: raised from 2
+      { numRuns: 5 },
     );
   });
 
@@ -197,11 +197,11 @@ describe("TASK-47: Property Tests", () => {
       fc.asyncProperty(
         fc.constantFrom("debug", "info", "warn", "error"),
         async (level) => {
-          const { getLogTarget } = await import("../../src/cli/framework");
           const target = await getLogTarget(level);
           expect(target).toBe("stderr");
         },
       ),
+      { numRuns: 10 },
     );
   });
 
@@ -210,7 +210,6 @@ describe("TASK-47: Property Tests", () => {
       fc.asyncProperty(
         fc.constantFrom("valid", "unknown-flag", "missing-required"),
         async (scenario) => {
-          const { parseArgs } = await import("../../src/cli/framework");
           if (scenario === "valid") {
             const result = await parseArgs(["--version"]);
             expect(result.exitCode).toBe(0);
@@ -224,6 +223,7 @@ describe("TASK-47: Property Tests", () => {
           }
         },
       ),
+      { numRuns: 10 },
     );
   });
 
@@ -233,6 +233,35 @@ describe("TASK-47: Property Tests", () => {
         const tty = detectTTY({ isTTY: false, yesFlag });
         expect(tty.interactive).toBe(false);
       }),
+      { numRuns: 25 },
+    );
+  });
+
+  it("forAll(random args): exit code is always 0, 1, or 2 [CLI-01]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(fc.string({ minLength: 1, maxLength: 30 }), {
+          minLength: 0,
+          maxLength: 5,
+        }),
+        async (args) => {
+          const result = await parseArgs(args);
+          expect([0, 1, 2]).toContain(result.exitCode);
+        },
+      ),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(detectTTY): result always has interactive and progressMode [CLI-06]", () => {
+    fc.assert(
+      fc.property(fc.boolean(), fc.boolean(), (isTTY, yesFlag) => {
+        const result = detectTTY({ isTTY, yesFlag });
+        expect(result).toHaveProperty("interactive");
+        expect(result).toHaveProperty("progressMode");
+        expect(["spinner", "status-lines"]).toContain(result.progressMode);
+      }),
+      { numRuns: 25 },
     );
   });
 });

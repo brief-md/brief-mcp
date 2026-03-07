@@ -53,6 +53,12 @@
 - `new NotFoundError("Pack '{pack}' not found")` — matches `/not found/i` — THROWN (nonexistent pack)
 - `new Error("No active project")` — matches `/active.*project|no project/i` — THROWN (noActiveProject guard)
 
+## cli/framework
+- Exit code `0` — success — RETURNED (not thrown)
+- Exit code `1` — runtime error (tool failure, file not found, parse error) — RETURNED (not thrown)
+- Exit code `2` — usage error (invalid arguments, missing required args) — RETURNED (not thrown)
+- `errorIfInteractive: string` — matches `/terminal|interactive/i` — RETURNED in detectTTY result (not thrown)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN
