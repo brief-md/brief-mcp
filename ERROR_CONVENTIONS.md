@@ -30,6 +30,10 @@
 - `new NotFoundError("Pack '{pack}' not found")` — matches `/not.?found/i` — THROWN (non-existent pack)
 - `new NotFoundError("Entry '{pack}:{id}' not found")` — matches `/not.?found/i` — THROWN (non-existent entry)
 
+## reference/writing
+- `new Error("No active project")` — matches `/active.*project|no project/i` — THROWN (noActiveProject guard)
+- `duplicateWarning: string` — RETURNED in result (same-section exact duplicate, write NOT blocked)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN
