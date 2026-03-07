@@ -330,14 +330,14 @@ $TYPE_CONTENT
   fi
 
   # --- Snapshot bug count before running build agent ---
-  BUGS_COUNT_BEFORE=$(grep -c '^### BUG-' BUGS.md 2>/dev/null || echo "0")
+  BUGS_COUNT_BEFORE=$(grep -c '^### BUG-' BUGS.md 2>/dev/null || true)
 
   # --- Run build agent ---
   PROMPT_FILE="$LOG_DIR/prompt-${ITERATION}.txt"
   printf '%s' "$DYNAMIC_PROMPT" > "$PROMPT_FILE"
   export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000
   cat "$PROMPT_FILE" | claude \
-    --model claude-sonnet-4-6 \
+    --model claude-opus-4-6 \
     --dangerously-skip-permissions \
     --output-format stream-json \
     --verbose \
@@ -411,7 +411,7 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
     printf '%s' "$CONT_PROMPT" > "$CONT_PROMPT_FILE"
     export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000
     cat "$CONT_PROMPT_FILE" | claude \
-      --model claude-sonnet-4-6 \
+      --model claude-opus-4-6 \
       --dangerously-skip-permissions \
       --output-format stream-json \
       --verbose \
@@ -537,7 +537,7 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
     git checkout HEAD -- src/ 2>/dev/null || true
 
     # Crash detection
-    BUGS_COUNT_AFTER=$(grep -c '^### BUG-' BUGS.md 2>/dev/null || echo "0")
+    BUGS_COUNT_AFTER=$(grep -c '^### BUG-' BUGS.md 2>/dev/null || true)
     IN_PROGRESS_TASK=$(grep 'in-progress' TASK_INDEX.md 2>/dev/null | grep -oE 'TASK-[0-9]+[a-z]*' | head -1 || true)
     if [ -n "$IN_PROGRESS_TASK" ] && [ "$BUGS_COUNT_AFTER" -le "$BUGS_COUNT_BEFORE" ]; then
       echo "  CRASH DETECTED: $IN_PROGRESS_TASK failed without writing a new bug entry"
@@ -548,7 +548,11 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
       NEXT_BUG_PAD=$(printf "%03d" $NEXT_BUG)
 
       CRASH_REASON="unknown"
-      if grep -q 'UND_ERR_SOCKET\|ECONNRESET\|ETIMEDOUT' "$ITER_LOG" 2>/dev/null; then
+      if grep -qE "You.ve hit your limit|rate.?limit|overloaded" "$ITER_LOG" 2>/dev/null; then
+        CRASH_REASON="API rate limit hit"
+      elif grep -qE 'ECONNREFUSED|ConnectionRefused|Unable to connect to API' "$ITER_LOG" 2>/dev/null; then
+        CRASH_REASON="API connection refused"
+      elif grep -q 'UND_ERR_SOCKET\|ECONNRESET\|ETIMEDOUT' "$ITER_LOG" 2>/dev/null; then
         CRASH_REASON="API connection error (socket/timeout)"
       elif [ "$HIT_MAX_TURNS" -gt 0 ]; then
         CRASH_REASON="hit max-turns limit without completing"
@@ -556,7 +560,12 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
         CRASH_REASON="out of memory"
       fi
 
-      PREV_ATTEMPTS=$(grep -c "$IN_PROGRESS_TASK.*Attempt" BUGS.md 2>/dev/null || echo "0")
+      if [[ "$CRASH_REASON" == *"rate limit"* ]]; then
+        echo "  -> Rate limited — sleeping 60s before retry"
+        sleep 60
+      fi
+
+      PREV_ATTEMPTS=$(grep -c "$IN_PROGRESS_TASK.*Attempt" BUGS.md 2>/dev/null || true)
       ATTEMPT_NUM=$((PREV_ATTEMPTS + 1))
 
       printf '\n### BUG-%s: %s — Attempt %d [Tier 3]\n' "$NEXT_BUG_PAD" "$IN_PROGRESS_TASK" "$ATTEMPT_NUM" >> BUGS.md
@@ -628,7 +637,7 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
   fi
 
   # --- Check if all tasks are done ---
-  REMAINING=$(grep -c 'pending\|in-progress' TASK_INDEX.md 2>/dev/null || echo "0")
+  REMAINING=$(grep -c 'pending\|in-progress' TASK_INDEX.md 2>/dev/null || true)
   if [ "$REMAINING" -eq 0 ]; then
     echo "=== All tasks completed or escalated to human review! ==="
     break
@@ -640,9 +649,9 @@ done
 
 echo ""
 echo "=== Loop finished after $ITERATION iterations ==="
-COMPLETED=$(grep -c 'completed' TASK_INDEX.md 2>/dev/null || echo "0")
-HUMAN_REVIEW=$(grep -c 'needs-human-review' TASK_INDEX.md 2>/dev/null || echo "0")
-STILL_PENDING=$(grep -c 'pending\|in-progress' TASK_INDEX.md 2>/dev/null || echo "0")
+COMPLETED=$(grep -c 'completed' TASK_INDEX.md 2>/dev/null || true)
+HUMAN_REVIEW=$(grep -c 'needs-human-review' TASK_INDEX.md 2>/dev/null || true)
+STILL_PENDING=$(grep -c 'pending\|in-progress' TASK_INDEX.md 2>/dev/null || true)
 echo "  Completed: $COMPLETED"
 echo "  Needs human review: $HUMAN_REVIEW"
 echo "  Still pending: $STILL_PENDING"
