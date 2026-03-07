@@ -339,7 +339,7 @@ export interface LookupReferenceOutput {
 
 export interface AddReferenceInput {
   readonly section: string;
-  readonly creator?: string;
+  readonly creator: string;
   readonly title: string;
   readonly notes?: string;
   readonly ontologyLinks?: Array<{ pack: string; entryId: string }>;

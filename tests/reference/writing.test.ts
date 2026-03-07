@@ -1,12 +1,21 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
-import { addReference } from "../../src/reference/writing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { _resetState, addReference } from "../../src/reference/writing";
 
 // ---------------------------------------------------------------------------
 // Unit Tests
 // ---------------------------------------------------------------------------
 
 describe("TASK-39: Reference — Writing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetState();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("basic writing [REF-04, REF-10]", () => {
     it("add reference with creator, title, and notes: entry written in correct format [REF-04]", async () => {
       const result = await addReference({
@@ -47,9 +56,9 @@ describe("TASK-39: Reference — Writing", () => {
       expect(result.refLinkComments).toBeDefined();
       expect(result.refLinkComments!.length).toBe(1);
       // G-292: assert link content matches <!-- brief:ref-link {pack} {id} --> format [T39-03, T39-04]
-      expect(result.refLinkComments[0].text).toContain("theme-pack");
-      expect(result.refLinkComments[0].text).toContain("freedom");
-      expect(result.refLinkComments[0].text).toMatch(
+      expect(result.refLinkComments![0].text).toContain("theme-pack");
+      expect(result.refLinkComments![0].text).toContain("freedom");
+      expect(result.refLinkComments![0].text).toMatch(
         /<!--\s*brief:ref-link\s+theme-pack\s+freedom\s*-->/,
       );
     });
@@ -66,8 +75,8 @@ describe("TASK-39: Reference — Writing", () => {
       });
       expect(result.refLinkComments!.length).toBe(2);
       // G-293: assert each link contains expected text
-      expect(result.refLinkComments[0].text).toContain("freedom");
-      expect(result.refLinkComments[1].text).toContain("nature");
+      expect(result.refLinkComments![0].text).toContain("freedom");
+      expect(result.refLinkComments![1].text).toContain("nature");
     });
 
     it("add reference without ontology_links: no ref-link comments written [REF-10]", async () => {
@@ -99,7 +108,7 @@ describe("TASK-39: Reference — Writing", () => {
         title: "New Film",
       });
       expect(result.written).toBe(true);
-      expect(result.sectionCreated).toBeFalsy();
+      expect(result.sectionCreated).toBe(false);
     });
   });
 
@@ -148,7 +157,7 @@ describe("TASK-39: Reference — Writing", () => {
       expect(result.contentPreserved).toBe(true);
       expect(result.originalContent).toBeDefined();
       expect(result.afterContent).toContain(
-        (result.originalContent as any).slice(0, 50),
+        result.originalContent.slice(0, 50),
       );
     });
   });
@@ -172,6 +181,15 @@ describe("TASK-39: Reference — Writing", () => {
 // ---------------------------------------------------------------------------
 
 describe("TASK-39: Property Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetState();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   // G-297: make async and await fc.assert
   it("forAll(reference with ontology_links): ref-link comments always written [REF-04]", async () => {
     await fc.assert(
@@ -260,6 +278,56 @@ describe("TASK-39: Property Tests", () => {
             title,
           });
           expect(result.filePath).toBeDefined();
+        },
+      ),
+      { numRuns: 5 },
+    );
+  });
+
+  // Negative property: missing required fields always rejects
+  it("forAll(invalid input): always rejects for noActiveProject guard", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 2, maxLength: 15 })
+          .filter((s) => /^[a-zA-Z]+$/.test(s)),
+        async (title) => {
+          await expect(
+            addReference({
+              section: "References: Test",
+              creator: "Author",
+              title,
+              noActiveProject: true,
+            }),
+          ).rejects.toThrow(/active.*project|no project/i);
+        },
+      ),
+      { numRuns: 10 },
+    );
+  });
+
+  // Structural invariant: result objects always have required fields
+  it("forAll(add operation): result always has required output fields", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc
+          .string({ minLength: 2, maxLength: 15 })
+          .filter((s) => /^[a-zA-Z]+$/.test(s)),
+        async (title) => {
+          const result = await addReference({
+            section: "References: Test",
+            creator: "Author",
+            title,
+          });
+          expect(Object.keys(result)).toEqual(
+            expect.arrayContaining([
+              "written",
+              "referenceText",
+              "format",
+              "contentPreserved",
+              "filePath",
+            ]),
+          );
         },
       ),
       { numRuns: 5 },
