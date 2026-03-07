@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Hook script: blocks Read/Grep/Glob access to tests/ directory
+// Hook script: blocks Read/Grep/Glob/Bash access to tests/ directory
 // Used as a PreToolUse hook in .claude/settings.json
 
 let data = "";
@@ -19,7 +19,13 @@ process.stdin.on("end", () => {
     const blocked = normalized.some((p) =>
       /\/tests\/|\/tests$|^tests\/|^tests$/.test(p)
     );
-    if (blocked && !process.env.AUDIT_MODE) {
+    // Also block Bash: git show / git cat-file targeting tests/ via refspec colon notation.
+    // Anchored to start of command (^) so commit messages and node -e strings containing
+    // "git show" as text don't false-positive. The colon (:tests/) is required so that
+    // normal "git show HEAD -- src/..." path args aren't caught.
+    const cmd = (ti.command || "").replace(/\\/g, "/").toLowerCase().trimStart();
+    const bashBlocked = /^git\s+(show|cat-file)\b[^;|&\n]*:tests\//.test(cmd);
+    if ((blocked || bashBlocked) && !process.env.AUDIT_MODE) {
       process.stdout.write(JSON.stringify({
         decision: "block",
         reason: "Access to tests/ directory is prohibited. Implement based on task packet and vitest output only."
