@@ -49,7 +49,7 @@
 | TASK-40 | 43 | completed | TASK-06, TASK-08 | Type guide loading & resolution |
 | TASK-41 | 44 | completed | TASK-40, TASK-14, TASK-08 | Type guide creation |
 | TASK-42 | 45 | completed | TASK-40, TASK-08 | Extension suggestion |
-| TASK-43 | 46 | pending | TASK-14, TASK-16, TASK-08 | Extension creation & listing |
+| TASK-43 | 46 | completed | TASK-14, TASK-16, TASK-08 | Extension creation & listing |
 | TASK-44 | 47 | pending | TASK-18, TASK-16, TASK-08 | Framework visibility & ontology management |
 | TASK-46 | 48 | pending | TASK-24, TASK-08 | Tool response formatting & context blocks |
 | TASK-47 | 49 | pending | TASK-01, TASK-03 | CLI framework |
