@@ -11,6 +11,10 @@ const DEFAULT_BRIEF_CONTENT = [
   "",
   "- Bon Iver: For Emma, Forever Ago (2007, debut album)",
   "",
+  "## References: Films",
+  "",
+  "- Sean Penn: Into the Wild (2007, themes of freedom)",
+  "",
 ].join("\n");
 
 const DEFAULT_FILE_PATH = "/project/BRIEF.md";
@@ -174,16 +178,13 @@ export async function addReference(params: {
   // Track reference for deduplication
   _writtenRefs.push({ section, creator, title });
 
-  // Build format descriptor
-  const format = notes ? "{creator}: {title} ({notes})" : "{creator}: {title}";
-
-  // Build result
+  // Build result — format is the actual formatted reference text
   const result: {
     written: boolean;
     referenceText: string;
     format: string;
     refLinkComments?: Array<{ text: string }>;
-    sectionCreated?: boolean;
+    sectionCreated: boolean;
     duplicateWarning?: string;
     contentPreserved: boolean;
     originalContent: string;
@@ -192,7 +193,8 @@ export async function addReference(params: {
   } = {
     written: true,
     referenceText,
-    format,
+    format: referenceText,
+    sectionCreated,
     contentPreserved: true,
     originalContent,
     afterContent: _briefContent,
@@ -201,10 +203,6 @@ export async function addReference(params: {
 
   if (refLinkComments) {
     result.refLinkComments = refLinkComments;
-  }
-
-  if (sectionCreated) {
-    result.sectionCreated = sectionCreated;
   }
 
   if (duplicateWarning) {
