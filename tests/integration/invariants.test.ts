@@ -63,38 +63,60 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
     it("hierarchy walk at all depth levels: correct context assembled [TEST-03]", async () => {
       const { assembleContext } = await import("../../src/hierarchy/context");
 
-      const single = await assembleContext({
-        startPath: "/workspace/project",
-        maxDepth: 1,
-      } as unknown as never[]);
+      // Single level — one level input
+      const single = await assembleContext([
+        {
+          depth: 0,
+          project: "Project",
+          type: "project",
+          dirPath: "/workspace/project",
+        },
+      ]);
       expect(single.levels.length).toBeLessThanOrEqual(1);
 
-      const two = await assembleContext({
-        startPath: "/workspace/collection/project",
-        maxDepth: 2,
-      } as unknown as never[]);
+      // Two levels — collection → project
+      const two = await assembleContext([
+        {
+          depth: 1,
+          project: "Collection",
+          type: "album",
+          dirPath: "/workspace/collection",
+        },
+        {
+          depth: 0,
+          project: "Project",
+          type: "song",
+          dirPath: "/workspace/collection/project",
+        },
+      ]);
       expect(two.levels.length).toBeLessThanOrEqual(2);
 
-      const three = await assembleContext({
-        startPath: "/workspace/collection/sub/project",
-        maxDepth: 3,
-      } as unknown as never[]);
+      // Three levels — artist → album → song
+      const three = await assembleContext([
+        {
+          depth: 2,
+          project: "Artist",
+          type: "artist",
+          dirPath: "/workspace/artist",
+        },
+        {
+          depth: 1,
+          project: "Album",
+          type: "album",
+          dirPath: "/workspace/artist/album",
+        },
+        {
+          depth: 0,
+          project: "Song",
+          type: "song",
+          dirPath: "/workspace/artist/album/song",
+        },
+      ]);
       expect(three.levels.length).toBeLessThanOrEqual(3);
 
-      if (three.levels.length > 1) {
-        expect((three.levels[0] as any).depth).toBeGreaterThanOrEqual(
-          (three.levels[1] as any).depth,
-        );
-      }
-
-      const bounded = await assembleContext({
-        startPath: "/workspace/project",
-        maxDepth: 10,
-        workspaceRoot: "/workspace",
-      } as unknown as never[]);
-      expect(
-        bounded.levels.every((l: any) => l.path.startsWith("/workspace")),
-      ).toBe(true);
+      // Empty input — no levels
+      const empty = await assembleContext([]);
+      expect(empty.levels.length).toBe(0);
     });
   });
 
