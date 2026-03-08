@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "build:ts": "tsup",
-    "build:assets": "copyfiles -u 1 \"assets/**/*\" dist/",
+    "build:assets": "copyfiles \"assets/**/*\" dist/",
     "build": "npm run build:ts && npm run build:assets",
     "dev": "tsup --watch",
     "test": "vitest run",

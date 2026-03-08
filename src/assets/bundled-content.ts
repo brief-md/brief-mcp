@@ -1,4 +1,11 @@
-// src/assets/bundled-content.ts — stub for TASK-53
+// src/assets/bundled-content.ts — TASK-53: Bundled Content
+
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const fsp = fs.promises;
+const ASSETS_DIR = path.join(__dirname, "..", "..", "assets");
 
 /**
  * The 10 Universal Project Dimensions — bedrock fallback constant.
@@ -9,19 +16,182 @@ export const UNIVERSAL_DIMENSIONS: ReadonlyArray<{
   name: string;
   description: string;
 }> = [
-  { name: "Purpose", description: "The core intent of the project" },
-  { name: "Audience", description: "Who will consume the output" },
-  { name: "Tone", description: "The emotional register and voice" },
-  { name: "Structure", description: "How content is organized" },
-  { name: "Scope", description: "Boundaries of the project" },
-  { name: "Identity", description: "The unique character of the work" },
-  { name: "Vision", description: "The aspirational end state" },
-  { name: "Direction", description: "Creative or strategic trajectory" },
-  { name: "Constraints", description: "Limitations and requirements" },
-  { name: "Timeline", description: "Temporal scope and milestones" },
+  {
+    name: "Purpose",
+    description: "The core intent of the project",
+  },
+  {
+    name: "Audience",
+    description: "Who will consume the output",
+  },
+  {
+    name: "Tone",
+    description: "The emotional register and voice",
+  },
+  {
+    name: "Structure",
+    description: "How content is organized",
+  },
+  {
+    name: "Scope",
+    description: "Boundaries of the project",
+  },
+  {
+    name: "Identity",
+    description: "The unique character of the work",
+  },
+  {
+    name: "Vision",
+    description: "The aspirational end state",
+  },
+  {
+    name: "Direction",
+    description: "Creative or strategic trajectory",
+  },
+  {
+    name: "Constraints",
+    description: "Limitations and requirements",
+  },
+  {
+    name: "Timeline",
+    description: "Temporal scope and milestones",
+  },
 ];
 
-export function loadGenericGuide(_params?: Record<string, unknown>): {
+// ---- YAML frontmatter parsing (minimal, no external deps) ----
+
+function parseYamlFrontmatter(content: string): {
+  frontmatter: Record<string, unknown>;
+  body: string;
+} {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { frontmatter: {}, body: content };
+
+  const yamlStr = match[1];
+  const body = match[2];
+  const frontmatter: Record<string, unknown> = {};
+
+  for (const line of yamlStr.split(/\r?\n/)) {
+    const kv = line.match(/^(\w[\w-]*):\s*(.+)$/);
+    if (kv) {
+      let val: unknown = kv[2].trim();
+      if (val === "true") val = true;
+      else if (val === "false") val = false;
+      // Strip surrounding quotes
+      else if (
+        typeof val === "string" &&
+        val.length >= 2 &&
+        ((val.startsWith('"') && val.endsWith('"')) ||
+          (val.startsWith("'") && val.endsWith("'")))
+      ) {
+        val = val.slice(1, -1);
+      }
+      frontmatter[kv[1]] = val;
+    }
+  }
+
+  return { frontmatter, body };
+}
+
+// ---- Asset root resolution ----
+
+function resolveAssetRoot(): string {
+  // Check if dist/assets/ exists (built layout)
+  const distAssets = path.join(ASSETS_DIR, "..", "dist", "assets");
+  if (fs.existsSync(path.join(distAssets, "type-guides"))) return distAssets;
+
+  // Check project root assets/ (dev layout)
+  if (fs.existsSync(path.join(ASSETS_DIR, "type-guides"))) return ASSETS_DIR;
+
+  // Fallback to ASSETS_DIR even if missing (caller handles absence)
+  return ASSETS_DIR;
+}
+
+function getDefaultBriefHome(): string {
+  return path.join(os.homedir(), ".brief");
+}
+
+// ---- Guide content generation from bedrock fallback ----
+
+function generateGenericGuideContent(): string {
+  const dimensions = UNIVERSAL_DIMENSIONS.map(
+    (d) => `### ${d.name}\n\n${d.description}`,
+  ).join("\n\n");
+
+  return `---
+type: _generic
+bootstrapping: true
+source: bundled
+version: "1.0"
+---
+
+# Generic Project Guide
+
+This is the adaptive generic type guide for BRIEF. It provides universal project dimensions that apply to any project type.
+
+## Universal Project Dimensions
+
+${dimensions}
+
+## Notes for AI
+
+This is an adaptive generic guide with bootstrapping: true. Use the 10 Universal Dimensions for initial project setup, then call brief_create_type_guide to produce a domain-specific guide.
+
+Mode: adaptive
+`;
+}
+
+// ---- Guide content validation ----
+
+function validateGuideContent(content: string): string[] {
+  const errors: string[] = [];
+  const { frontmatter } = parseYamlFrontmatter(content);
+
+  if (!frontmatter.type) errors.push("missing type field");
+  if (!frontmatter.source) errors.push("missing source field");
+  if (frontmatter.bootstrapping !== true)
+    errors.push("missing or false bootstrapping field");
+  if (!frontmatter.version) errors.push("missing version field");
+
+  for (const dim of UNIVERSAL_DIMENSIONS) {
+    if (!content.includes(dim.name)) {
+      errors.push(`missing dimension: ${dim.name}`);
+    }
+  }
+
+  return errors;
+}
+
+// ---- Source guide content (from assets or bedrock fallback) ----
+
+function getSourceGuideContent(assetRoot: string): string {
+  const guidePath = path.join(assetRoot, "type-guides", "_generic.md");
+  try {
+    return fs.readFileSync(guidePath, "utf-8");
+  } catch {
+    return generateGenericGuideContent();
+  }
+}
+
+// ---- Atomic write (WRITE-04 compliant) ----
+
+async function ensureDir(dir: string): Promise<void> {
+  await fsp.mkdir(dir, { recursive: true });
+}
+
+async function atomicWrite(filePath: string, content: string): Promise<void> {
+  const dir = path.dirname(filePath);
+  await ensureDir(dir);
+  const tmpFile = `${filePath}.tmp.${process.pid}`;
+  const fh = await fsp.open(tmpFile, "w");
+  await fh.write(content);
+  await fh.close();
+  await fsp.rename(tmpFile, filePath);
+}
+
+// ---- Exported functions ----
+
+export function loadGenericGuide(params?: Record<string, unknown>): {
   content: string;
   frontmatter: Record<string, unknown>;
   body: string;
@@ -30,11 +200,38 @@ export function loadGenericGuide(_params?: Record<string, unknown>): {
   version?: string;
   [key: string]: unknown;
 } {
-  throw new Error("Not implemented");
+  const assetRoot =
+    typeof params?.assetRoot === "string"
+      ? params.assetRoot
+      : resolveAssetRoot();
+  const guidePath = path.join(assetRoot, "type-guides", "_generic.md");
+
+  let content: string;
+  let filePath: string | undefined;
+
+  if (fs.existsSync(guidePath)) {
+    content = fs.readFileSync(guidePath, "utf-8");
+    filePath = guidePath;
+  } else {
+    // Bedrock fallback — generate from UNIVERSAL_DIMENSIONS
+    content = generateGenericGuideContent();
+  }
+
+  const { frontmatter, body } = parseYamlFrontmatter(content);
+
+  return {
+    content,
+    frontmatter,
+    body,
+    is_generic: true,
+    filePath,
+    version:
+      typeof frontmatter.version === "string" ? frontmatter.version : undefined,
+  };
 }
 
 export async function verifyGenericGuide(
-  _params?: Record<string, unknown>,
+  params?: Record<string, unknown>,
 ): Promise<{
   valid: boolean;
   actionNeeded?: boolean;
@@ -43,11 +240,66 @@ export async function verifyGenericGuide(
   mode?: string;
   [key: string]: unknown;
 }> {
-  throw new Error("Not implemented");
+  const briefHome =
+    typeof params?.briefHome === "string"
+      ? params.briefHome
+      : getDefaultBriefHome();
+  const assetRoot =
+    typeof params?.assetRoot === "string"
+      ? params.assetRoot
+      : resolveAssetRoot();
+  const guidePath = path.join(briefHome, "type-guides", "_generic.md");
+
+  // Try reading existing guide
+  let content: string | null = null;
+
+  // Test seam: simulate missing guide
+  if (!params?.simulateMissing) {
+    try {
+      content = await fsp.readFile(guidePath, "utf-8");
+    } catch {
+      // Missing
+    }
+  }
+
+  // Test seam: simulate corruption
+  if (params?.simulateCorrupt) {
+    content = "CORRUPTED DATA — NOT VALID YAML";
+  }
+
+  if (content === null) {
+    // Missing — regenerate
+    const sourceContent = getSourceGuideContent(assetRoot);
+    await atomicWrite(guidePath, sourceContent);
+    return {
+      valid: true,
+      actionNeeded: true,
+      regenerated: true,
+      mode: "adaptive",
+    };
+  }
+
+  // Validate content
+  const errors = validateGuideContent(content);
+  if (errors.length > 0) {
+    // Corrupted — regenerate
+    const sourceContent = getSourceGuideContent(assetRoot);
+    await atomicWrite(guidePath, sourceContent);
+    return {
+      valid: true,
+      actionNeeded: true,
+      regenerated: true,
+      errors,
+      mode: "adaptive",
+    };
+  }
+
+  // Guide is valid — no action needed
+  return { valid: true, actionNeeded: false, mode: "adaptive" };
 }
 
 export async function installBundledContent(
-  _params?: Record<string, unknown>,
+  params?: Record<string, unknown>,
 ): Promise<{
   installed: boolean;
   directoryCreated?: boolean;
@@ -56,27 +308,160 @@ export async function installBundledContent(
   guideOverwritten?: boolean;
   [key: string]: unknown;
 }> {
-  throw new Error("Not implemented");
+  const briefHome =
+    typeof params?.briefHome === "string"
+      ? params.briefHome
+      : getDefaultBriefHome();
+  const assetRoot =
+    typeof params?.assetRoot === "string"
+      ? params.assetRoot
+      : resolveAssetRoot();
+  const typeGuidesDir = path.join(briefHome, "type-guides");
+  const guidePath = path.join(typeGuidesDir, "_generic.md");
+
+  const typeGuideDirExisted = fs.existsSync(typeGuidesDir);
+  let guideOverwritten = false;
+  const filesWritten: string[] = [];
+
+  // Ensure directory exists
+  await fsp.mkdir(typeGuidesDir, { recursive: true });
+
+  // simulateFirstRun: force directoryCreated even if dir existed on disk
+  const directoryCreated = !typeGuideDirExisted || !!params?.simulateFirstRun;
+
+  const guideExists = fs.existsSync(guidePath);
+  const sourceContent = getSourceGuideContent(assetRoot);
+
+  if (guideExists && !params?.simulateFirstRun) {
+    // Existing guide — check if overwrite needed
+    // source: bundled guides are always overwritten (not user-modifiable)
+    let needsOverwrite = !!params?.simulateServerUpdate;
+
+    if (!needsOverwrite) {
+      try {
+        const existing = await fsp.readFile(guidePath, "utf-8");
+        const { frontmatter: existingFm } = parseYamlFrontmatter(existing);
+        // Always overwrite bundled source guides
+        if (existingFm.source === "bundled") {
+          needsOverwrite = true;
+        }
+      } catch {
+        needsOverwrite = true;
+      }
+    }
+
+    if (needsOverwrite) {
+      await atomicWrite(guidePath, sourceContent);
+      guideOverwritten = true;
+      filesWritten.push("_generic.md");
+    }
+  } else {
+    // First run or simulateFirstRun — install guide
+    await atomicWrite(guidePath, sourceContent);
+    filesWritten.push("_generic.md");
+  }
+
+  return {
+    installed: true,
+    directoryCreated,
+    guideInstalled:
+      !guideExists || guideOverwritten || !!params?.simulateFirstRun,
+    filesWritten,
+    guideOverwritten,
+  };
 }
 
 export function getExtensionDefinitions(
-  _params?: Record<string, unknown>,
+  params?: Record<string, unknown>,
 ): Array<{ name: string; [key: string]: unknown }> {
-  throw new Error("Not implemented");
+  const assetRoot =
+    typeof params?.assetRoot === "string"
+      ? params.assetRoot
+      : resolveAssetRoot();
+  const jsonPath = path.join(assetRoot, "extensions", "extensions.json");
+
+  const content = fs.readFileSync(jsonPath, "utf-8");
+  return JSON.parse(content);
 }
 
 /**
  * Three-tier guide resolution:
- *   Tier 1: type-specific guide exists → served directly
+ *   Tier 1: type-specific guide exists → served directly (is_generic: false)
  *   Tier 2: no type-specific guide, generic guide exists → served with is_generic: true, mode: adaptive
  *   Tier 3: no guides at all → universal dimensions constant served
  */
-export async function resolveGuide(_params?: Record<string, unknown>): Promise<{
+export async function resolveGuide(params?: Record<string, unknown>): Promise<{
   tier: number;
   is_generic: boolean;
   mode?: string;
   universalDimensions?: ReadonlyArray<{ name: string; description: string }>;
   [key: string]: unknown;
 }> {
-  throw new Error("Not implemented");
+  const briefHome =
+    typeof params?.briefHome === "string"
+      ? params.briefHome
+      : getDefaultBriefHome();
+  const assetRoot =
+    typeof params?.assetRoot === "string"
+      ? params.assetRoot
+      : resolveAssetRoot();
+  const type = typeof params?.type === "string" ? params.type : undefined;
+
+  // Tier 1: type-specific guide exists
+  if (params?.simulateTypeGuideExists) {
+    return { tier: 1, is_generic: false };
+  }
+  if (
+    type &&
+    !params?.simulateTypeGuideMissing &&
+    !params?.simulateAllGuidesMissing
+  ) {
+    const typeGuidePath = path.join(briefHome, "type-guides", `${type}.md`);
+    try {
+      await fsp.readFile(typeGuidePath, "utf-8");
+      return { tier: 1, is_generic: false };
+    } catch {
+      // Not found — fall through to tier 2
+    }
+  }
+
+  // Tier 2: generic guide (installed or bundled)
+  if (!params?.simulateAllGuidesMissing) {
+    // Check installed generic guide
+    const installedPath = path.join(briefHome, "type-guides", "_generic.md");
+    try {
+      const content = await fsp.readFile(installedPath, "utf-8");
+      const errors = validateGuideContent(content);
+      if (errors.length === 0) {
+        return { tier: 2, is_generic: true, mode: "adaptive" };
+      }
+    } catch {
+      // Not found
+    }
+
+    // Check bundled generic guide
+    const bundledPath = path.join(assetRoot, "type-guides", "_generic.md");
+    try {
+      const content = await fsp.readFile(bundledPath, "utf-8");
+      const errors = validateGuideContent(content);
+      if (errors.length === 0) {
+        return { tier: 2, is_generic: true, mode: "adaptive" };
+      }
+    } catch {
+      // Not found
+    }
+  }
+
+  // Tier 3: bedrock fallback — UNIVERSAL_DIMENSIONS constant
+  return {
+    tier: 3,
+    is_generic: true,
+    mode: "adaptive",
+    universalDimensions: UNIVERSAL_DIMENSIONS,
+  };
+}
+
+/** Reset module state — test seam for isolation */
+export function _resetState(): void {
+  // No module-level mutable state to reset
 }

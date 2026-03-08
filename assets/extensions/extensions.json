@@ -1,0 +1,133 @@
+[
+  {
+    "name": "SONIC ARTS",
+    "heading": "SONIC ARTS",
+    "description": "Extension for music, audio, and sound design projects. Covers composition, production, mixing, mastering, and sonic aesthetics.",
+    "abstract_capability_descriptors": [
+      "sensory qualities",
+      "temporal composition",
+      "layered production",
+      "aesthetic refinement",
+      "dynamic expression"
+    ],
+    "typical_subsections": [
+      "Sound Palette",
+      "Production Approach",
+      "Mix Philosophy",
+      "Sonic References",
+      "Technical Setup"
+    ],
+    "commonly_associated_ontologies": [
+      "genre-style",
+      "themes"
+    ]
+  },
+  {
+    "name": "NARRATIVE CREATIVE",
+    "heading": "NARRATIVE CREATIVE",
+    "description": "Extension for storytelling, fiction, and narrative-driven projects. Covers plot structure, character development, world-building, and narrative voice.",
+    "abstract_capability_descriptors": [
+      "narrative structure",
+      "character development",
+      "world construction",
+      "thematic exploration",
+      "voice and perspective"
+    ],
+    "typical_subsections": [
+      "Story Structure",
+      "Character Profiles",
+      "World Building",
+      "Narrative Voice",
+      "Thematic Elements"
+    ],
+    "commonly_associated_ontologies": [
+      "themes",
+      "genre-style"
+    ]
+  },
+  {
+    "name": "LYRICAL CRAFT",
+    "heading": "LYRICAL CRAFT",
+    "description": "Extension for songwriting, poetry, and lyrical composition. Covers rhyme, meter, imagery, emotional arc, and lyrical devices.",
+    "abstract_capability_descriptors": [
+      "linguistic patterning",
+      "emotional resonance",
+      "rhythmic structure",
+      "imagery and metaphor",
+      "concise expression"
+    ],
+    "typical_subsections": [
+      "Lyrical Theme",
+      "Rhyme Scheme",
+      "Imagery Bank",
+      "Emotional Arc",
+      "Structural Form"
+    ],
+    "commonly_associated_ontologies": [
+      "themes"
+    ]
+  },
+  {
+    "name": "VISUAL STORYTELLING",
+    "heading": "VISUAL STORYTELLING",
+    "description": "Extension for film, video, animation, and visual media projects. Covers visual narrative, cinematography, editing, and visual aesthetics.",
+    "abstract_capability_descriptors": [
+      "visual composition",
+      "sequential narrative",
+      "motion and pacing",
+      "aesthetic framing",
+      "sensory immersion"
+    ],
+    "typical_subsections": [
+      "Visual Style",
+      "Shot Composition",
+      "Editing Approach",
+      "Color and Mood",
+      "Narrative Flow"
+    ],
+    "commonly_associated_ontologies": [
+      "themes",
+      "genre-style"
+    ]
+  },
+  {
+    "name": "STRATEGIC PLANNING",
+    "heading": "STRATEGIC PLANNING",
+    "description": "Extension for business strategy, product planning, and organizational projects. Covers goals, metrics, stakeholder analysis, and roadmap planning.",
+    "abstract_capability_descriptors": [
+      "goal decomposition",
+      "stakeholder analysis",
+      "resource optimization",
+      "risk assessment",
+      "measurable outcomes"
+    ],
+    "typical_subsections": [
+      "Strategic Goals",
+      "Stakeholder Map",
+      "Resource Plan",
+      "Risk Register",
+      "Success Metrics"
+    ],
+    "commonly_associated_ontologies": []
+  },
+  {
+    "name": "SYSTEM DESIGN",
+    "heading": "SYSTEM DESIGN",
+    "description": "Extension for software architecture, system design, and technical infrastructure projects. Covers components, interfaces, data flow, and scalability.",
+    "abstract_capability_descriptors": [
+      "component architecture",
+      "interface design",
+      "data flow modeling",
+      "scalability planning",
+      "constraint satisfaction"
+    ],
+    "typical_subsections": [
+      "Architecture Overview",
+      "Component Design",
+      "Data Model",
+      "Interface Contracts",
+      "Scalability Plan"
+    ],
+    "commonly_associated_ontologies": []
+  }
+]
