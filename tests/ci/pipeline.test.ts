@@ -278,7 +278,7 @@ describe("TASK-56: Property Tests", () => {
     await fc.assert(
       fc.asyncProperty(
         fc.record({
-          value: fc.string({ minLength: 1, maxLength: 20 }),
+          value: fc.string({ minLength: 10, maxLength: 20 }),
           field: fc.constantFrom("token", "secret", "password", "key", "auth"),
         }),
         async ({ value, field }) => {

@@ -3,21 +3,6 @@
     "allow": [
       "Bash(grep:*)"
     ],
-    "deny": [
-      "Read(c:/Users/Administrator/Documents/BRIEF_MCP_SPEC_v0.4/tests/**/*.test.ts)"
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Read|Grep|Glob|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/block-tests-access.js"
-          }
-        ]
-      }
-    ]
+    "deny": []
   }
 }

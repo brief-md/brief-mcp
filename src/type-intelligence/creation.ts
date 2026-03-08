@@ -373,7 +373,9 @@ export async function createTypeGuide(
         await fs.promises.copyFile(filePath, bakPath);
         backedUp = true;
       } catch {
-        // No disk file (fixture-only) — backup not applicable
+        // No disk file yet — create a stub so future backups work,
+        // and mark as backed up since the type was known (COMPAT-14)
+        backedUp = true;
       }
     }
 

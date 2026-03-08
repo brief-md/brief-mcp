@@ -1,3 +1,4 @@
+import { getTypeGuide } from "../type-intelligence/loading.js"; // check-rules-ignore
 import type {
   ExtensionConfidence,
   ExtensionSuggestion,
@@ -303,8 +304,7 @@ export async function suggestExtensions(params: {
   /* Tier 1: Type guide driven */
   let tier1: ExtensionSuggestion[] = [];
   try {
-    const _t40 = await import("../type-intelligence/loading.js"); // check-rules-ignore
-    const res = await _t40.getTypeGuide({ type: projectType });
+    const res = await getTypeGuide({ type: projectType });
     if (!res.isGeneric && res.guide?.metadata?.suggestedExtensions) {
       tier1 = res.guide.metadata.suggestedExtensions
         .filter((e) => !activeExtensions.includes(e) && e in EXTENSION_REGISTRY)

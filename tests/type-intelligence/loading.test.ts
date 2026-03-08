@@ -1,6 +1,18 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import fc from "fast-check";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { _resetState, getTypeGuide } from "../../src/type-intelligence/loading";
+
+// Clean disk-based type-guides before tests to avoid cross-file pollution
+beforeAll(() => {
+  const briefHome = process.env.BRIEF_HOME ?? path.join(os.homedir(), ".brief");
+  const guidesDir = path.join(briefHome, "type-guides");
+  try {
+    fs.rmSync(guidesDir, { recursive: true, force: true });
+  } catch {}
+});
 
 afterEach(() => {
   _resetState();

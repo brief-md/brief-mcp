@@ -12,6 +12,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { checkNodeVersion } from "../check-node-version.js";
 import { createLogger } from "../observability/logger.js";
+import { TOOL_HANDLERS } from "./dispatch.js";
 
 // ---------------------------------------------------------------------------
 // Logger
@@ -1095,7 +1096,16 @@ export async function handleToolCall(
         };
       }
 
-      // Stub response — real handlers supplied by later tasks
+      // Dispatch to real handler
+      const handler = TOOL_HANDLERS[name];
+      if (handler) {
+        const result = await handler(args);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      // Fallback for unmapped tools
       return {
         content: [
           { type: "text", text: `Tool '${name}' is not yet implemented.` },

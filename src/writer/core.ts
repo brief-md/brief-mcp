@@ -124,7 +124,7 @@ function updateTimestamp(content: string, date: string): string {
  * The leading \n terminates the heading line; the second \n is the blank line.
  */
 function formatSectionBody(newContent: string): string {
-  const trimmed = newContent.trimEnd();
+  const trimmed = newContent.replace(/[\r\n]+$/, "");
   if (!trimmed) return "\n";
   return `\n\n${trimmed}\n`;
 }

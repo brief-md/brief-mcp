@@ -41,7 +41,7 @@ let aliasIndex = new Map<string, string>();
 let yamlFailedSlugs = new Set<string>();
 let guidesLoaded = false;
 let mtimeIndex = new Map<string, number>();
-let mtimeIndexInitialized = false;
+let _mtimeIndexInitialized = false;
 
 // ─── Embedded generic guide (always available for regeneration) ─────────────
 
@@ -520,7 +520,7 @@ async function loadFromDisk(): Promise<void> {
         // Skip unreadable files
       }
     }
-    mtimeIndexInitialized = true;
+    _mtimeIndexInitialized = true;
   } catch {
     // Directory doesn't exist or can't be read — fixtures only
   }
@@ -631,9 +631,25 @@ export async function getTypeGuide(
         expansionCount: 0,
       };
     }
-    // YAML failed (JS tag, broken syntax, etc.) — clean up and fall through
+    // YAML failed (JS tag, broken syntax, etc.) — return generic guide (SEC-09)
     yamlFailedSlugs.delete(injectedSlug);
-    // Fall through to normal resolution (returns generic for unknown types)
+    const generic =
+      guidesByType.get("_generic") ??
+      buildGuide("_generic", EMBEDDED_GENERIC_CONTENT, "<builtin>/_generic.md");
+    return {
+      guide: generic,
+      isGeneric: true,
+      is_generic: true,
+      mode: "adaptive" as const,
+      signal: `YAML content rejected (SEC-09). Returning generic guide.`,
+      yamlFallback: true,
+      fromCache: false,
+      reloaded: false,
+      sourceModified: false,
+      jsExecutionPrevented: true,
+      aliasExpansionLimited: true,
+      expansionCount: 0,
+    };
   }
 
   // Mtime handling
@@ -641,13 +657,13 @@ export async function getTypeGuide(
   let sourceModified = false;
 
   if (simulateFirstRun) {
-    mtimeIndexInitialized = false;
+    _mtimeIndexInitialized = false;
     mtimeIndex.clear();
     // Populate mtime index from current guides — no source updates
     for (const [, g] of guidesByType) {
       mtimeIndex.set(g.slug, Date.now());
     }
-    mtimeIndexInitialized = true;
+    _mtimeIndexInitialized = true;
     mtimeIndexPopulated = true;
   }
 
@@ -731,6 +747,7 @@ export async function getTypeGuide(
     matchedViaAlias: matchedViaAlias || undefined,
     aliasUsed,
     isGeneric: isGeneric || undefined,
+    is_generic: isGeneric || undefined,
     mode: isGeneric ? ("adaptive" as const) : undefined,
     signal,
     yamlFallback,
@@ -756,5 +773,5 @@ export function _resetState(): void {
   yamlFailedSlugs = new Set();
   guidesLoaded = false;
   mtimeIndex = new Map();
-  mtimeIndexInitialized = false;
+  _mtimeIndexInitialized = false;
 }

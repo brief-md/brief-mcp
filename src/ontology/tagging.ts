@@ -151,7 +151,7 @@ export async function tagEntry(
   }
 
   // Validate no double-dash in labelOverride
-  if (labelOverride !== undefined && labelOverride.includes("--")) {
+  if (labelOverride?.includes("--")) {
     throw new Error(
       "Label override contains '--' which would break HTML comment syntax",
     );

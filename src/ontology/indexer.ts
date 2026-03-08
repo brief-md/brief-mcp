@@ -197,7 +197,7 @@ export function buildIndex(pack: {
           if (!terms.has(token)) {
             terms.set(token, []);
           }
-          const existing = terms.get(token)!;
+          const existing = terms.get(token) ?? [];
           if (
             !existing.some((e) => e.entryId === entryId && e.field === field)
           ) {
@@ -223,7 +223,7 @@ export function buildIndex(pack: {
           if (!byReference.has(key)) {
             byReference.set(key, []);
           }
-          byReference.get(key)!.push({ pack: resolvedName, entryId });
+          byReference.get(key)?.push({ pack: resolvedName, entryId });
         }
       }
     }
@@ -325,11 +325,13 @@ export function searchIndex(
             source: ie.source,
           });
         }
-        const acc = targetMap.get(ie.entryId)!;
-        const matchMultiplier = isDirect ? DIRECT_MATCH_MULTIPLIER : 1;
-        acc.score += ie.baseScore * matchMultiplier;
-        acc.terms.add(searchTerm);
-        acc.fields.add(ie.field);
+        const acc = targetMap.get(ie.entryId);
+        if (acc) {
+          const matchMultiplier = isDirect ? DIRECT_MATCH_MULTIPLIER : 1;
+          acc.score += ie.baseScore * matchMultiplier;
+          acc.terms.add(searchTerm);
+          acc.fields.add(ie.field);
+        }
       }
     }
 
@@ -343,7 +345,8 @@ export function searchIndex(
     for (const entryId of allEntryIds) {
       const direct = directScores.get(entryId);
       const synonym = synonymScores.get(entryId);
-      const primary = direct ?? synonym!;
+      const primary = direct ?? synonym;
+      if (!primary) continue;
       const isDirect = !!direct;
 
       if (!scoreMap.has(entryId)) {
@@ -356,7 +359,8 @@ export function searchIndex(
           source: primary.source,
         });
       }
-      const acc = scoreMap.get(entryId)!;
+      const acc = scoreMap.get(entryId);
+      if (!acc) continue;
 
       // Score comes only from the primary match type
       acc.score += primary.score;
@@ -427,7 +431,7 @@ export function mergeIndexes(indexes: ForwardIndex[]): ForwardIndex {
       if (!mergedTerms.has(term)) {
         mergedTerms.set(term, []);
       }
-      mergedTerms.get(term)!.push(...entries);
+      mergedTerms.get(term)?.push(...entries);
     }
 
     // Merge entries — each entry retains its source
@@ -440,7 +444,7 @@ export function mergeIndexes(indexes: ForwardIndex[]): ForwardIndex {
       if (!mergedByReference.has(key)) {
         mergedByReference.set(key, []);
       }
-      mergedByReference.get(key)!.push(...refs);
+      mergedByReference.get(key)?.push(...refs);
     }
 
     // Merge synonyms — union of all synonym groups

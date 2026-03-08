@@ -163,7 +163,7 @@ export async function addExtension(params: {
   const { extensionName, subsections: customSubsections } = params;
   const simulateOrphanHeading = params.simulateOrphanHeading === true;
   const simulateAmbiguous = params.simulateAmbiguous === true;
-  const targetSubsection = params.targetSubsection;
+  const _targetSubsection = params.targetSubsection;
 
   if (
     !extensionName ||
@@ -224,8 +224,8 @@ export async function addExtension(params: {
   }
 
   /* Idempotent: already created in session (WRITE-18) */
-  if (createdExtensions.has(metadataFormat)) {
-    const existing = createdExtensions.get(metadataFormat)!;
+  const existing = createdExtensions.get(metadataFormat);
+  if (existing) {
     return {
       created: false,
       alreadyExists: true,

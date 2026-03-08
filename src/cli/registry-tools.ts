@@ -274,7 +274,7 @@ export async function getRegistryCache(params?: {
 
   if (opts.simulateExpired) {
     ensureCache();
-    registryCache!.timestamp = Date.now();
+    if (registryCache) registryCache.timestamp = Date.now();
     return { fromCache: true, refreshed: true };
   }
 

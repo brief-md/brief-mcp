@@ -34,6 +34,7 @@ export interface TypeGuideLoadResult {
   readonly matchedViaAlias?: boolean;
   readonly aliasUsed?: string;
   readonly isGeneric?: boolean;
+  readonly is_generic?: boolean;
   readonly mode?: "adaptive";
 }
 
