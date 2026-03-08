@@ -1,4 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { _resetStore as resetQuestions } from "../../src/context/write-questions";
+import { _resetState as resetExtension } from "../../src/extension/creation";
+import { _resetState as resetTagging } from "../../src/ontology/tagging";
+import { _resetState as resetWriting } from "../../src/reference/writing";
+import { _resetState as resetCreation } from "../../src/type-intelligence/creation";
+
+beforeEach(() => {
+  resetExtension();
+  resetCreation();
+  resetTagging();
+  resetWriting();
+  resetQuestions();
+});
 
 // ---------------------------------------------------------------------------
 // Unit Tests — Interaction Pattern Integration Tests

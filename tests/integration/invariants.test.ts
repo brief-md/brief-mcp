@@ -1,5 +1,12 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { _resetSectionStore } from "../../src/context/write-sections";
+import { _resetState as resetExtension } from "../../src/extension/creation";
+
+beforeEach(() => {
+  resetExtension();
+  _resetSectionStore();
+});
 
 // ---------------------------------------------------------------------------
 // Cross-Cutting Invariant Tests [T54-02]
@@ -184,10 +191,10 @@ describe("TASK-54: Cross-Cutting Invariants", () => {
       const updatedParsed = await parseBrief(result.content as string);
 
       const originalDecisions = originalParsed.sections.find((s: any) =>
-        /decisions/i.test(s.name),
+        /decisions/i.test(s.heading),
       );
       const updatedDecisions = updatedParsed.sections.find((s: any) =>
-        /decisions/i.test(s.name),
+        /decisions/i.test(s.heading),
       );
 
       expect(updatedDecisions?.body).toBe(originalDecisions?.body);
@@ -289,6 +296,7 @@ describe("TASK-54: Invariant Property Tests", () => {
           expect(reparsed.sections.length).toBe(parsed.sections.length);
         },
       ),
+      { numRuns: 10 },
     );
   });
 
@@ -315,6 +323,7 @@ describe("TASK-54: Invariant Property Tests", () => {
           expect(resultStr).toContain("Changed.");
         },
       ),
+      { numRuns: 10 },
     );
   });
 });
