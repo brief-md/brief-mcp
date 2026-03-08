@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readWithTimeout } from "../../src/io/file-io";
 import {
   normalizePath,
   resolveHomeDir,
@@ -62,7 +63,6 @@ describe("TASK-57: Platform Testing — Cross-Platform", () => {
 
   describe("network/cloud drive tolerance [FS-09]", () => {
     it("network drive file read: operation respects configured timeout [FS-09]", async () => {
-      const { resolveRealPath } = await import("../../src/platform/platform");
       // A very short timeout should cause any slow operation to reject
       await expect(
         resolveRealPath("/network/drive/path", { timeoutMs: 1 }),
@@ -70,7 +70,6 @@ describe("TASK-57: Platform Testing — Cross-Platform", () => {
     });
 
     it("slow network read: timeout enforced within budget [FS-09]", async () => {
-      const { readWithTimeout } = await import("../../src/io/file-io");
       const start = Date.now();
       await readWithTimeout("/tmp/slow-test.md", {
         timeoutMs: 100,

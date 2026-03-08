@@ -1,7 +1,10 @@
+import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
 import {
+  detectStdinEof,
   isReservedFilename,
   normalizePath,
+  registerSignalHandlers,
   resolveRealPath,
   retryRename,
 } from "../../src/platform/platform";
@@ -53,7 +56,6 @@ describe("TASK-57: Platform Testing — Windows", () => {
 
   describe("reserved filenames [FS-06]", () => {
     it("Windows reserved filename: all device names detected and handled [FS-06]", () => {
-      const { isReservedFilename } = require("../../src/platform/platform");
       // COM ports
       for (let i = 1; i <= 9; i++) {
         expect(isReservedFilename(`COM${i}`)).toBe(true);
@@ -87,9 +89,6 @@ describe("TASK-57: Platform Testing — Windows", () => {
   describe("Windows signals [CLI-08]", () => {
     it("Windows SIGBREAK: handler can be registered functionally [CLI-08]", () => {
       // On platforms that support SIGBREAK, verify handler registration
-      const {
-        registerSignalHandlers,
-      } = require("../../src/server/signal-handling");
       const signals = registerSignalHandlers({ dryRun: true });
       // dryRun mode returns list of registered signals without actually registering
       expect(signals).toBeDefined();
@@ -104,9 +103,6 @@ describe("TASK-57: Platform Testing — Windows", () => {
 
     it("Windows stdin EOF: client disconnection detected [CLI-08]", async () => {
       // Test actual stdin EOF scenario using a mock stream that emits 'end'
-      const { EventEmitter } = await import("node:events");
-      const { detectStdinEof } = await import("../../src/platform/platform");
-
       const mockStdin = new EventEmitter() as NodeJS.ReadableStream;
       const result = await new Promise<{ disconnected: boolean }>((resolve) => {
         detectStdinEof(mockStdin, (disconnectResult: any) =>

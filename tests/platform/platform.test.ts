@@ -1,6 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { normalizePath, resolveRealPath } from "../../src/platform/platform";
+import { readWithTimeout } from "../../src/io/file-io";
+import {
+  isReservedFilename,
+  normalizePath,
+  resolveRealPath,
+} from "../../src/platform/platform";
 
 // ---------------------------------------------------------------------------
 // TASK-57: Platform Testing — Property Tests [T57-03]
@@ -39,7 +44,7 @@ describe("TASK-57: Property Tests", () => {
           }
         },
       ),
-      { numRuns: 5 },
+      { numRuns: 10 },
     );
   });
 
@@ -54,7 +59,7 @@ describe("TASK-57: Property Tests", () => {
           expect(result.resolved).toBeDefined();
         },
       ),
-      { numRuns: 5 },
+      { numRuns: 10 },
     );
   });
 
@@ -69,6 +74,7 @@ describe("TASK-57: Property Tests", () => {
           expect(result.normalized).toBeDefined();
         },
       ),
+      { numRuns: 25 },
     );
   });
 
@@ -77,7 +83,6 @@ describe("TASK-57: Property Tests", () => {
       fc.asyncProperty(
         fc.integer({ min: 10, max: 1000 }),
         async (timeoutMs) => {
-          const { readWithTimeout } = await import("../../src/io/file-io");
           const start = Date.now();
           await readWithTimeout("/tmp/nonexistent-slow.md", {
             timeoutMs,
@@ -87,7 +92,66 @@ describe("TASK-57: Property Tests", () => {
           expect(elapsed).toBeLessThanOrEqual(timeoutMs + 200);
         },
       ),
-      { numRuns: 3 },
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(non-reserved name): isReservedFilename returns false [FS-06]", () => {
+    const RESERVED = new Set([
+      "CON",
+      "PRN",
+      "AUX",
+      "NUL",
+      "CLOCK$",
+      "COM1",
+      "COM2",
+      "COM3",
+      "COM4",
+      "COM5",
+      "COM6",
+      "COM7",
+      "COM8",
+      "COM9",
+      "LPT1",
+      "LPT2",
+      "LPT3",
+      "LPT4",
+      "LPT5",
+      "LPT6",
+      "LPT7",
+      "LPT8",
+      "LPT9",
+    ]);
+    fc.assert(
+      fc.property(
+        fc
+          .string({ minLength: 4, maxLength: 30 })
+          .filter((s) => /^[a-zA-Z][a-zA-Z0-9_]+$/.test(s))
+          .filter((s) => !RESERVED.has(s.toUpperCase())),
+        (safeName) => {
+          expect(isReservedFilename(safeName)).toBe(false);
+        },
+      ),
+      { numRuns: 25 },
+    );
+  });
+
+  it("forAll(path): normalizePath always returns { normalized: string } [FS-06]", () => {
+    fc.assert(
+      fc.property(
+        fc
+          .string({ minLength: 1, maxLength: 100 })
+          .filter((s) => /^[a-zA-Z0-9/\\._-]+$/.test(s)),
+        (inputPath) => {
+          const result = normalizePath(inputPath);
+          expect(Object.keys(result)).toEqual(
+            expect.arrayContaining(["normalized"]),
+          );
+          expect(typeof result.normalized).toBe("string");
+          expect(result.normalized.length).toBeGreaterThan(0);
+        },
+      ),
+      { numRuns: 25 },
     );
   });
 });

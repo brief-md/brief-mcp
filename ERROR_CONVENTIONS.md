@@ -80,6 +80,14 @@
 - First run → `directoryCreated: true, guideInstalled: true` in result — NOT THROWN
 - Server update → `guideOverwritten: true` in result — NOT THROWN
 
+## platform/platform
+- `new Error("Operation timeout: path resolution cancelled")` — matches `/timeout|cancelled|abort/i` — THROWN (resolveRealPath with timeoutMs)
+- `new Error("Path traversal outside boundary: {path}")` — matches `/boundary|traversal/i` — THROWN (resolveRealPath with boundary check)
+- `normalizePath` warning: `{ warning: string }` — matches `/path.*length|MAX_PATH/i` — RETURNED (not thrown, paths exceeding 260 chars)
+- `isReservedFilename` — returns `boolean`, no errors — RETURNED (not thrown)
+- `retryRename` — returns `{ success: boolean }`, no errors — RETURNED (not thrown)
+- `detectStdinEof` — callback with `{ disconnected: boolean }`, no errors — RETURNED (not thrown)
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

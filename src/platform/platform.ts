@@ -59,12 +59,14 @@ export function detectStdinEof(
 
 export function registerSignalHandlers(
   _options?: Record<string, unknown>,
-): void {
-  // stub
+): string[] {
+  // stub — returns list of registered signal names (dryRun mode)
+  return [];
 }
 
 export function detectBriefVariants(
+  _dirPath: string,
   _options?: Record<string, unknown>,
-): Record<string, unknown> {
-  return {};
+): string[] {
+  return [];
 }
