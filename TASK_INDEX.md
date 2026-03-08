@@ -58,7 +58,7 @@
 | TASK-50 | 52 | completed | TASK-07, TASK-03, TASK-06 | Signal handling, graceful shutdown & crash recovery |
 | TASK-52 | 53 | completed | TASK-13, TASK-19, TASK-32a, TASK-32b, TASK-33 | Performance verification & benchmarks |
 | TASK-53 | 54 | completed | TASK-40, TASK-48 | Bundled content |
-| TASK-54 | 55 | pending | TASK-20 through TASK-46 | Integration tests for interaction patterns |
-| TASK-55 | 56 | pending | TASK-01 | npm package configuration |
+| TASK-54 | 55 | needs-human-review | TASK-20 through TASK-46 | Integration tests for interaction patterns |
+| TASK-55 | 56 | completed | TASK-01 | npm package configuration |
 | TASK-56 | 57 | pending | TASK-01, TASK-54 | CI/CD pipeline |
 | TASK-57 | 58 | pending | TASK-07, TASK-05a | Platform testing |

@@ -26,3 +26,6 @@
 !vitest.setup.ts
 !biome.json
 !.gitignore
+!LICENSE
+!CHANGELOG.md
+!SECURITY.md

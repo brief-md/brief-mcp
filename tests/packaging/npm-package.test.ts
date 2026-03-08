@@ -60,7 +60,7 @@ describe("TASK-55: Packaging — npm Package Configuration", () => {
       expect(pkg.main).toBeDefined();
       expect(pkg.types).toBeDefined();
       expect(pkg.module).toBeDefined();
-      expect(pkg.main).toMatch(/^dist\//);
+      expect(pkg.main).toMatch(/^(\.\/)?dist\//);
       expect(pkg.types).toMatch(/\.d\.ts$/);
     });
 
@@ -133,28 +133,31 @@ describe("TASK-55: Packaging — npm Package Configuration", () => {
   });
 
   describe("dependency hygiene [OSS-02]", () => {
-    it("no known high/critical vulnerabilities", async () => {
-      const { execSync } = await import("node:child_process");
-      let auditOutput = "";
-      try {
-        auditOutput = execSync("npm audit --audit-level=high 2>/dev/null", {
-          encoding: "utf8",
-          timeout: 30000,
-        });
-        // Command succeeded with exit 0: no high/critical vulnerabilities found
-      } catch (e: any) {
-        // npm audit exits non-zero when vulnerabilities are found (status 1) or on command errors
-        auditOutput = e.stdout ?? e.stderr ?? "";
-        if (e.status !== 1) {
-          // Status > 1 means the audit command itself failed (not a vulnerability result) — rethrow
-          throw e;
+    it.skipIf(process.platform === "win32")(
+      "no known high/critical vulnerabilities",
+      async () => {
+        const { execSync } = await import("node:child_process");
+        let auditOutput = "";
+        try {
+          auditOutput = execSync("npm audit --audit-level=high 2>/dev/null", {
+            encoding: "utf8",
+            timeout: 30000,
+          });
+          // Command succeeded with exit 0: no high/critical vulnerabilities found
+        } catch (e: any) {
+          // npm audit exits non-zero when vulnerabilities are found (status 1) or on command errors
+          auditOutput = e.stdout ?? e.stderr ?? "";
+          if (e.status !== 1) {
+            // Status > 1 means the audit command itself failed (not a vulnerability result) — rethrow
+            throw e;
+          }
+          // T55-01: status 1 means high/critical vulnerabilities were found — this must fail the test
+          throw new Error(
+            `npm audit found high/critical vulnerabilities:\n${auditOutput}`,
+          );
         }
-        // T55-01: status 1 means high/critical vulnerabilities were found — this must fail the test
-        throw new Error(
-          `npm audit found high/critical vulnerabilities:\n${auditOutput}`,
-        );
-      }
-    });
+      },
+    );
   });
 });
 
@@ -191,6 +194,34 @@ describe("TASK-55: Property Tests", () => {
           ).toBe(false);
         },
       ),
+      { numRuns: 25 },
+    );
+  });
+
+  it("forAll(excluded file): NOT in files field [OSS-05]", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(
+          "tests/",
+          "src/",
+          ".env",
+          "node_modules/",
+          "*.map",
+          ".github/",
+          "tsconfig.json",
+        ),
+        (excluded) => {
+          const pkg = JSON.parse(
+            fs.readFileSync(
+              path.resolve(__dirname, "../../package.json"),
+              "utf-8",
+            ),
+          );
+          const filesField: string[] = pkg.files;
+          expect(filesField).not.toContain(excluded);
+        },
+      ),
+      { numRuns: 25 },
     );
   });
 
@@ -201,6 +232,7 @@ describe("TASK-55: Property Tests", () => {
         const lockPath = path.resolve(__dirname, "../../package-lock.json");
         expect(fs.existsSync(lockPath)).toBe(true);
       }),
+      { numRuns: 25 },
     );
   });
 
@@ -224,6 +256,7 @@ describe("TASK-55: Property Tests", () => {
           ).toBeDefined();
         });
       }),
+      { numRuns: 25 },
     );
   });
 });

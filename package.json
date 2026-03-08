@@ -1,10 +1,11 @@
 {
-  "name": "brief-mcp-server",
-  "version": "1.0.0",
-  "description": "MCP server for brief-mcp project context management",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "name": "brief-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for BRIEF.md project context management",
+  "license": "MIT",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -16,7 +17,10 @@
   },
   "files": [
     "dist/",
-    "assets/"
+    "assets/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build:ts": "tsup",
@@ -26,7 +30,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "biome check src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:size": "npm pack --dry-run 2>&1 | tail -1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
@@ -46,5 +51,20 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "publishConfig": {
+    "provenance": true,
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brief-mcp/brief-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "brief",
+    "context",
+    "ai",
+    "model-context-protocol"
+  ]
 }
