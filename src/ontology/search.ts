@@ -190,6 +190,7 @@ interface SearchParams {
   detail_level?: string;
   allRejected?: boolean;
   rejectedIds?: string[];
+  slowThresholdMs?: number;
 }
 
 interface SearchResultItem {
@@ -218,6 +219,8 @@ interface SearchResponse {
   totalMatches?: number;
   signal?: string;
   recoveryPaths?: string[];
+  latencyMs?: number;
+  warningLogged?: boolean;
 }
 
 // ─── Search Implementation ──────────────────────────────────────────────────
@@ -340,8 +343,12 @@ export async function searchOntology(
 
   // ── Latency tracking (PERF-09) ────────────────────────────────────────
   const elapsed = Date.now() - startTime;
-  if (elapsed > 100) {
-    logger.warn(`Ontology search took ${elapsed}ms (exceeds 100ms threshold)`);
+  const warnThreshold = params.slowThresholdMs ?? 100;
+  const warningLogged = elapsed > warnThreshold;
+  if (warningLogged) {
+    logger.warn(
+      `Ontology search took ${elapsed}ms (exceeds ${warnThreshold}ms threshold)`,
+    );
   } else {
     logger.debug(`Ontology search completed in ${elapsed}ms`);
   }
@@ -350,6 +357,8 @@ export async function searchOntology(
   const response: SearchResponse = {
     results: paginatedResults,
     totalMatches,
+    latencyMs: elapsed,
+    warningLogged,
   };
 
   // ── Empty/rejected signal (ONT-13, Pattern 4) ─────────────────────────

@@ -436,5 +436,13 @@ export async function parseBriefMdFile(
   throw new Error("Not implemented: parseBriefMdFile");
 }
 
-/** Alias for preprocess — used by performance benchmarks */
-export const parse = preprocess;
+/** Wrapper for preprocess — adds streamingUsed field for benchmark verification */
+export function parse(
+  input: string,
+): PreprocessResult & { streamingUsed: string } {
+  const result = preprocess(input);
+  return {
+    ...result,
+    streamingUsed: result.mode === "streaming" ? "streaming" : "in-memory",
+  };
+}
