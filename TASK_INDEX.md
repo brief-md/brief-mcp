@@ -53,7 +53,7 @@
 | TASK-44 | 47 | completed | TASK-18, TASK-16, TASK-08 | Framework visibility & ontology management |
 | TASK-46 | 48 | completed | TASK-24, TASK-08 | Tool response formatting & context blocks |
 | TASK-47 | 49 | completed | TASK-01, TASK-03 | CLI framework |
-| TASK-48 | 50 | pending | TASK-06, TASK-47, TASK-35 | Setup wizard |
+| TASK-48 | 50 | completed | TASK-06, TASK-47, TASK-35 | Setup wizard |
 | TASK-49 | 51 | pending | TASK-48, TASK-08 | Compatible MCP registry, add-tool & registry search |
 | TASK-50 | 52 | pending | TASK-07, TASK-03, TASK-06 | Signal handling, graceful shutdown & crash recovery |
 | TASK-52 | 53 | pending | TASK-13, TASK-19, TASK-32a, TASK-32b, TASK-33 | Performance verification & benchmarks |
