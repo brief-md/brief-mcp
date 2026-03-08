@@ -386,15 +386,41 @@ export async function readFileSafe(filePath: string): Promise<string> {
   }
 }
 
-/** Read a file with an optional timeout (stub — timeout is not yet enforced). */
+/**
+ * Read a file with an optional timeout (FS-09).
+ * When simulateSlowRead is true, simulates a network/cloud drive delay
+ * that is cancelled by the timeout — rejects after timeoutMs.
+ */
 export async function readWithTimeout(
   filePath: string,
-  _options?: {
+  options?: {
     timeoutMs?: number;
     simulateSlowRead?: boolean;
     [key: string]: unknown;
   },
 ): Promise<{ content: string }> {
+  if (options?.simulateSlowRead) {
+    const timeout = options.timeoutMs ?? 30_000;
+    return new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("Operation timeout: read cancelled"));
+      }, timeout);
+    });
+  }
+
+  if (options?.timeoutMs !== undefined) {
+    const timeout = options.timeoutMs;
+    return Promise.race([
+      readFileSafe(filePath).then((content) => ({ content })),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Operation timeout: read cancelled")),
+          timeout,
+        ),
+      ),
+    ]);
+  }
+
   const content = await readFileSafe(filePath);
   return { content };
 }

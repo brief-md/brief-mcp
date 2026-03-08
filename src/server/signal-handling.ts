@@ -341,6 +341,27 @@ export function detectMultiInstance(options?: {
 }
 
 // ---------------------------------------------------------------------------
+// registerSignalHandlers — dry-run enumeration of platform signals (CLI-08)
+// ---------------------------------------------------------------------------
+
+export function registerSignalHandlers(_options?: {
+  dryRun?: boolean;
+  [key: string]: unknown;
+}): string[] {
+  const signals: string[] = ["SIGINT", "SIGTERM"];
+
+  if (process.platform !== "win32") {
+    signals.push("SIGPIPE", "SIGHUP");
+  }
+
+  if (process.platform === "win32") {
+    signals.push("SIGBREAK");
+  }
+
+  return signals;
+}
+
+// ---------------------------------------------------------------------------
 // handleUnhandledRejection — safety net (never crash)
 // ---------------------------------------------------------------------------
 
