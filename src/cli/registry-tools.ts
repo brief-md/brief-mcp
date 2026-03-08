@@ -1,18 +1,34 @@
 // src/cli/registry-tools.ts — stub for TASK-49
 // Replace with real implementation during build loop.
 
+// ---------------------------------------------------------------------------
+// Module-level state
+// ---------------------------------------------------------------------------
+let _registryCache: {
+  entries: unknown[];
+  timestamp: number;
+} | null = null;
+
+// ---------------------------------------------------------------------------
+// _resetState — @internal, for test isolation
+// ---------------------------------------------------------------------------
+
+/** @internal Reset module-level state for test isolation */
+export function _resetState(): void {
+  _registryCache = null;
+}
+
 export async function searchRegistry(_params: {
   query: string;
-  typeFilter?: string;
+  typeFilter?: "ontology" | "type-guide" | "all";
   simulateUntrusted?: boolean;
 }): Promise<{
   entries: Array<{
     name: string;
     description: string;
-    type?: string;
-    trustLevel?: string;
+    type: string;
+    trustLevel: string;
     requiresConfirmation?: boolean;
-    [key: string]: unknown;
   }>;
 }> {
   return { entries: [] };
@@ -26,16 +42,18 @@ export async function addTool(_params: {
   simulateExistingConfig?: boolean;
 }): Promise<{
   configMerged: boolean;
-  commandDisplayed: boolean;
+  commandDisplayed?: boolean;
   warningShown?: boolean;
   warningMessage?: string;
   existingPreserved?: boolean;
 }> {
-  return { configMerged: false, commandDisplayed: false };
+  return { configMerged: false };
 }
 
 export async function listTools(): Promise<{
-  tools: Array<{ name: string; status: string; [key: string]: unknown }>;
+  tools: Array<{ name: string; status: string }>;
+  installed?: string[];
+  notInstalled?: string[];
 }> {
   return { tools: [] };
 }
@@ -48,7 +66,6 @@ export async function getRegistryCache(_params?: {
   fromCache: boolean;
   refreshed?: boolean;
   stale?: boolean;
-  [key: string]: unknown;
 }> {
   return { fromCache: false };
 }

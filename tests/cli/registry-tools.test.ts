@@ -1,10 +1,14 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  _resetState,
   addTool,
+  getInstallCommand,
   getRegistryCache,
+  getRegistryTools,
   listTools,
   searchRegistry,
+  validateRegistryEntry,
 } from "../../src/cli/registry-tools";
 
 // ---------------------------------------------------------------------------
@@ -12,6 +16,14 @@ import {
 // ---------------------------------------------------------------------------
 
 describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    _resetState();
+  });
+
   describe("registry search [SEC-12]", () => {
     it("search registry by name: matching entries returned [SEC-12]", async () => {
       const result = await searchRegistry({ query: "brief" });
@@ -25,7 +37,7 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
       expect(result.entries).toBeDefined();
       expect(result.entries.length).toBeGreaterThan(0);
       expect(
-        result.entries.some((e: any) =>
+        result.entries.some((e) =>
           e.description.toLowerCase().includes(searchTerm.toLowerCase()),
         ),
       ).toBe(true);
@@ -88,7 +100,6 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
     });
 
     it("installed tool: marked as installed in list [SEC-12]", async () => {
-      const { getRegistryTools } = await import("../../src/cli/registry-tools");
       const result = await getRegistryTools({
         simulateInstalled: ["brief-mcp", "test-tool"],
       });
@@ -101,7 +112,6 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
     });
 
     it("not installed tool: marked as not installed in list [SEC-12]", async () => {
-      const { getRegistryTools } = await import("../../src/cli/registry-tools");
       const result = await getRegistryTools({
         simulateNotInstalled: ["some-other-tool"],
       });
@@ -111,9 +121,6 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
 
   describe("command execution safety [SEC-12]", () => {
     it("install command: uses execFile args array, not string concatenation [SEC-12]", async () => {
-      const { getInstallCommand } = await import(
-        "../../src/cli/registry-tools"
-      );
       const cmd = await getInstallCommand({ toolName: "my-ontology-pack" });
       expect(Array.isArray(cmd.args)).toBe(true);
       expect(typeof cmd.executable).toBe("string");
@@ -134,7 +141,7 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
     it("registry cache expired: refresh attempted with stale-while-revalidate [CONF-04]", async () => {
       const result = await getRegistryCache({ simulateExpired: true });
       expect(result).toBeDefined();
-      expect(result.refreshed).toBeTruthy();
+      expect(result.refreshed).toBe(true);
     });
 
     it("registry refresh timeout (>5s): stale data served [CONF-04]", async () => {
@@ -167,7 +174,7 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
         simulateUntrusted: true,
       });
       const untrustedEntries = result.entries.filter(
-        (e: any) => e.trustLevel === "untrusted" || e.trustLevel === "external",
+        (e) => e.trustLevel === "untrusted" || e.trustLevel === "external",
       );
       for (const entry of untrustedEntries) {
         expect(entry.requiresConfirmation).toBe(true);
@@ -176,19 +183,13 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
   });
 
   describe("registry entry schema validation [SEC-12, T49-02]", () => {
-    it("registry entry with missing required fields: rejected with validation error [T49-02]", async () => {
-      const { validateRegistryEntry } = await import(
-        "../../src/cli/registry-tools"
-      );
+    it("registry entry with missing required fields: rejected with validation error [T49-02]", () => {
       const result = validateRegistryEntry({ name: "test" }); // missing required fields
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
-    it("registry entry with all required fields: passes schema validation [T49-02]", async () => {
-      const { validateRegistryEntry } = await import(
-        "../../src/cli/registry-tools"
-      );
+    it("registry entry with all required fields: passes schema validation [T49-02]", () => {
       const result = validateRegistryEntry({
         name: "valid-tool",
         description: "A valid tool",
@@ -219,6 +220,14 @@ describe("TASK-49: CLI — Compatible MCP Registry, Add-Tool & Registry Search",
 // ---------------------------------------------------------------------------
 
 describe("TASK-49: Property Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    _resetState();
+  });
+
   it("forAll(install command): always displayed and confirmed before execution [SEC-12]", async () => {
     await fc.assert(
       fc.asyncProperty(fc.constantFrom("tool-a", "tool-b"), async (tool) => {
@@ -268,13 +277,12 @@ describe("TASK-49: Property Tests", () => {
           .string({ minLength: 3, maxLength: 50 })
           .filter((s) => /^[a-zA-Z0-9@/._-]+$/.test(s)),
         async (toolName) => {
-          const { getInstallCommand } = await import(
-            "../../src/cli/registry-tools"
-          );
           const cmd = await getInstallCommand({ toolName });
           expect(Array.isArray(cmd.args)).toBe(true);
           // All arguments must be discrete strings, no shell concatenation
-          expect(cmd.args.every((a: any) => typeof a === "string")).toBe(true);
+          expect(cmd.args.every((a: string) => typeof a === "string")).toBe(
+            true,
+          );
         },
       ),
       { numRuns: 5 },
@@ -297,9 +305,6 @@ describe("TASK-49: Property Tests", () => {
       fc.asyncProperty(
         fc.constantFrom(...shellHostileNames),
         async (toolName) => {
-          const { getInstallCommand } = await import(
-            "../../src/cli/registry-tools"
-          );
           // Either the function rejects the adversarial name (validation), OR it returns
           // a safe args-array command (execFile-safe). It must NOT produce a shell string.
           try {
@@ -314,6 +319,71 @@ describe("TASK-49: Property Tests", () => {
         },
       ),
       { numRuns: 5 },
+    );
+  });
+
+  it("forAll(random entry): validateRegistryEntry rejects entries missing required fields [T49-02]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.record({
+          name: fc.oneof(
+            fc.string({ minLength: 1, maxLength: 20 }),
+            fc.constant(undefined),
+          ),
+          description: fc.oneof(
+            fc.string({ minLength: 1, maxLength: 30 }),
+            fc.constant(undefined),
+          ),
+          type: fc.oneof(
+            fc.constantFrom("ontology", "type-guide"),
+            fc.constant(undefined),
+          ),
+          trustLevel: fc.oneof(
+            fc.constantFrom("bundled", "community", "external"),
+            fc.constant(undefined),
+          ),
+        }),
+        async (entry) => {
+          const filtered: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(entry)) {
+            if (v !== undefined) filtered[k] = v;
+          }
+          const result = validateRegistryEntry(filtered);
+          // If any required field is missing, must be invalid
+          const hasAll =
+            entry.name !== undefined &&
+            entry.description !== undefined &&
+            entry.type !== undefined &&
+            entry.trustLevel !== undefined;
+          if (!hasAll) {
+            expect(result.valid).toBe(false);
+            expect(result.errors.length).toBeGreaterThan(0);
+          }
+        },
+      ),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(search result): result always has entries array with correct shape [SEC-12]", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom("brief", "test", "ontology", "guide"),
+        fc.constantFrom("ontology", "type-guide", "all") as fc.Arbitrary<
+          "ontology" | "type-guide" | "all"
+        >,
+        async (query, typeFilter) => {
+          const result = await searchRegistry({ query, typeFilter });
+          expect(Array.isArray(result.entries)).toBe(true);
+          for (const entry of result.entries) {
+            expect(typeof entry.name).toBe("string");
+            expect(typeof entry.description).toBe("string");
+            expect(typeof entry.type).toBe("string");
+            expect(typeof entry.trustLevel).toBe("string");
+          }
+        },
+      ),
+      { numRuns: 10 },
     );
   });
 });

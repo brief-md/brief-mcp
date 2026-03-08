@@ -94,6 +94,39 @@ The setup wizard (`npx brief-mcp init`) and `add-tool` command use interactive p
 - forAll(registry search): results always include name and description
 - forAll(command execution): always uses args array, never string concatenation
 
+## Test Fixtures
+
+The implementation MUST embed (or build from) a bundled registry containing at least these entries.
+Tests use specific query terms and tool names — the registry data must match.
+
+### Bundled Registry Entries (minimum set)
+
+| name | displayName | description | type | trustLevel | installCommand |
+|------|------------|-------------|------|------------|---------------|
+| `brief-mcp` | `BRIEF MCP Server` | `Creative tool for BRIEF.md project context` | `ontology` | `bundled` | `["npx", "--yes", "brief-mcp"]` |
+| `registry-tool-a` | `Registry Tool A` | `A test creative tool for ontology management` | `ontology` | `bundled` | `["npx", "--yes", "registry-tool-a"]` |
+| `test-type-guide` | `Test Type Guide` | `A test creative tool for type guide management` | `type-guide` | `bundled` | `["npx", "--yes", "test-type-guide"]` |
+| `test-tool` | `Test Tool` | `A bundled test tool` | `ontology` | `bundled` | `["npx", "--yes", "test-tool"]` |
+
+Tests reference these query terms → expected matches:
+- `"brief"` → matches `brief-mcp` by name
+- `"creative tool"` → matches entries with "creative tool" in description
+- `"test"` → matches `registry-tool-a`, `test-type-guide`, `test-tool` by name/description
+- `"bundled"` → matches entries with `trustLevel: "bundled"` (description or name match)
+- `"external"` with `simulateUntrusted: true` → synthetic untrusted entries returned
+
+### Tool names referenced by addTool / getInstallCommand tests
+- `"registry-tool-a"` — must exist in registry
+- `"custom"` — not in registry, triggers custom config path
+- `"tool-a"`, `"tool-b"` — property test tools, must exist or be handled gracefully
+- `"new-tool"` — addTool with simulateExistingConfig
+- `"my-ontology-pack"` — getInstallCommand test
+- `"external-untrusted-tool"` — addTool with simulateUntrustedEntry
+
+### validateRegistryEntry required fields
+A registry entry is valid when it has ALL of: `name`, `description`, `type`, `trustLevel`, and install info (either `installCommand: string[]` OR `command: string` + `args: string[]`).
+Missing any of these → `{ valid: false, errors: [...] }`.
+
 ## Tier 4 Criteria
 
 Tier 4 criteria: JC-01, JC-02, JC-07, JC-09

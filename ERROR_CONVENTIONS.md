@@ -63,6 +63,11 @@
 - `new Error("interactive mode requires a terminal")` — matches `/terminal|interactive/i` — THROWN (non-TTY without --yes)
 - `new Error("...directory...invalid path...")` — matches `/directory|not.*dir|invalid.*path/i` — THROWN (workspace root is file, not directory)
 
+## cli/registry-tools
+- `new Error("Invalid tool name: {name} — contains unsafe characters")` — matches `/invalid|unsafe|character|rejected/i` — THROWN (adversarial tool name with shell metacharacters)
+- `{ valid: false, errors: string[] }` — RETURNED (not thrown) — from `validateRegistryEntry` when entry is missing required fields
+- `{ warningShown: true, warningMessage: string }` — RETURNED (not thrown) — from `addTool` when entry is untrusted, message matches `/untrusted|external|unverified/i`
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

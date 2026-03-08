@@ -21,6 +21,8 @@ export interface CliContext {
 export interface RegistryEntry {
   readonly name: string;
   readonly displayName: string;
+  readonly description: string;
+  readonly type: "ontology" | "type-guide";
   readonly installCommand: string[];
   readonly configBlock: Record<string, unknown>;
   readonly requiresToolSetup?: boolean;
