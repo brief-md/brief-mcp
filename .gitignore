@@ -29,3 +29,7 @@
 !LICENSE
 !CHANGELOG.md
 !SECURITY.md
+
+# CI/CD
+!.github/
+!.github/**
