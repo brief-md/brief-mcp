@@ -184,11 +184,20 @@ describe("TASK-48: CLI — Setup Wizard", () => {
 // ---------------------------------------------------------------------------
 
 describe("TASK-48: Property Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    _resetState();
+  });
+
   it("forAll(tool install): command always displayed and confirmed before execution [SEC-12]", async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.constantFrom("tool-a", "tool-b", "tool-c"),
         async (tool) => {
+          _resetState();
           const result = await initWizard({
             isTTY: true,
             selectedTools: [tool],
@@ -203,6 +212,7 @@ describe("TASK-48: Property Tests", () => {
   it("forAll(config write): changes persisted to disk immediately [CONF-04]", async () => {
     await fc.assert(
       fc.asyncProperty(fc.constantFrom("claude", "cursor"), async (client) => {
+        _resetState();
         const result = await initWizard({ isTTY: true, client });
         expect(result.configPersisted).toBe(true);
       }),
@@ -235,6 +245,7 @@ describe("TASK-48: Property Tests", () => {
             .filter((s) => /^\w+$/.test(s)),
         }),
         async (config) => {
+          _resetState();
           await runSetupWizard({ ...config, nonInteractive: true });
           const result2 = await runSetupWizard({
             ...config,
@@ -254,6 +265,7 @@ describe("TASK-48: Property Tests", () => {
           .string({ minLength: 1, maxLength: 20 })
           .filter((s) => /^\w+$/.test(s)),
         async (client) => {
+          _resetState();
           await expect(
             initWizard({ isTTY: false, yesFlag: false, client }),
           ).rejects.toThrow(/terminal|interactive/i);
@@ -266,6 +278,7 @@ describe("TASK-48: Property Tests", () => {
   it("forAll(initWizard TTY): result always has expected shape [CONF-04]", async () => {
     await fc.assert(
       fc.asyncProperty(fc.constantFrom("claude", "cursor"), async (client) => {
+        _resetState();
         const result = await initWizard({ isTTY: true, client });
         expect(Object.keys(result)).toEqual(
           expect.arrayContaining(["directoryCreated", "configPersisted"]),
