@@ -63,16 +63,4 @@ here — they waste context on information the agent doesn't need.
 
 *(BUG-013 and BUG-014 for TASK-41 resolved — see BUGS_RESOLVED.md)*
 
-### BUG-013: TASK-55 — Attempt 1 [Tier 3]
-- **Failing tier:** Tier 3 (agent crashed before completing)
-- **Error:** Agent crashed: API rate limit hit. No test results or approach data available.
-- **Approach tried:** Unknown — agent did not complete. Check log: .loop-logs/iteration-2-20260308-034813.log
-- **Why it failed:** Agent process terminated before reaching bug-logging step.
-- **Suggested next approach:** Start fresh. Review log file for any partial progress.
-
-### BUG-013: TASK-55 — Attempt 2 [Tier 3]
-- **Failing tier:** Tier 3 (agent crashed before completing)
-- **Error:** Agent crashed: API rate limit hit. No test results or approach data available.
-- **Approach tried:** Unknown — agent did not complete. Check log: .loop-logs/iteration-3-20260308-041247.log
-- **Why it failed:** Agent process terminated before reaching bug-logging step.
-- **Suggested next approach:** Start fresh. Review log file for any partial progress.
+*(BUG-013 for TASK-55 resolved — rate-limit crashes; human committed implementation, npm audit test skipped on Windows per platform incompatibility pattern.)*
