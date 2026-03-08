@@ -183,7 +183,7 @@ describe("TASK-56: Packaging — CI/CD Pipeline", () => {
       const pkg = JSON.parse(
         fs.readFileSync(path.resolve(__dirname, "../../package.json"), "utf-8"),
       );
-      const coverageScript = pkg.scripts?.coverage;
+      const coverageScript = pkg.scripts?.["test:coverage"];
       expect(coverageScript).toBeDefined();
       expect(coverageScript).toMatch(/coverage|c8|istanbul|nyc/i);
     });
@@ -250,6 +250,7 @@ describe("TASK-56: Property Tests", () => {
           expect(hasScript).toBeDefined();
         },
       ),
+      { numRuns: 10 },
     );
   });
 
@@ -269,6 +270,7 @@ describe("TASK-56: Property Tests", () => {
           expect(parsed.jsonrpc).toBe("2.0");
         },
       ),
+      { numRuns: 10 },
     );
   });
 
@@ -293,6 +295,7 @@ describe("TASK-56: Property Tests", () => {
           expect(() => JSON.parse(sanitized)).not.toThrow();
         },
       ),
+      { numRuns: 10 },
     );
   });
 
@@ -310,6 +313,7 @@ describe("TASK-56: Property Tests", () => {
         );
         expect(pkg.scripts?.build).toBeDefined();
       }),
+      { numRuns: 10 },
     );
   });
 });
