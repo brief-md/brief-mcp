@@ -74,6 +74,12 @@
 - `{ logged: boolean, serverContinues: boolean }` — RETURNED (not thrown) from `handleUnhandledRejection`
 - No errors thrown — all functions return result objects
 
+## assets/bundled-content
+- No errors thrown — all functions return result objects
+- Missing/corrupted guide → `regenerated: true` in result — NOT THROWN
+- First run → `directoryCreated: true, guideInstalled: true` in result — NOT THROWN
+- Server update → `guideOverwritten: true` in result — NOT THROWN
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

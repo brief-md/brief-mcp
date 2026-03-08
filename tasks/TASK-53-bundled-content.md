@@ -34,13 +34,47 @@ Create the `assets/` directory at the project root and build the generic type gu
 
 9. Size discipline: monitor the cumulative size of `assets/` as content is added. The total npm package size target is under 10 MB (OQ-125, also specified in TASK-55). The generic type guide should be under 20 KB. The extension definitions JSON should be under 50 KB. When adding v1.1 content (ontology packs, synonym dataset), consider compression or lazy extraction. Add a CI check (coordinated with TASK-56) that fails if the published package exceeds 10 MB. (OQ-057)
 
-10. Bedrock fallback: embed the 10 Universal Project Dimensions directly as a constant string in `src/type-intelligence/generic-guide-fallback.ts`. This serves as the absolute last-resort fallback — if BOTH `~/.brief/type-guides/_generic.md` AND `dist/assets/type-guides/_generic.md` are missing or corrupt, regenerate from this hardcoded constant. This ensures bootstrapping can never fail regardless of filesystem state. (OQ-173; OQ-225)
+10. Bedrock fallback: embed the 10 Universal Project Dimensions directly as an exported constant `UNIVERSAL_DIMENSIONS` in `src/assets/bundled-content.ts`. This serves as the absolute last-resort fallback — if BOTH `~/.brief/type-guides/_generic.md` AND `dist/assets/type-guides/_generic.md` are missing or corrupt, regenerate from this hardcoded constant. This ensures bootstrapping can never fail regardless of filesystem state. (OQ-173; OQ-225)
 
 11. This task implements Design Pattern 37 (Domain Bootstrapping). The full adaptive flow is: (1) `brief_get_type_guide` returns the generic guide with `is_generic: true`, (2) the AI uses the 10 Universal Dimensions for the setup conversation, (3) within the first session `brief_create_type_guide` is called to produce a domain-specific guide, (4) future lookups for this type find the specific guide (the generic guide is self-replacing for that domain). The bundled generic guide is the entry point of this flow.
 
+## Test Fixtures
+
+### 10 Universal Project Dimensions
+The generic guide references these 10 dimensions (regex-matched in test):
+Purpose, Audience, Tone, Structure, Scope, Identity, Vision, Direction, Constraints, Timeline
+
+### 6 Spec-Defined Extensions (COMPAT-05)
+SONIC ARTS, NARRATIVE CREATIVE, LYRICAL CRAFT, VISUAL STORYTELLING, STRATEGIC PLANNING, SYSTEM DESIGN
+
+Each extension entry in `assets/extensions/extensions.json` has:
+- `name`: metadata format (e.g., `"SONIC ARTS"`)
+- `heading`: ALL CAPS display heading (must match `/^[A-Z\s]+$/`)
+- `description`: string
+- `abstract_capability_descriptors`: string[] (domain-agnostic descriptors)
+- `typical_subsections`: string[] (default section names)
+- `commonly_associated_ontologies`: string[] (ontology names)
+
+### Generic Guide Frontmatter
+- `type: "_generic"`
+- `bootstrapping: true`
+- `source: "bundled"`
+- `version: "1.0"`
+
+### UNIVERSAL_DIMENSIONS Constant (bedrock fallback)
+Exported from `src/assets/bundled-content.ts`. Array of 10 `{ name: string, description: string }`.
+
 ## Exported API
 
-This task creates bundled content assets (type guides, ontology packs, language packs). The test file (`tests/assets/bundled-content.test.ts`) validates that bundled files exist and have correct structure. No new function exports — this is a content/asset task.
+This task creates bundled content assets (type guides, extension definitions). The test file validates that bundled files exist and have correct structure.
+
+### Functions exported from `src/assets/bundled-content.ts`:
+- `loadGenericGuide(params?)` → `{ content, frontmatter, body, is_generic, filePath?, version? }`
+- `verifyGenericGuide(params?)` → `Promise<{ valid, actionNeeded?, regenerated?, errors?, mode? }>`
+- `installBundledContent(params?)` → `Promise<{ installed, directoryCreated?, guideInstalled?, filesWritten?, guideOverwritten? }>`
+- `getExtensionDefinitions(params?)` → `Array<{ name, heading, description, abstract_capability_descriptors, typical_subsections, commonly_associated_ontologies }>`
+- `resolveGuide(params?)` → `Promise<{ tier, is_generic, mode?, universalDimensions? }>` — three-tier fallback chain
+- `UNIVERSAL_DIMENSIONS` — `ReadonlyArray<{ name, description }>` constant (10 entries)
 
 ## Rules
 

@@ -15,7 +15,8 @@
     "brief-mcp": "./dist/cli.js"
   },
   "files": [
-    "dist/"
+    "dist/",
+    "assets/"
   ],
   "scripts": {
     "build:ts": "tsup",

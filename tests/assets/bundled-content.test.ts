@@ -1,9 +1,13 @@
+import fs from "node:fs";
+import path from "node:path";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   getExtensionDefinitions,
   installBundledContent,
   loadGenericGuide,
+  resolveGuide,
+  UNIVERSAL_DIMENSIONS,
   verifyGenericGuide,
 } from "../../src/assets/bundled-content";
 
@@ -38,8 +42,6 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
 
   describe("build step [COMPAT-08]", () => {
     it("build step: assets/ directory exists and contains required files [COMPAT-08]", () => {
-      const fs = require("node:fs");
-      const path = require("node:path");
       const assetsDir = path.resolve(__dirname, "../../assets");
       expect(fs.existsSync(assetsDir)).toBe(true);
       // The generic guide file must exist in assets/type-guides/
@@ -55,7 +57,9 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
 
   describe("installer logic [COMPAT-08]", () => {
     it("first run with no ~/.brief/type-guides/: directory created, generic guide installed [COMPAT-08]", async () => {
-      const result = await installBundledContent({ simulateFirstRun: true });
+      const result = await installBundledContent({
+        simulateFirstRun: true,
+      });
       expect(result.directoryCreated).toBe(true);
       expect(result.guideInstalled).toBe(true);
     });
@@ -96,7 +100,7 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
 
     it("extension definitions: each entry has name, description, and suggested subsections [COMPAT-05]", () => {
       const defs = getExtensionDefinitions();
-      defs.forEach((extDef: any) => {
+      for (const extDef of defs) {
         expect(extDef.name).toBeDefined();
         expect(typeof extDef.name).toBe("string");
         expect(extDef).toHaveProperty("description");
@@ -109,14 +113,12 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
         expect(Array.isArray(extDef.commonly_associated_ontologies)).toBe(true);
         expect(extDef.heading).toBeDefined();
         expect(extDef.heading).toMatch(/^[A-Z\s]+$/);
-      });
+      }
     });
   });
 
   describe("supporting files [OSS-07]", () => {
     it("LICENSES-THIRD-PARTY.md: exists and is not empty [OSS-07]", () => {
-      const fs = require("node:fs");
-      const path = require("node:path");
       const licensesPath = path.resolve(
         __dirname,
         "../../LICENSES-THIRD-PARTY.md",
@@ -129,8 +131,6 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
 
   describe("size discipline [PERF-11]", () => {
     it("bundled assets meet size discipline", () => {
-      const fs = require("node:fs");
-      const path = require("node:path");
       const assetsDir = path.resolve(__dirname, "../../assets");
       // T53-01: task spec says _generic.md (not generic.yaml)
       const genericGuidePath = path.join(
@@ -148,12 +148,10 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
   });
 
   describe("bedrock fallback [COMPAT-08]", () => {
-    it("10 Universal Project Dimensions bundled as constant", async () => {
-      const assets = await import("../../src/assets/bundled-content");
-      const dims = (assets as any).UNIVERSAL_DIMENSIONS;
-      expect(Array.isArray(dims)).toBe(true);
-      expect(dims.length).toBe(10);
-      expect(dims[0]).toHaveProperty("name");
+    it("10 Universal Project Dimensions bundled as constant", () => {
+      expect(Array.isArray(UNIVERSAL_DIMENSIONS)).toBe(true);
+      expect(UNIVERSAL_DIMENSIONS.length).toBe(10);
+      expect(UNIVERSAL_DIMENSIONS[0]).toHaveProperty("name");
     });
   });
 
@@ -165,7 +163,9 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
     });
 
     it("generic guide served when no type-specific guide exists: mode is adaptive [COMPAT-08, T53-04]", async () => {
-      const result = await verifyGenericGuide({ simulateNoTypeGuide: true });
+      const result = await verifyGenericGuide({
+        simulateNoTypeGuide: true,
+      });
       expect(result).toBeDefined();
       expect(result.mode).toBe("adaptive");
     });
@@ -173,8 +173,6 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
 
   describe("three-tier fallback chain [COMPAT-08, T53-05]", () => {
     it("type-specific guide exists: served (tier 1) [COMPAT-08, T53-05]", async () => {
-      const assets = await import("../../src/assets/bundled-content");
-      const { resolveGuide } = assets as any;
       const result = await resolveGuide({
         type: "song",
         simulateTypeGuideExists: true,
@@ -184,8 +182,6 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
     });
 
     it("no type-specific guide, generic guide exists: served (tier 2) [COMPAT-08, T53-05]", async () => {
-      const assets = await import("../../src/assets/bundled-content");
-      const { resolveGuide } = assets as any;
       const result = await resolveGuide({
         type: "unknown-type",
         simulateTypeGuideMissing: true,
@@ -196,8 +192,6 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
     });
 
     it("no type-specific or generic guide: universal dimensions served (tier 3) [COMPAT-08, T53-05]", async () => {
-      const assets = await import("../../src/assets/bundled-content");
-      const { resolveGuide } = assets as any;
       const result = await resolveGuide({
         type: "unknown-type",
         simulateAllGuidesMissing: true,
@@ -219,13 +213,15 @@ describe("TASK-53: Property Tests", () => {
       fc.asyncProperty(
         fc.constantFrom(true, false),
         async (simulateMissing) => {
-          const result = await verifyGenericGuide({ simulateMissing });
+          const result = await verifyGenericGuide({
+            simulateMissing,
+          });
           // After verification, guide should always be available
           const guide = loadGenericGuide();
           expect(guide).toBeDefined();
         },
       ),
-      { numRuns: 5 }, // G3: raised from 2
+      { numRuns: 5 },
     );
   });
 
@@ -235,13 +231,11 @@ describe("TASK-53: Property Tests", () => {
         const result = await installBundledContent({ isUpdate: true });
         expect(result.guideOverwritten).toBe(true);
       }),
-      { numRuns: 5 }, // G3: raised from 2
+      { numRuns: 5 },
     );
   });
 
   it("forAll(build): assets/ always included in dist/ [COMPAT-08]", () => {
-    const fs = require("node:fs");
-    const path = require("node:path");
     fc.assert(
       fc.property(
         fc.constantFrom("assets/", "type-guides/", "ontologies/"),
@@ -256,6 +250,23 @@ describe("TASK-53: Property Tests", () => {
           expect(pkg.files).toContain("assets/");
         },
       ),
+    );
+  });
+
+  it("forAll(extension definitions): all entries have required COMPAT-05 fields [COMPAT-05]", () => {
+    const defs = getExtensionDefinitions();
+    fc.assert(
+      fc.property(fc.constantFrom(...defs), (extDef: any) => {
+        expect(typeof extDef.name).toBe("string");
+        expect(typeof extDef.heading).toBe("string");
+        expect(typeof extDef.description).toBe("string");
+        expect(Array.isArray(extDef.abstract_capability_descriptors)).toBe(
+          true,
+        );
+        expect(Array.isArray(extDef.typical_subsections)).toBe(true);
+        expect(Array.isArray(extDef.commonly_associated_ontologies)).toBe(true);
+      }),
+      { numRuns: 10 },
     );
   });
 });
