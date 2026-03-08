@@ -35,6 +35,13 @@ export function getShutdownState(): ShutdownState {
 let _sigintCount = 0;
 
 /**
+ * @internal Reset all module-level state. Called from test beforeEach.
+ */
+export function _resetState(): void {
+  _sigintCount = 0;
+}
+
+/**
  * Handles a process signal and returns the resulting shutdown state.
  */
 export async function handleSignal(

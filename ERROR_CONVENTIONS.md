@@ -68,6 +68,12 @@
 - `{ valid: false, errors: string[] }` — RETURNED (not thrown) — from `validateRegistryEntry` when entry is missing required fields
 - `{ warningShown: true, warningMessage: string }` — RETURNED (not thrown) — from `addTool` when entry is untrusted, message matches `/untrusted|external|unverified/i`
 
+## server/signal-handling
+- `{ warning: string }` — matches `/instance|lock|concurrent/i` — RETURNED (not thrown) from `detectMultiInstance`
+- `{ violated: boolean, limitName, actualValue, configuredLimit, adjustmentGuidance }` — RETURNED (not thrown) from `checkSecurityLimit`
+- `{ logged: boolean, serverContinues: boolean }` — RETURNED (not thrown) from `handleUnhandledRejection`
+- No errors thrown — all functions return result objects
+
 ## errors/error-types (base classes)
 - `NotFoundError(message)` — extends `BriefError`, type: `"not_found"` — THROWN
 - `InvalidInputError(message)` — extends `BriefError`, type: `"invalid_input"` — THROWN

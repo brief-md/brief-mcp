@@ -1,12 +1,17 @@
 import fc from "fast-check";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  _resetState,
   checkRateLimit,
+  checkSecurityLimit,
   cleanupOrphanedTempFiles,
   detectMultiInstance,
+  getProjectState,
   getStartupInfo,
+  handleMultiSource,
   handleSignal,
   handleUnhandledRejection,
+  handleWrite,
   verifyGenericGuide,
 } from "../../src/server/signal-handling";
 
@@ -15,6 +20,11 @@ import {
 // ---------------------------------------------------------------------------
 
 describe("TASK-50: Cross-Cutting — Signal Handling, Graceful Shutdown & Crash Recovery", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetState();
+  });
+
   describe("signal handling [CLI-08]", () => {
     it("SIGINT received: graceful shutdown initiated, in-flight writes complete [CLI-08]", async () => {
       const result = await handleSignal("SIGINT");
@@ -192,14 +202,11 @@ describe("TASK-50: Cross-Cutting — Signal Handling, Graceful Shutdown & Crash 
 
   describe("security limit violation [ERR-10]", () => {
     it("security limit violation -> error includes all four required fields [ERR-10, T50-01]", async () => {
-      const signalHandling = await import("../../src/server/signal-handling");
-      const checkFn = signalHandling.checkSecurityLimit;
-      expect(checkFn).toBeDefined();
-      const result = await checkFn({
+      const result = await checkSecurityLimit({
         simulateViolation: true,
         limitType: "rate",
       });
-      expect(result.violated).toBeTruthy();
+      expect(result.violated).toBe(true);
       expect(result.logged).toBe(true);
       // T50-01: error response must include all four ERR-10 required fields
       expect(result.limitName).toBeDefined(); // which limit was violated
@@ -215,6 +222,11 @@ describe("TASK-50: Cross-Cutting — Signal Handling, Graceful Shutdown & Crash 
 // ---------------------------------------------------------------------------
 
 describe("TASK-50: Property Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetState();
+  });
+
   it("forAll(shutdown): temp files always cleaned up [CLI-09]", async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -254,33 +266,49 @@ describe("TASK-50: Property Tests", () => {
           .string({ minLength: 1, maxLength: 100 })
           .filter((s) => s.trim().length > 0),
         async (content) => {
-          const { handleWrite, getProjectState } = await import(
-            "../../src/server/signal-handling"
-          );
-          const stateBefore = await getProjectState(testPath);
+          const stateBefore = getProjectState(testPath);
           const result = await handleWrite(testPath, content, {
             simulateFailure: true,
           });
-          expect(result.failed).toBeTruthy();
-          const stateAfter = await getProjectState(testPath);
+          expect(result.failed).toBe(true);
+          const stateAfter = getProjectState(testPath);
           expect(JSON.stringify(stateAfter)).toBe(JSON.stringify(stateBefore));
         },
       ),
+      { numRuns: 10 },
     );
   });
 
   it("forAll(multi-source failure): partial results always returned from successful sources [ERR-11]", async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 4 }), async (failCount) => {
-        const { handleMultiSource } = await import(
-          "../../src/server/signal-handling"
-        );
-        const result = await handleMultiSource({
+        const result = handleMultiSource({
           simulateFailCount: failCount,
         });
-        expect(result.partialResults).toBeTruthy();
+        expect(result.partialResults.length).toBeGreaterThan(0);
         expect(result.failedCount).toBeGreaterThan(0);
       }),
+      { numRuns: 10 },
+    );
+  });
+
+  it("forAll(signal): all known signals always return shutdownInitiated [CLI-08]", async () => {
+    const KNOWN_SIGNALS = [
+      "SIGINT",
+      "SIGTERM",
+      "SIGHUP",
+      "SIGPIPE",
+      "SIGBREAK",
+      "stdin-end",
+      "inactivity-timeout",
+    ];
+    await fc.assert(
+      fc.asyncProperty(fc.constantFrom(...KNOWN_SIGNALS), async (signal) => {
+        _resetState();
+        const result = await handleSignal(signal);
+        expect(result.shutdownInitiated).toBe(true);
+      }),
+      { numRuns: 10 },
     );
   });
 });

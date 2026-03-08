@@ -51,14 +51,19 @@ Implement signal handling for graceful shutdown and startup crash recovery. Shut
 ## Exported API
 
 Export from `src/server/signal-handling.ts`:
-- `handleSignal(signal: string, options?: { inFlightWrites?: number; simulateSlowWrite?: boolean; operationTimeout?: boolean }) → { shutdownInitiated: boolean; inFlightCompleted?: boolean; forceExit?: boolean; exitCode?: number; epipeConverted?: boolean; tempFilesCleaned?: boolean }`
-  Signals: `SIGINT`, `SIGTERM`, `SIGHUP`, `SIGPIPE`, `SIGBREAK`, `stdin-end`, `inactivity-timeout`, `timeout`. SIGPIPE → converted to EPIPE warning (`epipeConverted: true`). In-flight writes drain before exit.
+- `handleSignal(signal: string, options?: { inFlightWrites?: number; simulateSlowWrite?: boolean; operationTimeout?: boolean }) → { shutdownInitiated?: boolean; inFlightCompleted?: boolean; forceExit?: boolean; exitCode?: number; epipeConverted?: boolean; tempFilesCleaned?: boolean; completed?: boolean; cleanupPerformed?: boolean; forcedTermination?: boolean }`
+  Signals: `SIGINT`, `SIGTERM`, `SIGHUP`, `SIGPIPE`, `SIGBREAK`, `stdin-end`, `inactivity-timeout`, `timeout`. SIGPIPE → converted to EPIPE warning (`epipeConverted: true`). In-flight writes drain before exit. Timeout path returns `completed: false, cleanupPerformed: true`. Slow write forced termination returns `forcedTermination: true`.
 - `cleanupOrphanedTempFiles(options?: { simulateYoungFile?: boolean; simulateOldFile?: boolean; ageSeconds?: number; includeSymlinks?: boolean }) → { cleaned: boolean; cleanedCount: number; skippedYoung?: number; symlinksSkipped?: boolean }`
 - `verifyGenericGuide(options?: { simulateMissing?: boolean }) → { regenerated: boolean }`
 - `getStartupInfo() → { version: string; transport: string; workspaceRoots: string[]; packCount: number; guidesCount: number; duration: number }`
 - `detectMultiInstance(options?: { simulateLockExists?: boolean }) → { warning?: string }`
 - `handleUnhandledRejection(error: Error) → { logged: boolean; serverContinues: boolean }` — logs but does not crash
 - `checkRateLimit(params: { type: 'read' | 'write'; currentRate: number }) → { exceeded: boolean }`
+- `checkSecurityLimit(params: { simulateViolation?: boolean; limitType?: string }) → { violated: boolean; logged: boolean; limitName: string; actualValue: unknown; configuredLimit: unknown; adjustmentGuidance?: string }` — checks ERR-10 security limit violations
+- `handleWrite(path: string, content: string, options?: { simulateFailure?: boolean }) → { failed: boolean }` — write operation with rollback on failure (ERR-07)
+- `getProjectState(path?: string) → unknown` — returns current project state for rollback verification
+- `handleMultiSource(params: { simulateFailCount?: number }) → { partialResults: unknown[]; failedCount: number }` — multi-source operation with partial results (ERR-11)
+- `_resetState() → void` — @internal, resets module-level state for test isolation
 
 ## Rules
 
