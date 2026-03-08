@@ -673,9 +673,14 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
 
     extract_tokens "$TR_LOG" "TEST-REVIEW"
 
-    # Safety: verify test-review agent only touched tests/
+    # Safety: verify test-review agent only touched tests/ or allowed management files
+    # Management files (TASK_INDEX.md, BUGS.md, BUGS_RESOLVED.md, DESIGN_REVIEW.md)
+    # must be updatable by the test-review agent so it can clear [SUSPECT-TEST] flags
+    # and mark tasks completed — without this, the loop re-runs the same task forever.
     TR_UNCOMMITTED=$(git diff --name-only 2>/dev/null || true)
-    TR_NON_TEST=$(echo "$TR_UNCOMMITTED" | grep -v '^tests/' | grep -v '^$' || true)
+    TR_NON_TEST=$(echo "$TR_UNCOMMITTED" | grep -v '^tests/' | grep -v '^$' \
+      | grep -v '^TASK_INDEX\.md$' | grep -v '^BUGS\.md$' \
+      | grep -v '^BUGS_RESOLVED\.md$' | grep -v '^DESIGN_REVIEW\.md$' || true)
     if [ -n "$TR_NON_TEST" ]; then
       echo "  SAFETY: test-review agent left uncommitted non-test changes — reverting"
       while IFS= read -r f; do
@@ -686,7 +691,9 @@ $(git ls-files --others --exclude-standard src/ 2>/dev/null | while IFS= read -r
     TR_COMMIT_TIME=$(git log -1 --format=%ct 2>/dev/null || echo "0")
     if [ "$TR_COMMIT_TIME" -ge "$ITER_START" ]; then
       TR_COMMITTED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
-      TR_BAD_COMMIT=$(echo "$TR_COMMITTED_FILES" | grep -v '^tests/' | grep -v '^$' || true)
+      TR_BAD_COMMIT=$(echo "$TR_COMMITTED_FILES" | grep -v '^tests/' | grep -v '^$' \
+        | grep -v '^TASK_INDEX\.md$' | grep -v '^BUGS\.md$' \
+        | grep -v '^BUGS_RESOLVED\.md$' | grep -v '^DESIGN_REVIEW\.md$' || true)
       if [ -n "$TR_BAD_COMMIT" ]; then
         echo "  SAFETY: test-review agent committed non-test files — reverting commit"
         git revert --no-edit HEAD 2>/dev/null || git reset --hard HEAD~1
