@@ -57,6 +57,18 @@ function typed<T>(args: Args): T {
   return args as unknown as T;
 }
 
+/** Remap MCP snake_case param names to function camelCase param names. */
+function remap(args: Args, mapping: Record<string, string>): Args {
+  const result: Args = { ...args };
+  for (const [from, to] of Object.entries(mapping)) {
+    if (from in result && !(to in result)) {
+      result[to] = result[from];
+      delete result[from];
+    }
+  }
+  return result;
+}
+
 /**
  * Dispatch map: MCP tool name → handler function.
  *
@@ -71,14 +83,28 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   // Workspace
   brief_list_projects: (args) => listProjects(args),
   brief_set_active_project: (args) =>
-    setActiveProject(typed<Parameters<typeof setActiveProject>[0]>(args)),
+    setActiveProject(
+      typed<Parameters<typeof setActiveProject>[0]>(
+        remap(args, { path: "identifier", workspace_roots: "workspaceRoots" }),
+      ),
+    ),
   brief_create_project: (args) =>
-    createProject(typed<Parameters<typeof createProject>[0]>(args)),
+    createProject(
+      typed<Parameters<typeof createProject>[0]>(
+        remap(args, { name: "projectName", workspace: "workspaceRoot" }), // check-rules-ignore
+      ),
+    ),
   brief_create_sub_project: (args) =>
-    createSubProject(typed<Parameters<typeof createSubProject>[0]>(args)),
+    createSubProject(
+      typed<Parameters<typeof createSubProject>[0]>(
+        remap(args, { parent_path: "parentPath" }),
+      ),
+    ),
   brief_reenter_project: (args) =>
     generateReentrySummary(
-      typed<Parameters<typeof generateReentrySummary>[0]>(args),
+      typed<Parameters<typeof generateReentrySummary>[0]>(
+        remap(args, { path: "projectPath" }),
+      ),
     ),
   brief_start_tutorial: () => startTutorial(),
   brief_set_tutorial_dismissed: (args) =>
@@ -122,22 +148,57 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
   // Ontology
   brief_search_ontology: (args) =>
-    searchOntology(typed<Parameters<typeof searchOntology>[0]>(args)),
+    searchOntology(
+      typed<Parameters<typeof searchOntology>[0]>(
+        remap(args, { max_results: "maxResults" }),
+      ),
+    ),
   brief_get_ontology_entry: (args) =>
-    getOntologyEntry(typed<Parameters<typeof getOntologyEntry>[0]>(args)),
+    getOntologyEntry(
+      typed<Parameters<typeof getOntologyEntry>[0]>(
+        remap(args, { entry_id: "entryId", detail_level: "detailLevel" }),
+      ),
+    ),
   brief_browse_ontology: (args) =>
-    browseOntology(typed<Parameters<typeof browseOntology>[0]>(args)),
+    browseOntology(
+      typed<Parameters<typeof browseOntology>[0]>(
+        remap(args, { entry_id: "entryId", detail_level: "detailLevel" }),
+      ),
+    ),
   brief_list_ontologies: (args) => listOntologies(args),
   brief_install_ontology: (args) =>
     installOntology(typed<Parameters<typeof installOntology>[0]>(args)),
   brief_tag_entry: (args) =>
-    tagEntry(typed<Parameters<typeof tagEntry>[0]>(args)),
+    tagEntry(
+      typed<Parameters<typeof tagEntry>[0]>(
+        remap(args, { entry_id: "entryId", label_override: "labelOverride" }),
+      ),
+    ),
 
   // Reference
   brief_get_entry_references: (args) =>
-    getEntryReferences(typed<Parameters<typeof getEntryReferences>[0]>(args)),
+    getEntryReferences(
+      typed<Parameters<typeof getEntryReferences>[0]>(
+        remap(args, {
+          entry_id: "entryId",
+          type_filter: "typeFilter",
+          extension_filter: "extensionFilter",
+          max_results: "maxResults",
+        }),
+      ),
+    ),
   brief_suggest_references: (args) =>
-    suggestReferences(typed<Parameters<typeof suggestReferences>[0]>(args)),
+    suggestReferences({
+      context: {
+        section: String(args.context ?? ""),
+        activeExtensions: Array.isArray(args.active_extensions)
+          ? (args.active_extensions as string[])
+          : [],
+      },
+      existingReferences: args.existing_references as
+        | Array<{ ontology: string; entryId: string }>
+        | undefined,
+    }),
   brief_lookup_reference: (args) =>
     lookupReference(typed<Parameters<typeof lookupReference>[0]>(args)),
   brief_add_reference: (args) =>
@@ -149,9 +210,20 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
   // Extension
   brief_suggest_extensions: (args) =>
-    suggestExtensions(typed<Parameters<typeof suggestExtensions>[0]>(args)),
+    suggestExtensions(
+      typed<Parameters<typeof suggestExtensions>[0]>(
+        remap(args, {
+          project_type: "projectType",
+          active_extensions: "activeExtensions",
+        }),
+      ),
+    ),
   brief_add_extension: (args) =>
-    addExtension(typed<Parameters<typeof addExtension>[0]>(args)),
+    addExtension(
+      typed<Parameters<typeof addExtension>[0]>(
+        remap(args, { extension_name: "extensionName" }), // check-rules-ignore
+      ),
+    ),
   brief_list_extensions: (args) => listExtensions(args),
 
   // Visibility
@@ -160,7 +232,11 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       typed<Parameters<typeof getProjectFrameworks>[0]>(args),
     ),
   brief_remove_ontology: (args) =>
-    removeOntology(typed<Parameters<typeof removeOntology>[0]>(args)),
+    removeOntology(
+      typed<Parameters<typeof removeOntology>[0]>(
+        remap(args, { remove_tags: "removeTags" }),
+      ),
+    ),
 
   // Registry
   brief_search_registry: (args) =>
