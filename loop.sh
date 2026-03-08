@@ -218,7 +218,7 @@ $(cat LEARNINGS.md 2>/dev/null || echo '(not found)')
         --dangerously-skip-permissions \
         --output-format stream-json \
         --verbose \
-        --max-turns 30 \
+        --max-turns 40 \
         2>&1 | tee "$AUDIT_LOG" | node scripts/format-log.js || true
       unset AUDIT_MODE
 

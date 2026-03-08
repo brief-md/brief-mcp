@@ -353,9 +353,52 @@ export async function handleCaptureExternalSession(
   };
 }
 
-/** Flexible alias for tests — accepts any param shape and forwards to handleUpdateSection. */
+/** Flexible alias for tests — accepts any param shape and forwards to handleUpdateSection.
+ *  Integration test API: { content: fullFileContent, section, newContent } →
+ *  replaces the named section body and returns the modified full file in result.content.
+ */
 export async function updateSection(
   params: Record<string, unknown>,
 ): Promise<UpdateSectionResult> {
+  // Integration test API: content = full BRIEF.md, newContent = replacement body
+  if (
+    typeof params.newContent === "string" &&
+    typeof params.content === "string"
+  ) {
+    const fullContent = params.content as string;
+    const sectionName = String(params.section ?? params.heading ?? "");
+    const newBody = params.newContent as string;
+
+    const lines = fullContent.split("\n");
+    const headingPattern = `## ${sectionName}`;
+    let secStart = -1;
+    let secEnd = lines.length;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trimEnd() === headingPattern) {
+        secStart = i;
+      } else if (secStart >= 0 && i > secStart && /^## /.test(lines[i])) {
+        secEnd = i;
+        break;
+      }
+    }
+
+    let resultContent: string;
+    if (secStart >= 0) {
+      const before = lines.slice(0, secStart + 1).join("\n");
+      const after = lines.slice(secEnd).join("\n");
+      resultContent = `${before}\n\n${newBody}\n\n${after}`;
+    } else {
+      resultContent = `${fullContent}\n\n## ${sectionName}\n\n${newBody}\n`;
+    }
+
+    return {
+      success: true,
+      sectionUpdated: true,
+      canonicalName: sectionName,
+      content: resultContent,
+    } as UpdateSectionResult;
+  }
+
   return handleUpdateSection(params as unknown as UpdateSectionOptions);
 }

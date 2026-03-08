@@ -238,5 +238,12 @@ export async function handleAddDecision(
 export async function addDecision(
   params: Record<string, unknown>,
 ): Promise<AddDecisionResult> {
+  // Normalize camelCase → snake_case for dual-interface compat (integration tests)
+  if (params.exceptionTo !== undefined && params.exception_to === undefined) {
+    params.exception_to = params.exceptionTo;
+  }
+  if (params.rationale !== undefined && params.why === undefined) {
+    params.why = params.rationale;
+  }
   return handleAddDecision(params as unknown as AddDecisionParams);
 }
