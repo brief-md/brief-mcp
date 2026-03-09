@@ -1,5 +1,8 @@
 // src/ontology/tagging.ts — TASK-36: Ontology Tagging Tool (stub)
 
+import { getKnownExtensions } from "../extension/creation.js"; // check-rules-ignore
+import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
+import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
 import { getPackIndex, installPack } from "./management.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -29,6 +32,9 @@ export interface TagEntryResult {
   afterContent: string;
   validated?: boolean;
   entryId?: string;
+  extensionName?: string;
+  scopeWarning?: string;
+  entryReferences?: unknown[];
   [key: string]: unknown;
 }
 
@@ -179,6 +185,18 @@ export async function tagEntry(
   const defaultLabel = (entryData.label as string) ?? entryId;
   const label = labelOverride ?? defaultLabel;
 
+  // Scope validation (WP2/GAP-A+E): check if section is under an extension
+  const scopeInfo = validateExtensionSection(section);
+  const extensionName = scopeInfo.extensionName;
+  const scopeWarning = scopeInfo.valid
+    ? undefined
+    : `Section '${section}' is not under a known extension. Tags are most useful within extension subsections.`;
+
+  // Entry references (WP2/GAP-F): surface references from the pack entry
+  const entryReferences = Array.isArray(entryData.references)
+    ? (entryData.references as unknown[])
+    : [];
+
   // Qualified ID (ONT-12)
   const qualifiedId = `${ontology}:${entryId}`;
 
@@ -212,6 +230,9 @@ export async function tagEntry(
         afterContent,
         validated: true,
         entryId,
+        extensionName,
+        scopeWarning,
+        entryReferences,
       };
     }
     // Same entry, different label → update existing comment's label
@@ -227,6 +248,9 @@ export async function tagEntry(
       afterContent,
       validated: true,
       entryId,
+      extensionName,
+      scopeWarning,
+      entryReferences,
     };
   }
 
@@ -263,5 +287,162 @@ export async function tagEntry(
     afterContent,
     validated: true,
     entryId,
+    extensionName,
+    scopeWarning,
+    entryReferences,
   };
+}
+
+// ─── Scope Validation (WP2/GAP-A+E) ────────────────────────────────────────
+
+/**
+ * Validate whether a section name belongs to a known extension.
+ * Soft enforcement: returns a warning rather than rejecting.
+ */
+export function validateExtensionSection(section: string): {
+  valid: boolean;
+  extensionName?: string;
+} {
+  const lower = section.toLowerCase();
+  const extensions = getKnownExtensions();
+
+  for (const [slug, ext] of extensions) {
+    // Check if section matches the extension heading itself
+    if (lower === ext.name.toLowerCase() || lower === slug) {
+      return { valid: true, extensionName: slug };
+    }
+    // Check if section matches one of the extension's subsections
+    for (const sub of ext.subsections) {
+      if (sub.toLowerCase() === lower) {
+        return { valid: true, extensionName: slug };
+      }
+    }
+  }
+
+  return { valid: false };
+}
+
+// ─── isTagged (WP2/GAP-E) ──────────────────────────────────────────────────
+
+/**
+ * Check if a specific ontology entry has been tagged (for browse integration).
+ */
+export function isTagged(ontology: string, entryId: string): boolean {
+  for (const key of tagRegistry.keys()) {
+    if (key.startsWith(`${ontology}:${entryId}:`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ─── listTags (WP2/GAP-E) ──────────────────────────────────────────────────
+
+export interface TagInfo {
+  ontology: string;
+  entryId: string;
+  label: string;
+  section: string;
+  paragraph?: string;
+  extensionName?: string;
+}
+
+/**
+ * List all tags in the tag registry, optionally filtered by extension.
+ */
+export async function listTags(params?: {
+  projectPath?: string;
+  extensionFilter?: string;
+}): Promise<{
+  tags: TagInfo[];
+  groupedByExtension: Record<string, TagInfo[]>;
+  total: number;
+}> {
+  const tags: TagInfo[] = [];
+
+  for (const [key, label] of tagRegistry) {
+    const parts = key.split(":");
+    if (parts.length < 3) continue;
+    const ontology = parts[0];
+    const entryId = parts[1];
+    const section = parts[2];
+    const paragraph = parts.length > 3 ? parts.slice(3).join(":") : undefined;
+
+    const scopeInfo = validateExtensionSection(section);
+    const tag: TagInfo = {
+      ontology,
+      entryId,
+      label,
+      section,
+      paragraph,
+      extensionName: scopeInfo.extensionName,
+    };
+
+    if (params?.extensionFilter) {
+      if (scopeInfo.extensionName !== params.extensionFilter) continue;
+    }
+
+    tags.push(tag);
+  }
+
+  // Group by extension
+  const groupedByExtension: Record<string, TagInfo[]> = {};
+  for (const tag of tags) {
+    const ext = tag.extensionName ?? "(unscoped)";
+    if (!groupedByExtension[ext]) groupedByExtension[ext] = [];
+    groupedByExtension[ext].push(tag);
+  }
+
+  return { tags, groupedByExtension, total: tags.length };
+}
+
+// ─── removeTag (WP2/GAP-E) ─────────────────────────────────────────────────
+
+/**
+ * Remove a tag from the registry (and optionally from BRIEF.md on disk).
+ */
+export async function removeTag(params: {
+  ontology: string;
+  entryId: string;
+  section: string;
+  paragraph?: string;
+  projectPath?: string;
+}): Promise<{
+  removed: boolean;
+  qualifiedId: string;
+}> {
+  const { ontology, entryId, section, paragraph } = params;
+  const qualifiedId = `${ontology}:${entryId}`;
+
+  const tagKey = paragraph
+    ? `${ontology}:${entryId}:${section}:${paragraph}`
+    : `${ontology}:${entryId}:${section}`;
+
+  const existed = tagRegistry.has(tagKey);
+  tagRegistry.delete(tagKey);
+
+  // Attempt to remove from BRIEF.md on disk (best-effort)
+  const projectPath = params.projectPath ?? getActiveProject()?.path;
+  if (projectPath) {
+    try {
+      const content = await readBrief(projectPath);
+      if (content) {
+        // Remove the HTML comment tag from content
+        const escapedOntology = ontology.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const escapedEntryId = entryId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const tagRe = new RegExp(
+          `\\s*<!-- brief:ontology ${escapedOntology} ${escapedEntryId} "[^"]*" -->`,
+          "g",
+        );
+        const updated = content.replace(tagRe, "");
+        if (updated !== content) {
+          await writeBrief(projectPath, updated);
+        }
+      }
+    } catch {
+      /* best-effort disk removal */
+    }
+  }
+
+  return { removed: existed, qualifiedId };
 }

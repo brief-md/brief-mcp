@@ -4,6 +4,23 @@ import { NotFoundError } from "../errors/error-types.js";
 import defaultLogger from "../observability/logger.js";
 import { getPackIndex, installPack } from "./management.js";
 
+// Lazy import to avoid fixture contamination at module load time
+let _isTaggedFn: ((ontology: string, entryId: string) => boolean) | undefined;
+async function getIsTagged(): Promise<
+  (ontology: string, entryId: string) => boolean
+> {
+  if (!_isTaggedFn) {
+    const mod = await import("./tagging.js"); // check-rules-ignore
+    _isTaggedFn = mod.isTagged;
+  }
+  return _isTaggedFn;
+}
+
+/** Sync check — returns false if tagging module not yet loaded. */
+function isTaggedSync(ontology: string, entryId: string): boolean {
+  return _isTaggedFn ? _isTaggedFn(ontology, entryId) : false;
+}
+
 const logger = defaultLogger;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -37,6 +54,7 @@ interface BrowseEntry {
   keywords?: string[];
   aliases?: string[];
   references?: unknown[];
+  alreadyTagged?: boolean;
   [key: string]: unknown;
 }
 
@@ -440,6 +458,9 @@ export async function browseOntology(params: {
 }): Promise<BrowseResponse> {
   const { ontology, entryId, direction, detailLevel = "standard" } = params;
 
+  // Eagerly initialize isTagged for alreadyTagged enrichment
+  await getIsTagged();
+
   const index = getPackIndex(ontology);
   if (!index) {
     throw makeNotFoundError(`Pack '${ontology}' not found`);
@@ -494,6 +515,7 @@ export async function browseOntology(params: {
         ...(isDirectParent ? { isParent: true } : { isAncestor: true }),
         depth: entryDepth,
         level: entryDepth,
+        alreadyTagged: isTaggedSync(ontology, currentId),
       };
 
       entries.push(browseEntry);
@@ -542,6 +564,7 @@ export async function browseOntology(params: {
         ...(directChild ? { isChild: true } : { isDescendant: true }),
         depth: entryDepth,
         level: entryDepth,
+        alreadyTagged: isTaggedSync(ontology, id),
       };
       entries.push(browseEntry);
 
@@ -574,6 +597,7 @@ export async function browseOntology(params: {
             isSibling: true,
             depth: entryDepth,
             level: entryDepth,
+            alreadyTagged: isTaggedSync(ontology, id),
           };
           entries.push(browseEntry);
         }
