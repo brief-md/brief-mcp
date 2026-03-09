@@ -21,20 +21,29 @@ import {
   handleUpdateSection,
 } from "../context/write-sections.js"; // check-rules-ignore
 import { addExtension, listExtensions } from "../extension/creation.js"; // check-rules-ignore
+import { removeExtension } from "../extension/removal.js"; // check-rules-ignore
 import { suggestExtensions } from "../extension/suggestion.js"; // check-rules-ignore
+import { getHierarchyPosition } from "../hierarchy/position.js"; // check-rules-ignore
+import { buildHierarchyTree } from "../hierarchy/tree.js"; // check-rules-ignore
 import { browseOntology, getOntologyEntry } from "../ontology/browse.js"; // check-rules-ignore
+import { createOntology } from "../ontology/creation.js"; // check-rules-ignore
+import { fetchAndConvert, previewDataset } from "../ontology/dataset.js"; // check-rules-ignore
+import { discoverOntologies } from "../ontology/discovery.js"; // check-rules-ignore
+import { ontologyDraft } from "../ontology/draft.js"; // check-rules-ignore
 import { installOntology, listOntologies } from "../ontology/management.js"; // check-rules-ignore
 import { searchOntology } from "../ontology/search.js"; // check-rules-ignore
-import { tagEntry } from "../ontology/tagging.js"; // check-rules-ignore
+import { listTags, removeTag, tagEntry } from "../ontology/tagging.js"; // check-rules-ignore
 import { lookupReference } from "../reference/lookup.js"; // check-rules-ignore
 import {
   getEntryReferences,
   suggestReferences,
 } from "../reference/suggestion.js"; // check-rules-ignore
 import { addReference } from "../reference/writing.js"; // check-rules-ignore
+import { applyTypeGuide } from "../type-intelligence/apply.js"; // check-rules-ignore
 import { extractConflictPatterns } from "../type-intelligence/conflict-patterns.js"; // check-rules-ignore
 import { createTypeGuide } from "../type-intelligence/creation.js"; // check-rules-ignore
 import { getTypeGuide } from "../type-intelligence/loading.js"; // check-rules-ignore
+import { suggestTypeGuides } from "../type-intelligence/search.js"; // check-rules-ignore
 import type { CheckConflictsParams } from "../validation/conflicts.js"; // check-rules-ignore
 import { lintBrief } from "../validation/lint.js"; // check-rules-ignore
 import {
@@ -52,6 +61,8 @@ import {
 } from "../workspace/active.js"; // check-rules-ignore
 import { createProject, createSubProject } from "../workspace/creation.js"; // check-rules-ignore
 import { listProjects } from "../workspace/listing.js"; // check-rules-ignore
+import { getMaturitySignals } from "../workspace/maturity.js"; // check-rules-ignore
+import { createParentProject } from "../workspace/parent-creation.js"; // check-rules-ignore
 import {
   generateReentrySummary,
   setTutorialDismissed,
@@ -275,6 +286,24 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
         remap(args, { entry_id: "entryId", label_override: "labelOverride" }),
       ),
     ),
+  brief_list_tags: (args) =>
+    listTags(
+      typed<Parameters<typeof listTags>[0]>(
+        remap(withProjectPath(args), {
+          project_path: "projectPath",
+          extension_filter: "extensionFilter",
+        }),
+      ),
+    ),
+  brief_remove_tag: (args) =>
+    removeTag(
+      typed<Parameters<typeof removeTag>[0]>(
+        remap(withProjectPath(args), {
+          entry_id: "entryId",
+          project_path: "projectPath",
+        }),
+      ),
+    ),
 
   // Reference
   brief_get_entry_references: (args) =>
@@ -329,6 +358,16 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       ),
     ),
   brief_list_extensions: (args) => listExtensions(args),
+  brief_remove_extension: (args) =>
+    removeExtension(
+      typed<Parameters<typeof removeExtension>[0]>(
+        remap(withProjectPath(args), {
+          extension_name: "extensionName", // check-rules-ignore
+          project_path: "projectPath",
+          remove_content: "removeContent",
+        }),
+      ),
+    ),
 
   // Visibility
   brief_get_project_frameworks: (args) =>
@@ -347,4 +386,160 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   // Registry
   brief_search_registry: (args) =>
     searchRegistry(typed<Parameters<typeof searchRegistry>[0]>(args)),
+
+  // WP1: Create parent project
+  brief_create_parent_project: (args) =>
+    createParentProject(
+      typed<Parameters<typeof createParentProject>[0]>(
+        remap(args, {
+          child_path: "childPath",
+          parent_directory: "parentDirectory",
+          name: "projectName", // check-rules-ignore
+          display_name: "displayName", // check-rules-ignore
+          what_this_is: "whatThisIs",
+          what_this_is_not: "whatThisIsNot",
+          why_this_exists: "whyThisExists",
+        }),
+      ),
+    ),
+
+  // WP2: Suggest type guides
+  brief_suggest_type_guides: (args) =>
+    suggestTypeGuides(
+      typed<Parameters<typeof suggestTypeGuides>[0]>(
+        remap(args, {
+          early_decisions: "earlyDecisions",
+          max_results: "maxResults",
+        }),
+      ),
+    ),
+
+  // WP4: Apply type guide
+  brief_apply_type_guide: (args) =>
+    applyTypeGuide(
+      typed<Parameters<typeof applyTypeGuide>[0]>(
+        remap(withProjectPath(args), {
+          project_path: "projectPath",
+          auto_install_extensions: "autoInstallExtensions",
+          auto_install_ontologies: "autoInstallOntologies",
+        }),
+      ),
+    ),
+
+  // WP5: Discover ontologies
+  brief_discover_ontologies: (args) =>
+    discoverOntologies(
+      typed<Parameters<typeof discoverOntologies>[0]>(
+        remap(args, {
+          extension_context: "extensionContext",
+          project_type: "projectType",
+          max_results: "maxResults",
+        }),
+      ),
+    ),
+
+  // WP5: Create ontology (needs sampling access)
+  brief_create_ontology: async (args) => {
+    const server = _server;
+    const samplingFn: SamplingFn | undefined = server
+      ? (params) =>
+          server.createMessage(
+            params as Parameters<typeof server.createMessage>[0],
+          )
+      : undefined;
+    return createOntology(
+      typed<Parameters<typeof createOntology>[0]>(
+        remap(args, {
+          extension_context: "extensionContext",
+          project_type: "projectType",
+          domain_keywords: "domainKeywords",
+          entry_count: "entryCount",
+        }),
+      ),
+      samplingFn,
+    );
+  },
+
+  // WP6: Get maturity signals
+  brief_get_maturity_signals: (args) =>
+    getMaturitySignals(
+      typed<Parameters<typeof getMaturitySignals>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
+
+  // WP3/GAP-B+H: Hierarchy awareness
+  brief_where_am_i: (args) =>
+    getHierarchyPosition(
+      typed<Parameters<typeof getHierarchyPosition>[0]>(
+        remap(withProjectPath(args), {
+          project_path: "projectPath",
+          workspace_roots: "workspaceRoots",
+        }),
+      ),
+    ),
+  brief_hierarchy_tree: (args) =>
+    buildHierarchyTree(
+      typed<Parameters<typeof buildHierarchyTree>[0]>(
+        remap(withProjectPath(args), {
+          root_path: "rootPath",
+          depth_limit: "depthLimit",
+          include_health_check: "includeHealthCheck",
+        }),
+      ),
+    ),
+
+  // WP4/GAP-C: Dataset preview & fetch
+  brief_preview_dataset: (args) =>
+    previewDataset(
+      typed<Parameters<typeof previewDataset>[0]>(
+        remap(args, {
+          max_rows: "maxRows",
+        }),
+      ),
+    ),
+  brief_fetch_dataset: async (args) => {
+    const server = _server;
+    const samplingFn: SamplingFn | undefined = server
+      ? (params) =>
+          server.createMessage(
+            params as Parameters<typeof server.createMessage>[0],
+          )
+      : undefined;
+    return fetchAndConvert(
+      typed<Parameters<typeof fetchAndConvert>[0]>(
+        remap(args, {
+          id_column: "idColumn",
+          label_column: "labelColumn",
+          description_column: "descriptionColumn",
+          keywords_column: "keywordsColumn",
+          max_entries: "maxEntries",
+        }),
+      ),
+      samplingFn,
+    );
+  },
+
+  // WP5/GAP-D: Interactive ontology builder
+  brief_ontology_draft: async (args) => {
+    const server = _server;
+    const samplingFn: SamplingFn | undefined = server
+      ? (params) =>
+          server.createMessage(
+            params as Parameters<typeof server.createMessage>[0],
+          )
+      : undefined;
+    return ontologyDraft(
+      typed<Parameters<typeof ontologyDraft>[0]>(
+        remap(args, {
+          domain_keywords: "domainKeywords",
+          initial_entry_count: "initialEntryCount",
+          draft_id: "draftId",
+          entry_ids: "entryIds",
+          entry_id: "entryId",
+        }),
+      ),
+      samplingFn,
+    );
+  },
 };

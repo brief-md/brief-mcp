@@ -59,9 +59,9 @@ describe("TASK-08: MCP Server Bootstrap", () => {
   });
 
   describe("tool registration [MCP-02, MCP-06]", () => {
-    it("listing tools returns exactly 38 definitions [MCP-02]", async () => {
+    it("listing tools returns exactly 52 definitions [MCP-02]", async () => {
       const tools = await getRegisteredTools();
-      expect(tools).toHaveLength(38);
+      expect(tools).toHaveLength(52);
     });
 
     it("every tool name starts with brief_ [MCP-06]", async () => {
@@ -71,7 +71,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
       }
     });
 
-    it("registered tool names match exact spec list of 38 tools [MCP-02]", async () => {
+    it("registered tool names match exact spec list of 52 tools [MCP-02]", async () => {
       const tools = await getRegisteredTools();
       const toolNames = tools.map((t: any) => t.name).sort();
       const expectedTools = [
@@ -124,6 +124,22 @@ describe("TASK-08: MCP Server Bootstrap", () => {
         "brief_get_project_frameworks",
         // Registry (TASK-49)
         "brief_search_registry",
+        // WP1-WP6: New tools
+        "brief_create_parent_project",
+        "brief_suggest_type_guides",
+        "brief_apply_type_guide",
+        "brief_discover_ontologies",
+        "brief_create_ontology",
+        "brief_get_maturity_signals",
+        // UX-GAP tools (WP1-WP3)
+        "brief_remove_extension",
+        "brief_list_tags",
+        "brief_remove_tag",
+        "brief_where_am_i",
+        "brief_hierarchy_tree",
+        "brief_preview_dataset",
+        "brief_fetch_dataset",
+        "brief_ontology_draft",
       ].sort();
       expect(toolNames).toEqual(expectedTools);
     });

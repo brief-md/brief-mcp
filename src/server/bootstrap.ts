@@ -36,7 +36,7 @@ const logOutput = {
 const logger = createLogger({ module: "server", output: logOutput });
 
 // ---------------------------------------------------------------------------
-// Tool definitions (38 tools — MCP-02, MCP-05, MCP-06)
+// Tool definitions (44 tools — MCP-02, MCP-05, MCP-06)
 // All parameter names use snake_case (A2-04).
 // ---------------------------------------------------------------------------
 
@@ -568,6 +568,44 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 
+  {
+    name: "brief_list_tags",
+    description:
+      "List all ontology tags in the current project. brief-mcp scope: tag management. Returns tags grouped by extension.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: {
+          type: "string",
+          description: "Project path. Defaults to active project.",
+        },
+        extension_filter: {
+          type: "string",
+          description: "Filter tags to a specific extension slug.",
+        },
+      },
+    },
+  },
+  {
+    name: "brief_remove_tag",
+    description:
+      "Remove an ontology tag from a section. brief-mcp scope: tag management. Removes from registry and BRIEF.md.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ontology: { type: "string", description: "Pack ID." },
+        entry_id: { type: "string", description: "Entry identifier." },
+        section: { type: "string", description: "Section the tag is in." },
+        paragraph: { type: "string", description: "Specific paragraph." },
+        project_path: {
+          type: "string",
+          description: "Project path. Defaults to active project.",
+        },
+      },
+      required: ["ontology", "entry_id", "section"],
+    },
+  },
+
   // --- Reference tools ---
   {
     name: "brief_get_entry_references",
@@ -760,6 +798,31 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {},
     },
   },
+  {
+    name: "brief_remove_extension",
+    description:
+      "Remove an extension from BRIEF.md. Removes from **Extensions:** metadata and optionally removes the extension's content sections. brief-mcp scope: extension management.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        extension_name: {
+          type: "string",
+          description:
+            "Extension name to remove (e.g. 'sonic_arts' or 'SONIC ARTS').",
+        },
+        project_path: {
+          type: "string",
+          description: "Project path. Defaults to active project.",
+        },
+        remove_content: {
+          type: "boolean",
+          description:
+            "If true, also removes the extension's # heading and all subsections from BRIEF.md. Default: false (metadata only).",
+        },
+      },
+      required: ["extension_name"],
+    },
+  },
 
   // --- Visibility tools ---
   {
@@ -810,6 +873,363 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+
+  // --- WP1: Create parent project ---
+  {
+    name: "brief_create_parent_project",
+    description:
+      "Create a parent BRIEF.md in an ancestor directory, linking an existing child project into a hierarchy. brief-mcp scope: workspace hierarchy creation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        child_path: {
+          type: "string",
+          description: "Path to the existing child project.",
+        },
+        parent_directory: {
+          type: "string",
+          description:
+            "Ancestor directory where the parent BRIEF.md will be created.",
+        },
+        name: { type: "string", description: "Parent project name." },
+        display_name: {
+          type: "string",
+          description: "Optional display name for the parent project.",
+        },
+        type: { type: "string", description: "Project type." },
+        what_this_is: {
+          type: "string",
+          description: "What the parent project is.",
+        },
+        what_this_is_not: {
+          type: "string",
+          description: "What the parent project is NOT.",
+        },
+        why_this_exists: {
+          type: "string",
+          description: "Why the parent project exists.",
+        },
+      },
+      required: ["child_path", "parent_directory", "name", "type"],
+    },
+  },
+
+  // --- WP2: Suggest type guides ---
+  {
+    name: "brief_suggest_type_guides",
+    description:
+      "Search all available type guides and rank them by relevance to the user's project. Returns candidates for the user to choose from. brief-mcp scope: type intelligence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Project type or description to search for.",
+        },
+        description: {
+          type: "string",
+          description: "Project description for context.",
+        },
+        early_decisions: {
+          type: "string",
+          description: "Early decision text for keyword extraction.",
+        },
+        max_results: {
+          type: "number",
+          description: "Maximum candidates to return (default 5).",
+        },
+      },
+      required: ["query"],
+    },
+  },
+
+  // --- WP4: Apply type guide ---
+  {
+    name: "brief_apply_type_guide",
+    description:
+      "Apply a type guide to a project by installing its suggested extensions and surfacing ontology suggestions. brief-mcp scope: type intelligence + extensions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "Type guide to apply." },
+        project_path: {
+          type: "string",
+          description: "Target project path.",
+        },
+        auto_install_extensions: {
+          type: "boolean",
+          description:
+            "Automatically install suggested extensions (default true).",
+        },
+        auto_install_ontologies: {
+          type: "boolean",
+          description: "Surface ontology suggestions (default true).",
+        },
+      },
+      required: ["type"],
+    },
+  },
+
+  // --- WP5: Discover ontologies ---
+  {
+    name: "brief_discover_ontologies",
+    description:
+      "Search local installed packs and external sources (Hugging Face) for relevant ontologies. brief-mcp scope: ontology discovery.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query for ontology discovery.",
+        },
+        extension_context: {
+          type: "string",
+          description: "Extension name/domain for relevance scoring.",
+        },
+        project_type: {
+          type: "string",
+          description: "Project type for context.",
+        },
+        max_results: {
+          type: "number",
+          description: "Maximum results per source (default 10).",
+        },
+        sources: {
+          type: "array",
+          items: { type: "string", enum: ["local", "huggingface"] },
+          description: "Sources to search (default both).",
+        },
+      },
+      required: ["query"],
+    },
+  },
+
+  // --- WP5: Create ontology ---
+  {
+    name: "brief_create_ontology",
+    description:
+      "Create a custom ontology pack, optionally using AI to generate structured entries. Falls back to a template pack if AI sampling is unavailable. brief-mcp scope: ontology creation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Ontology pack name.",
+        },
+        description: {
+          type: "string",
+          description: "Description of the ontology domain.",
+        },
+        extension_context: {
+          type: "string",
+          description: "Extension context for the ontology.",
+        },
+        project_type: {
+          type: "string",
+          description: "Project type for context.",
+        },
+        domain_keywords: {
+          type: "array",
+          items: { type: "string" },
+          description: "Domain keywords to seed entry generation.",
+        },
+        entry_count: {
+          type: "number",
+          description: "Target number of entries (default 20).",
+        },
+      },
+      required: ["name", "description"],
+    },
+  },
+
+  // --- WP6: Get maturity signals ---
+  {
+    name: "brief_get_maturity_signals",
+    description:
+      "Analyse a project's decisions and return maturity signals with nudges to upgrade minimal decisions to full format. brief-mcp scope: project lifecycle.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: {
+          type: "string",
+          description: "Path to the project to analyse.",
+        },
+      },
+      required: ["project_path"],
+    },
+  },
+  {
+    name: "brief_where_am_i",
+    description:
+      "Show current position in the project hierarchy: parent, siblings, children, and depth. brief-mcp scope: hierarchy navigation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: {
+          type: "string",
+          description: "Project path. Defaults to active project.",
+        },
+        workspace_roots: {
+          type: "array",
+          items: { type: "string" },
+          description: "Workspace roots for boundary detection.",
+        },
+      },
+      required: ["project_path"],
+    },
+  },
+  {
+    name: "brief_hierarchy_tree",
+    description:
+      "Build an ASCII tree view of the project hierarchy from a root path. brief-mcp scope: hierarchy visualisation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        root_path: {
+          type: "string",
+          description: "Root directory to start the tree from.",
+        },
+        depth_limit: {
+          type: "number",
+          description: "Maximum depth to traverse (default: 5).",
+        },
+        include_health_check: {
+          type: "boolean",
+          description:
+            "Include health issues (missing type, orphaned children).",
+        },
+      },
+      required: ["root_path"],
+    },
+  },
+  {
+    name: "brief_preview_dataset",
+    description:
+      "Preview rows and columns from a HuggingFace dataset before converting it to an ontology pack. brief-mcp scope: dataset inspection.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        source: {
+          type: "string",
+          description:
+            "HuggingFace dataset ID (e.g., 'huggingface/dataset-name') or HTTPS URL.",
+        },
+        max_rows: {
+          type: "number",
+          description: "Maximum rows to preview (default: 10).",
+        },
+      },
+      required: ["source"],
+    },
+  },
+  {
+    name: "brief_fetch_dataset",
+    description:
+      "Fetch a dataset and convert it to an ontology pack by mapping columns to entry fields. brief-mcp scope: dataset conversion.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        source: {
+          type: "string",
+          description:
+            "HuggingFace dataset ID (e.g., 'huggingface/dataset-name') or HTTPS URL.",
+        },
+        name: {
+          type: "string",
+          description: "Name for the resulting ontology pack.",
+        },
+        id_column: {
+          type: "string",
+          description: "Column to use as entry ID.",
+        },
+        label_column: {
+          type: "string",
+          description: "Column to use as entry label.",
+        },
+        description_column: {
+          type: "string",
+          description: "Column to use as entry description (optional).",
+        },
+        keywords_column: {
+          type: "string",
+          description:
+            "Column to use as entry keywords — comma-separated string or array (optional).",
+        },
+        max_entries: {
+          type: "number",
+          description: "Maximum entries to import (default: 500, max: 50000).",
+        },
+      },
+      required: ["source", "name", "id_column", "label_column"],
+    },
+  },
+  {
+    name: "brief_ontology_draft",
+    description:
+      "Interactive ontology builder — create, refine, and finalize ontology packs through a multi-step workflow. brief-mcp scope: ontology drafting.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          description:
+            "Action to perform: create, add_entries, remove_entries, approve_rows, fill_columns, add_column, edit_entry, get, list, finalize.",
+          enum: [
+            "create",
+            "add_entries",
+            "remove_entries",
+            "approve_rows",
+            "fill_columns",
+            "add_column",
+            "edit_entry",
+            "get",
+            "list",
+            "finalize",
+          ],
+        },
+        name: {
+          type: "string",
+          description: "Name for the ontology (create action).",
+        },
+        description: {
+          type: "string",
+          description: "Description for the ontology (create action).",
+        },
+        domain_keywords: {
+          type: "array",
+          items: { type: "string" },
+          description: "Keywords to seed initial entries (create action).",
+        },
+        draft_id: {
+          type: "string",
+          description:
+            "Draft ID to operate on (all actions except create/list).",
+        },
+        entries: {
+          type: "array",
+          description: "Entries to add (add_entries action).",
+        },
+        entry_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Entry IDs to remove (remove_entries action).",
+        },
+        column: {
+          type: "object",
+          description: "Column to add (add_column action).",
+        },
+        entry_id: {
+          type: "string",
+          description: "Entry ID to edit (edit_entry action).",
+        },
+        fields: {
+          type: "object",
+          description: "Fields to update on entry (edit_entry action).",
+        },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -841,6 +1261,7 @@ const REQUIRED_STRING_PARAMS: Record<string, readonly string[]> = {
   brief_browse_ontology: ["ontology"],
   brief_install_ontology: ["source"],
   brief_tag_entry: ["ontology", "entry_id", "section"],
+  brief_remove_tag: ["ontology", "entry_id", "section"],
   brief_get_entry_references: ["ontology", "entry_id"],
   brief_suggest_references: ["context"],
   brief_add_reference: ["section", "title"],
@@ -848,7 +1269,24 @@ const REQUIRED_STRING_PARAMS: Record<string, readonly string[]> = {
   brief_create_type_guide: ["type", "body"],
   brief_suggest_extensions: ["project_type"],
   brief_add_extension: ["extension_name"],
+  brief_remove_extension: ["extension_name"],
   brief_remove_ontology: ["ontology"],
+  brief_create_parent_project: [
+    "child_path",
+    "parent_directory",
+    "name",
+    "type",
+  ],
+  brief_suggest_type_guides: ["query"],
+  brief_apply_type_guide: ["type"],
+  brief_discover_ontologies: ["query"],
+  brief_create_ontology: ["name", "description"],
+  brief_get_maturity_signals: ["project_path"],
+  brief_where_am_i: ["project_path"],
+  brief_hierarchy_tree: ["root_path"],
+  brief_preview_dataset: ["source"],
+  brief_fetch_dataset: ["source", "name", "id_column", "label_column"],
+  brief_ontology_draft: ["action"],
 };
 
 /** Required non-string params — must be present but not validated as strings. */
@@ -1022,10 +1460,17 @@ const WRITE_TOOLS = new Set<string>([
   "brief_install_ontology",
   "brief_remove_ontology",
   "brief_tag_entry",
+  "brief_remove_tag",
   "brief_add_reference",
   "brief_create_type_guide",
   "brief_add_extension",
+  "brief_remove_extension",
   "brief_set_tutorial_dismissed",
+  "brief_create_parent_project",
+  "brief_apply_type_guide",
+  "brief_create_ontology",
+  "brief_fetch_dataset",
+  "brief_ontology_draft",
 ]);
 
 function checkRateLimit(toolName: string): boolean {

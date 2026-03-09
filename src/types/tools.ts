@@ -295,6 +295,39 @@ export interface TagEntryOutput {
   readonly changesSummary: string;
 }
 
+// --- Tag Management Tools ---
+
+export interface ListTagsInput {
+  readonly projectPath?: string;
+  readonly extensionFilter?: string;
+}
+
+export interface ListTagsOutput {
+  readonly tags: Array<{
+    ontology: string;
+    entryId: string;
+    label: string;
+    section: string;
+    paragraph?: string;
+    extensionName?: string;
+  }>;
+  readonly groupedByExtension: Record<string, unknown[]>;
+  readonly total: number;
+}
+
+export interface RemoveTagInput {
+  readonly ontology: string;
+  readonly entryId: string;
+  readonly section: string;
+  readonly paragraph?: string;
+  readonly projectPath?: string;
+}
+
+export interface RemoveTagOutput {
+  readonly removed: boolean;
+  readonly qualifiedId: string;
+}
+
 // --- Reference Tools ---
 
 export interface GetEntryReferencesInput {
@@ -408,6 +441,20 @@ export type ListExtensionsInput = Record<string, never>;
 export interface ListExtensionsOutput {
   readonly extensions: import("./extensions.js").Extension[];
   readonly customExtensions?: string[];
+}
+
+export interface RemoveExtensionInput {
+  readonly extensionName: string;
+  readonly projectPath?: string;
+  readonly removeContent?: boolean;
+}
+
+export interface RemoveExtensionOutput {
+  readonly removed: boolean;
+  readonly sectionsRemoved: string[];
+  readonly metadataUpdated: boolean;
+  readonly filePath: string;
+  readonly warnings: string[];
 }
 
 // --- Visibility Tools ---
@@ -721,6 +768,34 @@ export const brief_tag_entry: ToolSchema = {
   },
 };
 
+export const brief_list_tags: ToolSchema = {
+  input: {
+    project_path: "optional",
+    extension_filter: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    tags: "required",
+    groupedByExtension: "required",
+    total: "required",
+  },
+};
+
+export const brief_remove_tag: ToolSchema = {
+  input: {
+    ontology: "required",
+    entry_id: "required",
+    section: "required",
+    paragraph: "optional",
+    project_path: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    removed: "required",
+    qualifiedId: "required",
+  },
+};
+
 export const brief_get_entry_references: ToolSchema = {
   input: {
     ontology: "required",
@@ -813,6 +888,22 @@ export const brief_list_extensions: ToolSchema = {
   output: { ...BASE_OUTPUT, extensions: "required" },
 };
 
+export const brief_remove_extension: ToolSchema = {
+  input: {
+    extension_name: "required",
+    project_path: "optional",
+    remove_content: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    removed: "required",
+    sectionsRemoved: "required",
+    metadataUpdated: "required",
+    filePath: "required",
+    warnings: "required",
+  },
+};
+
 export const brief_get_project_frameworks: ToolSchema = {
   input: { project: "optional" },
   output: { ...BASE_OUTPUT, frameworks: "required" },
@@ -848,7 +939,404 @@ export const brief_set_tutorial_dismissed: ToolSchema = {
   output: { ...BASE_OUTPUT, dismissed: "required" },
 };
 
-// Aggregate of all 38 tool schemas for iteration and packaging
+// --- WP1: Create parent project ---
+
+export interface CreateParentProjectInput {
+  readonly childPath: string;
+  readonly parentDirectory: string;
+  readonly projectName: string;
+  readonly displayName?: string;
+  readonly type: string;
+  readonly whatThisIs?: string;
+  readonly whatThisIsNot?: string;
+  readonly whyThisExists?: string;
+}
+
+export interface CreateParentProjectOutput {
+  readonly success: boolean;
+  readonly parentPath: string;
+  readonly briefMdPath: string;
+  readonly childLinked: boolean;
+  readonly content: string;
+  readonly warnings: string[];
+}
+
+export const brief_create_parent_project: ToolSchema = {
+  input: {
+    child_path: "required",
+    parent_directory: "required",
+    name: "required",
+    type: "required",
+    what_this_is: "optional",
+    what_this_is_not: "optional",
+    why_this_exists: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    success: "required",
+    parentPath: "required",
+    briefMdPath: "required",
+    childLinked: "required",
+  },
+};
+
+// --- WP2: Suggest type guides ---
+
+export interface SuggestTypeGuidesInput {
+  readonly query: string;
+  readonly description?: string;
+  readonly earlyDecisions?: string;
+  readonly maxResults?: number;
+}
+
+export interface SuggestTypeGuidesOutput {
+  readonly candidates: Array<{
+    type: string;
+    displayName: string;
+    source: string;
+    matchType: string;
+    relevanceScore: number;
+    summary: string;
+    suggestedExtensions?: string[];
+    suggestedOntologies?: string[];
+  }>;
+  readonly hasExactMatch: boolean;
+  readonly signal: string;
+}
+
+export const brief_suggest_type_guides: ToolSchema = {
+  input: {
+    query: "required",
+    description: "optional",
+    early_decisions: "optional",
+    max_results: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    candidates: "required",
+    hasExactMatch: "required",
+    signal: "required",
+  },
+};
+
+// --- WP4: Apply type guide ---
+
+export interface ApplyTypeGuideInput {
+  readonly type: string;
+  readonly projectPath?: string;
+  readonly autoInstallExtensions?: boolean;
+  readonly autoInstallOntologies?: boolean;
+}
+
+export interface ApplyTypeGuideOutput {
+  readonly applied: boolean;
+  readonly guideName: string;
+  readonly guideSource: string;
+  readonly extensionsInstalled: string[];
+  readonly extensionsFailed: string[];
+  readonly ontologiesSuggested: Array<{ name: string; status: string }>;
+  readonly warnings: string[];
+  readonly nextSteps: string[];
+}
+
+export const brief_apply_type_guide: ToolSchema = {
+  input: {
+    type: "required",
+    project_path: "optional",
+    auto_install_extensions: "optional",
+    auto_install_ontologies: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    applied: "required",
+    guideName: "required",
+    extensionsInstalled: "required",
+  },
+};
+
+// --- WP5: Discover ontologies ---
+
+export interface DiscoverOntologiesInput {
+  readonly query: string;
+  readonly extensionContext?: string;
+  readonly projectType?: string;
+  readonly maxResults?: number;
+  readonly sources?: Array<"local" | "huggingface">;
+}
+
+export interface DiscoverOntologiesOutput {
+  readonly localResults: Array<{
+    name: string;
+    entryCount: number;
+    relevanceScore: number;
+    description?: string;
+  }>;
+  readonly externalResults: Array<{
+    source: string;
+    datasetId: string;
+    description: string;
+    tags: string[];
+    downloads: number;
+    relevanceScore: number;
+  }>;
+  readonly signal: string;
+}
+
+export const brief_discover_ontologies: ToolSchema = {
+  input: {
+    query: "required",
+    extension_context: "optional",
+    project_type: "optional",
+    max_results: "optional",
+    sources: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    localResults: "required",
+    externalResults: "required",
+    signal: "required",
+  },
+};
+
+// --- WP5: Create ontology ---
+
+export interface CreateOntologyInput {
+  readonly name: string;
+  readonly description: string;
+  readonly extensionContext?: string;
+  readonly projectType?: string;
+  readonly domainKeywords?: string[];
+  readonly entryCount?: number;
+}
+
+export interface CreateOntologyOutput {
+  readonly created: boolean;
+  readonly packName: string;
+  readonly entryCount: number;
+  readonly trustLevel: string;
+  readonly validated: boolean;
+  readonly installed: boolean;
+  readonly warnings: string[];
+  readonly signal?: string;
+}
+
+export const brief_create_ontology: ToolSchema = {
+  input: {
+    name: "required",
+    description: "required",
+    extension_context: "optional",
+    project_type: "optional",
+    domain_keywords: "optional",
+    entry_count: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    created: "required",
+    packName: "required",
+    entryCount: "required",
+    installed: "required",
+  },
+};
+
+// --- WP6: Get maturity signals ---
+
+export interface GetMaturitySignalsInput {
+  readonly projectPath: string;
+}
+
+export interface GetMaturitySignalsOutput {
+  readonly maturityLevel: string;
+  readonly decisionCount: number;
+  readonly minimalFormatCount: number;
+  readonly fullFormatCount: number;
+  readonly upgradeableDecisions: Array<{
+    title: string;
+    missingFields: string[];
+  }>;
+  readonly openQuestionCount: number;
+  readonly signals: string[];
+  readonly nextSteps: string[];
+}
+
+export const brief_get_maturity_signals: ToolSchema = {
+  input: { project_path: "required" },
+  output: {
+    ...BASE_OUTPUT,
+    maturityLevel: "required",
+    decisionCount: "required",
+    signals: "required",
+    nextSteps: "required",
+  },
+};
+
+// --- WP3: Hierarchy Tools ---
+
+export interface WhereAmIInput {
+  readonly projectPath: string;
+  readonly workspaceRoots?: string[];
+}
+
+export interface WhereAmIOutput {
+  readonly currentProject: { name: string; type: string; path: string };
+  readonly depth: number;
+  readonly parent?: { name: string; type: string; path: string };
+  readonly siblings: Array<{ name: string; type: string; path: string }>;
+  readonly children: Array<{ name: string; type: string; path: string }>;
+  readonly signal: string;
+}
+
+export const brief_where_am_i: ToolSchema = {
+  input: { project_path: "required", workspace_roots: "optional" },
+  output: {
+    ...BASE_OUTPUT,
+    currentProject: "required",
+    depth: "required",
+    siblings: "required",
+    children: "required",
+    signal: "required",
+  },
+};
+
+export interface HierarchyTreeInput {
+  readonly rootPath: string;
+  readonly depthLimit?: number;
+  readonly includeHealthCheck?: boolean;
+}
+
+export interface HierarchyTreeOutput {
+  readonly tree: unknown;
+  readonly ascii: string;
+  readonly totalProjects: number;
+  readonly maxDepth: number;
+  readonly healthIssues?: Array<{ path: string; issue: string }>;
+}
+
+export const brief_hierarchy_tree: ToolSchema = {
+  input: {
+    root_path: "required",
+    depth_limit: "optional",
+    include_health_check: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    tree: "required",
+    ascii: "required",
+    totalProjects: "required",
+    maxDepth: "required",
+  },
+};
+
+// WP4/GAP-C: Dataset preview & fetch
+export interface PreviewDatasetInput {
+  readonly source: string;
+  readonly maxRows?: number;
+}
+
+export interface PreviewDatasetOutput {
+  readonly columns: string[];
+  readonly sampleRows: Array<Record<string, unknown>>;
+  readonly totalRows?: number;
+  readonly format: string;
+  readonly signal: string;
+}
+
+export const brief_preview_dataset: ToolSchema = {
+  input: {
+    source: "required",
+    max_rows: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    columns: "required",
+    sampleRows: "required",
+    format: "required",
+    signal: "required",
+  },
+};
+
+export interface FetchDatasetInput {
+  readonly source: string;
+  readonly name: string;
+  readonly idColumn: string;
+  readonly labelColumn: string;
+  readonly descriptionColumn?: string;
+  readonly keywordsColumn?: string;
+  readonly maxEntries?: number;
+}
+
+export interface FetchDatasetOutput {
+  readonly created: boolean;
+  readonly packName: string;
+  readonly entryCount: number;
+  readonly droppedRows: number;
+  readonly fitEvaluation?: { score: number; reasoning: string };
+  readonly warnings: string[];
+}
+
+export const brief_fetch_dataset: ToolSchema = {
+  input: {
+    source: "required",
+    name: "required",
+    id_column: "required",
+    label_column: "required",
+    description_column: "optional",
+    keywords_column: "optional",
+    max_entries: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    created: "required",
+    packName: "required",
+    entryCount: "required",
+    droppedRows: "required",
+    warnings: "required",
+  },
+};
+
+// WP5/GAP-D: Interactive ontology builder
+export interface OntologyDraftInput {
+  readonly action: string;
+  readonly name?: string;
+  readonly description?: string;
+  readonly domainKeywords?: string[];
+  readonly draftId?: string;
+  readonly entries?: Array<{ id: string; label: string; description?: string }>;
+  readonly entryIds?: string[];
+  readonly column?: { name: string };
+  readonly entryId?: string;
+  readonly fields?: Record<string, unknown>;
+}
+
+export interface OntologyDraftOutput {
+  readonly draftId: string;
+  readonly draft: Record<string, unknown>;
+  readonly signal: string;
+  readonly installed?: boolean;
+  readonly packName?: string;
+}
+
+export const brief_ontology_draft: ToolSchema = {
+  input: {
+    action: "required",
+    name: "optional",
+    description: "optional",
+    domain_keywords: "optional",
+    draft_id: "optional",
+    entries: "optional",
+    entry_ids: "optional",
+    column: "optional",
+    entry_id: "optional",
+    fields: "optional",
+  },
+  output: {
+    ...BASE_OUTPUT,
+    draftId: "required",
+    draft: "required",
+    signal: "required",
+  },
+};
+
+// Aggregate of all tool schemas for iteration and packaging
 export const toolSchemas: Readonly<Record<string, ToolSchema>> = {
   brief_list_projects,
   brief_set_active_project,
@@ -874,6 +1362,8 @@ export const toolSchemas: Readonly<Record<string, ToolSchema>> = {
   brief_list_ontologies,
   brief_install_ontology,
   brief_tag_entry,
+  brief_list_tags,
+  brief_remove_tag,
   brief_get_entry_references,
   brief_suggest_references,
   brief_lookup_reference,
@@ -883,9 +1373,21 @@ export const toolSchemas: Readonly<Record<string, ToolSchema>> = {
   brief_suggest_extensions,
   brief_add_extension,
   brief_list_extensions,
+  brief_remove_extension,
   brief_get_project_frameworks,
   brief_remove_ontology,
   brief_search_registry,
   brief_start_tutorial,
   brief_set_tutorial_dismissed,
+  brief_create_parent_project,
+  brief_suggest_type_guides,
+  brief_apply_type_guide,
+  brief_discover_ontologies,
+  brief_create_ontology,
+  brief_get_maturity_signals,
+  brief_where_am_i,
+  brief_hierarchy_tree,
+  brief_preview_dataset,
+  brief_fetch_dataset,
+  brief_ontology_draft,
 };
