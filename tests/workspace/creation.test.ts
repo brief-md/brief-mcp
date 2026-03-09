@@ -159,6 +159,12 @@ describe("TASK-22: Workspace — Project Creation", () => {
     });
 
     it("createSubProject inherits type from parent when type omitted [FS-14, T22-03]", async () => {
+      // Create parent project first so type can be inherited from disk
+      await createProject({
+        projectName: "album",
+        type: "album",
+        workspaceRoot: "/root",
+      });
       const result = await createSubProject({
         name: "track-two",
         whatThisIs: "Second track",

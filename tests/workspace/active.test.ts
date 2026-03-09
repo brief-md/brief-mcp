@@ -1,5 +1,8 @@
+import * as fsp from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import fc from "fast-check";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   addWorkspace,
   clearActiveProject,
@@ -7,6 +10,36 @@ import {
   requireActiveProject,
   setActiveProject,
 } from "../../src/workspace/active";
+
+// ---------------------------------------------------------------------------
+// Temp directory setup for real filesystem tests
+// ---------------------------------------------------------------------------
+
+let tmpRoot: string;
+let tmpRootA: string;
+let tmpRootB: string;
+let tmpWorkspace: string;
+
+beforeAll(async () => {
+  // Create real workspace roots and project directories for name-based lookup
+  tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "brief-active-root-"));
+  tmpRootA = await fsp.mkdtemp(path.join(os.tmpdir(), "brief-active-rootA-"));
+  tmpRootB = await fsp.mkdtemp(path.join(os.tmpdir(), "brief-active-rootB-"));
+  tmpWorkspace = await fsp.mkdtemp(path.join(os.tmpdir(), "brief-active-ws-"));
+
+  // Create project dirs inside the roots for name-based lookup
+  await fsp.mkdir(path.join(tmpRoot, "my-project"), { recursive: true });
+  // Create same-named dir in both roots for duplicate test
+  await fsp.mkdir(path.join(tmpRootA, "duplicate-name"), { recursive: true });
+  await fsp.mkdir(path.join(tmpRootB, "duplicate-name"), { recursive: true });
+});
+
+afterAll(async () => {
+  await fsp.rm(tmpRoot, { recursive: true, force: true });
+  await fsp.rm(tmpRootA, { recursive: true, force: true });
+  await fsp.rm(tmpRootB, { recursive: true, force: true });
+  await fsp.rm(tmpWorkspace, { recursive: true, force: true });
+});
 
 // ---------------------------------------------------------------------------
 // Unit Tests
@@ -18,9 +51,10 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
   });
   describe("set active project [ARCH-06]", () => {
     it("set active project by name (unique): project set successfully [ARCH-06]", async () => {
+      // "my-project" dir exists inside tmpRoot (created in beforeAll)
       const result = await setActiveProject({
         identifier: "My Project",
-        workspaceRoots: ["/root"],
+        workspaceRoots: [tmpRoot],
       });
       expect(result.success).toBe(true);
       // G-138: assert the active project is now set to the expected name
@@ -41,11 +75,12 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
 
     it("set active project by name matching multiple: error listing all matches with paths [FS-08]", async () => {
       // T21-02: error must include the paths of matching projects so user can disambiguate
+      // "duplicate-name" dir exists in both tmpRootA and tmpRootB (created in beforeAll)
       let error: Error | undefined;
       try {
         await setActiveProject({
           identifier: "Duplicate Name",
-          workspaceRoots: ["/root-a", "/root-b"],
+          workspaceRoots: [tmpRootA, tmpRootB],
         });
       } catch (e: any) {
         error = e;
@@ -53,7 +88,7 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
       expect(error).toBeDefined();
       expect(error!.message).toMatch(/multiple|disambig/i);
       // Paths of matching projects must be included in the error so the user can disambiguate
-      expect(error!.message).toMatch(/root-a|root-b|\//);
+      expect(error!.message).toMatch(/duplicate-name/i);
     });
 
     it("set active project by name matching none: not_found error [FS-08]", async () => {
@@ -136,11 +171,10 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
 
   describe("add workspace [CONF-04]", () => {
     it("add workspace with valid directory path: added to config, written to disk [CONF-04]", async () => {
-      const addedWorkspacePath = "/new/workspace";
-      const result = await addWorkspace({ path: addedWorkspacePath });
+      const result = await addWorkspace({ path: tmpWorkspace });
       expect(result.success).toBe(true);
       expect(result.workspaceAdded).toBe(true);
-      expect(result.config.workspaces).toContain(addedWorkspacePath);
+      expect(result.config.workspaces).toContain(tmpWorkspace);
     });
 
     it("add workspace with non-existent path: error [CONF-04]", async () => {
@@ -150,7 +184,7 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
     });
 
     it("add workspace, then list projects: new root included [CONF-04]", async () => {
-      const addResult = await addWorkspace({ path: "/new/root" });
+      const addResult = await addWorkspace({ path: tmpWorkspace });
       expect(addResult).toBeDefined();
       const { listProjects } = await import("../../src/workspace/listing");
       const listResult = await listProjects();
@@ -159,7 +193,8 @@ describe("TASK-21: Workspace — Active Project & Workspace", () => {
       expect(Array.isArray(listResult.projects)).toBe(true);
       expect(
         listResult.projects.some(
-          (p: any) => p.root === "/new/root" || p.workspaceRoot === "/new/root",
+          (p: any) =>
+            p.root === tmpWorkspace || p.workspaceRoot === tmpWorkspace,
         ),
       ).toBe(true);
     });

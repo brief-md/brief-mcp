@@ -6,17 +6,16 @@ import {
 } from "../../src/type-intelligence/creation";
 import { _resetState as _resetLoadingState } from "../../src/type-intelligence/loading";
 
-afterEach(() => {
-  _resetState();
-  _resetLoadingState();
-  vi.clearAllMocks();
-});
-
 // ---------------------------------------------------------------------------
 // Unit Tests
 // ---------------------------------------------------------------------------
 
 describe("TASK-41: Type Intelligence — Type Guide Creation", () => {
+  afterEach(() => {
+    _resetState();
+    _resetLoadingState();
+    vi.clearAllMocks();
+  });
   describe("basic creation [COMPAT-10]", () => {
     it("create guide with all fields: file written with correct YAML frontmatter and markdown body [COMPAT-10]", async () => {
       const result = await createTypeGuide({
@@ -224,6 +223,9 @@ describe("TASK-41: Property Tests", () => {
           .string({ minLength: 2, maxLength: 20 })
           .filter((s) => /^[a-z-]+$/.test(s)),
         async (type) => {
+          // Reset state between property runs to avoid cross-run contamination
+          _resetState();
+          _resetLoadingState();
           const result = await createTypeGuide({
             type,
             body: `# Guide for ${type}`,
@@ -247,6 +249,9 @@ describe("TASK-41: Property Tests", () => {
           { minLength: 1, maxLength: 3 },
         ),
         async (aliases) => {
+          // Reset state between property runs to avoid cross-run contamination
+          _resetState();
+          _resetLoadingState();
           try {
             const result = await createTypeGuide({
               type: `alias-test-${aliases[0]}`,
@@ -290,6 +295,9 @@ describe("TASK-41: Property Tests", () => {
           .string({ minLength: 2, maxLength: 20 })
           .filter((s) => /^[a-z-]+$/.test(s)),
         async (type) => {
+          // Reset state between property runs to avoid cross-run contamination
+          _resetState();
+          _resetLoadingState();
           const result = await createTypeGuide({ type, body: "# Guide" });
           expect(result.filePath).toBeDefined();
           expect(result.filePath).toMatch(/type-guides/);

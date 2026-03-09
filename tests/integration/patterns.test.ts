@@ -1,9 +1,52 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import * as fsp from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { _resetStore as resetQuestions } from "../../src/context/write-questions";
 import { _resetState as resetExtension } from "../../src/extension/creation";
+import { writeBrief } from "../../src/io/project-state";
 import { _resetState as resetTagging } from "../../src/ontology/tagging";
 import { _resetState as resetWriting } from "../../src/reference/writing";
 import { _resetState as resetCreation } from "../../src/type-intelligence/creation";
+
+let tmpDir: string;
+
+const BRIEF_CONTENT = `# Test Project BRIEF
+
+**Project:** Test Project
+**Type:** software
+**Status:** development
+**Created:** 2025-01-01
+**Updated:** 2025-06-15
+
+## Purpose & Scope
+
+A test project for integration pattern validation.
+
+## Key Decisions
+
+- Use TypeScript (why: type safety) [2025-06-15]
+- Use PostgreSQL (why: strong JSON support) [2025-06-01]
+
+## Open Questions
+
+- [ ] Which CI system?
+- Monorepo vs polyrepo?
+- [x] Which language? — TypeScript
+
+## What This Is NOT
+
+- This is NOT a replacement for detailed design documents
+`;
+
+beforeAll(async () => {
+  tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "brief-patterns-test-"));
+  await writeBrief(tmpDir, BRIEF_CONTENT);
+});
+
+afterAll(async () => {
+  await fsp.rm(tmpDir, { recursive: true, force: true });
+});
 
 beforeEach(() => {
   resetExtension();
@@ -227,9 +270,9 @@ describe("TASK-54: Integration Tests — Interaction Patterns", () => {
       );
       const { checkConflicts } = await import("../../src/validation/conflicts");
 
-      const context = await getContext({ projectPath: "test-project" });
-      const decisions = await getDecisions({ projectPath: "test-project" });
-      const questions = await getQuestions({ projectPath: "test-project" });
+      const context = await getContext({ projectPath: tmpDir });
+      const decisions = await getDecisions({ projectPath: tmpDir });
+      const questions = await getQuestions({ projectPath: tmpDir });
       const conflicts = checkConflicts({
         decisions: decisions.activeDecisions.map((d) => ({
           text: d.text ?? "",

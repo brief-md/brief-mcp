@@ -147,7 +147,7 @@ describe("TASK-20: Workspace — Project Listing & Filtering", () => {
       // G-133: assert result.projects is defined first before looping
       expect(result.projects).toBeDefined();
       for (const project of result.projects) {
-        expect((project as any).path).toMatch(/^[/A-Z]/); // Starts with / or drive letter
+        expect((project as any).path).toMatch(/^[/\\A-Z]/); // Starts with / or \ or drive letter
         expect((project as any).path).not.toContain("~");
       }
     });
