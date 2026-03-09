@@ -42,6 +42,69 @@ export const CANONICAL_FIELD_ORDER = [
 ];
 
 // ---------------------------------------------------------------------------
+// syncUpdatedTimestamp
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace (or insert) the **Updated:** metadata line with today's ISO date.
+ * If no **Updated:** line exists, inserts one after **Created:** (or appends
+ * to the metadata block).
+ */
+export function syncUpdatedTimestamp(content: string): string {
+  const today = todayISO();
+  const updatedRe = /^\*\*Updated:\*\*\s*.*$/m;
+
+  if (updatedRe.test(content)) {
+    return content.replace(updatedRe, `**Updated:** ${today}`);
+  }
+
+  // Insert after **Created:** line if present
+  const createdRe = /^(\*\*Created:\*\*\s*.*)$/m;
+  if (createdRe.test(content)) {
+    return content.replace(createdRe, `$1\n**Updated:** ${today}`);
+  }
+
+  // Fallback: insert before first blank line or at end of first line block
+  const firstBlankLine = content.indexOf("\n\n");
+  if (firstBlankLine >= 0) {
+    return (
+      content.slice(0, firstBlankLine) +
+      `\n**Updated:** ${today}` +
+      content.slice(firstBlankLine)
+    );
+  }
+
+  return `${content}\n**Updated:** ${today}\n`;
+}
+
+// ---------------------------------------------------------------------------
+// syncTypeGuideMetadata
+// ---------------------------------------------------------------------------
+
+/**
+ * Add or update **Type Guide:** metadata field in BRIEF.md content.
+ */
+export function syncTypeGuideMetadata(
+  content: string,
+  params: { slug: string; source: string },
+): string {
+  const value = `${params.slug} (${params.source})`;
+  const typeGuideRe = /^\*\*Type Guide:\*\*\s*.*$/m;
+
+  if (typeGuideRe.test(content)) {
+    return content.replace(typeGuideRe, `**Type Guide:** ${value}`);
+  }
+
+  // Insert after **Type:** line if present
+  const typeRe = /^(\*\*Type:\*\*\s*.*)$/m;
+  if (typeRe.test(content)) {
+    return content.replace(typeRe, `$1\n**Type Guide:** ${value}`);
+  }
+
+  return `**Type Guide:** ${value}\n${content}`;
+}
+
+// ---------------------------------------------------------------------------
 // translateExtensionName
 // ---------------------------------------------------------------------------
 

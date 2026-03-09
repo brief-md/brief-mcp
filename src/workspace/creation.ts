@@ -254,6 +254,8 @@ export async function createProject(params: {
   content += `**Type:** ${normalizedType}\n`;
   content += `**Status:** concept\n`;
   content += `**Created:** ${createdDate}\n`;
+  content += `**Updated:** ${createdDate}\n`;
+  content += `**Version:** 1.0\n`;
 
   if (parentProject) {
     content += `\nParent: ${parentProject}\n`;
@@ -389,11 +391,60 @@ export async function createProject(params: {
     }
   }
 
+  // --- Core identity completeness (WP3 / OQ-5 Phase 1) ---
+  const identityComplete = !!(whatThisIs && whatThisIsNot && whyThisExists);
+  result.coreIdentity = {
+    complete: identityComplete,
+    missing: [
+      ...(!whatThisIs ? ["whatThisIs"] : []),
+      ...(!whatThisIsNot ? ["whatThisIsNot"] : []),
+      ...(!whyThisExists ? ["whyThisExists"] : []),
+    ],
+  };
+
+  // --- Type guide suggestions (WP3 / OQ-5 Phase 2) ---
+  if (
+    type &&
+    (result.typeGuide as { isGeneric?: boolean } | undefined)?.isGeneric
+  ) {
+    try {
+      const { suggestTypeGuides } = await import(
+        "../type-intelligence/search.js"
+      );
+      const suggestions = await suggestTypeGuides({
+        query: normalizedType,
+        description: whatThisIs ?? "",
+      });
+      if (suggestions.candidates.length > 0) {
+        result.typeGuideSuggestions = suggestions.candidates;
+      }
+    } catch {
+      /* best-effort */
+    }
+  }
+
   // --- Lifecycle signals (Gap 6) ---
   const nextSteps: string[] = [];
-  if (!type) {
+  if (!identityComplete) {
+    result.setupPhase = "needs_identity";
+    const missingNames = (
+      result.coreIdentity as { missing: string[] }
+    ).missing.join(", ");
+    nextSteps.push(
+      `Collect the project's core identity before proceeding. Missing: ${missingNames}`,
+    );
+  } else if (!type) {
     result.setupPhase = "needs_type";
     nextSteps.push("Determine the project type with the user");
+  } else if (
+    Array.isArray((result as Record<string, unknown>).typeGuideSuggestions) &&
+    ((result as Record<string, unknown>).typeGuideSuggestions as unknown[])
+      .length > 0
+  ) {
+    result.setupPhase = "choose_type_guide";
+    nextSteps.push(
+      "Present type guide suggestions to the user — let them choose or create custom",
+    );
   } else if (
     (result.typeGuide as { isGeneric?: boolean } | undefined)?.isGeneric
   ) {
@@ -486,12 +537,15 @@ export async function createSubProject(params: {
 
   const displayLabel = displayName || name;
 
+  const subCreatedDate = new Date().toISOString().slice(0, 10);
   let content = `**Project:** ${displayLabel}\n`;
   if (normalizedType) {
     content += `**Type:** ${normalizedType}\n`;
   }
   content += `**Status:** concept\n`;
-  content += `**Created:** ${new Date().toISOString().slice(0, 10)}\n`;
+  content += `**Created:** ${subCreatedDate}\n`;
+  content += `**Updated:** ${subCreatedDate}\n`;
+  content += `**Version:** 1.0\n`;
 
   if (whatThisIs) {
     content += `\n## What This Is\n\n${whatThisIs}\n`;
