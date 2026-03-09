@@ -85,8 +85,10 @@ export async function addWorkspace(params: { path: string }): Promise<{
 }> {
   const dirPath = params.path;
 
-  // Validate: reject paths that are clearly non-existent
-  if (dirPath === "/nonexistent/path") {
+  // Validate: check if the path actually exists on disk
+  try {
+    await fsp.stat(dirPath);
+  } catch {
     throw new Error(`Workspace path does not exist: ${dirPath}`);
   }
 
@@ -187,19 +189,6 @@ export async function setActiveProject(params: {
 
   // --- Name-based lookup ---
 
-  // Ambiguity check: same name in multiple workspace roots (FS-08)
-  if (workspaceRoots.length > 1 && identifier === "Duplicate Name") {
-    const paths = workspaceRoots.map((r) => `${r}/${identifier}`).join(", ");
-    throw new Error(
-      `Multiple projects match "${identifier}". Disambiguate by path: ${paths}`,
-    );
-  }
-
-  // Name not found
-  if (identifier === "Nonexistent") {
-    throw new Error(`Project not found: "${identifier}"`);
-  }
-
   // No workspace roots configured
   if (workspaceRoots.length === 0) {
     return {
@@ -209,10 +198,39 @@ export async function setActiveProject(params: {
     };
   }
 
-  // Resolve to first workspace root
-  const matchedRoot = workspaceRoots[0];
+  // Scan workspace roots for matching project directories
   const slug = identifier.toLowerCase().replace(/\s+/g, "-");
-  const projectPath = `${matchedRoot}/${slug}`;
+  const matchingPaths: string[] = [];
+
+  for (const root of workspaceRoots) {
+    // Try both the raw identifier and the slugified version
+    for (const candidate of [identifier, slug]) {
+      const candidatePath = path.join(root, candidate);
+      try {
+        const stat = await fsp.stat(candidatePath);
+        if (stat.isDirectory()) {
+          matchingPaths.push(candidatePath);
+          break; // Only count one match per workspace root
+        }
+      } catch {
+        // Path doesn't exist in this workspace root, continue
+      }
+    }
+  }
+
+  // Ambiguity check: same name in multiple workspace roots (FS-08)
+  if (matchingPaths.length > 1) {
+    throw new Error(
+      `Multiple projects match "${identifier}". Disambiguate by path: ${matchingPaths.join(", ")}`,
+    );
+  }
+
+  // Not found in any workspace root
+  if (matchingPaths.length === 0) {
+    throw new Error(`Project not found: "${identifier}"`);
+  }
+
+  const projectPath = matchingPaths[0];
   const project = { name: identifier, path: projectPath };
   _activeProject = project;
   _activeScope = scope;

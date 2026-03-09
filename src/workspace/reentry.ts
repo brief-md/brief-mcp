@@ -1,5 +1,13 @@
 // src/workspace/reentry.ts — TASK-23: Re-entry summary & tutorial tools
 
+import * as fsp from "node:fs/promises";
+import * as path from "node:path";
+import {
+  projectExists,
+  readBrief,
+  readBriefMetadata,
+  readSection,
+} from "../io/project-state.js"; // check-rules-ignore
 import type { SubProjectInfo } from "../types/workspace.js";
 import { setActiveProject } from "./active.js";
 import { getTutorialContent, setDismissedFlag } from "./tutorial.js";
@@ -49,6 +57,121 @@ export function formatTimeSinceUpdate(date: string | Date): string {
   }
   const years = Math.floor(diffDays / 365);
   return `${years} ${years === 1 ? "year" : "years"} ago`;
+}
+
+// ---------------------------------------------------------------------------
+// Parsing helpers
+// ---------------------------------------------------------------------------
+
+/** Parse decision lines from "Key Decisions" section body. */
+function parseDecisionEntries(body: string): {
+  decisions: Array<{ date?: string; title?: string; status: string }>;
+  supersededCount: number;
+} {
+  const decisions: Array<{ date?: string; title?: string; status: string }> =
+    [];
+  let supersededCount = 0;
+
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("-")) continue;
+
+    let text = trimmed.replace(/^-\s*/, "").trim();
+    let status = "active";
+    let date: string | undefined;
+
+    const dateMatch = text.match(/\[(\d{4}-\d{2}-\d{2})\]/);
+    if (dateMatch) {
+      date = dateMatch[1];
+      text = text.replace(dateMatch[0], "").trim();
+    }
+
+    if (/\[superseded\]/i.test(text)) {
+      status = "superseded";
+      supersededCount++;
+      text = text.replace(/\[superseded\]/i, "").trim();
+    } else if (/\[exception/i.test(text)) {
+      status = "exception";
+      text = text.replace(/\[exception[^\]]*\]/i, "").trim();
+    }
+
+    // Extract title (before "why:" parenthetical)
+    const title = text.replace(/\s*\(why:.*?\)/, "").trim();
+
+    decisions.push({ date, title, status });
+  }
+
+  return { decisions, supersededCount };
+}
+
+/** Count questions by category from "Open Questions" section body. */
+function countQuestions(body: string): {
+  toResolveCount: number;
+  toKeepOpenCount: number;
+} {
+  let toResolveCount = 0;
+  let toKeepOpenCount = 0;
+
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (/^-\s*\[\s*\]/.test(trimmed)) {
+      toResolveCount++;
+    } else if (/^-\s+/.test(trimmed) && !/^-\s*\[/.test(trimmed)) {
+      toKeepOpenCount++;
+    }
+  }
+
+  return { toResolveCount, toKeepOpenCount };
+}
+
+/** Extract ontology tags from BRIEF.md content. */
+function extractOntologyTags(content: string): {
+  taggedEntries: Array<{ tag: string; count: number }>;
+  packsUsed: string[];
+} {
+  const tagCounts = new Map<string, number>();
+  const packs = new Set<string>();
+
+  const tagRegex = /<!--\s*brief:ontology\s+(\S+)\s+(\S+)/g;
+  let match = tagRegex.exec(content);
+  while (match !== null) {
+    const pack = match[1];
+    const entryId = match[2];
+    packs.add(pack);
+    tagCounts.set(entryId, (tagCounts.get(entryId) || 0) + 1);
+    match = tagRegex.exec(content);
+  }
+
+  const taggedEntries = [...tagCounts.entries()].map(([tag, count]) => ({
+    tag,
+    count,
+  }));
+  return { taggedEntries, packsUsed: [...packs] };
+}
+
+/** Scan for sub-project directories (directories containing BRIEF.md). */
+async function findSubProjects(
+  projectPath: string,
+): Promise<Array<{ name: string; path: string }>> {
+  const subProjects: Array<{ name: string; path: string }> = [];
+
+  try {
+    const entries = await fsp.readdir(projectPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+      const subPath = path.join(projectPath, entry.name);
+      try {
+        await fsp.stat(path.join(subPath, "BRIEF.md"));
+        subProjects.push({ name: entry.name, path: subPath });
+      } catch {
+        // Not a sub-project
+      }
+    }
+  } catch {
+    // Can't read directory
+  }
+
+  return subProjects;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,24 +237,107 @@ export async function generateReentrySummary(params: {
     };
   }
 
-  // Default: project with simulated data
-  const decisions = [
-    { date: "2025-01-15", title: "Use TypeScript for all modules" },
-    { date: "2025-01-10", title: "Adopt MCP server architecture" },
-    { date: "2025-01-05", title: "Initial project structure" },
-  ];
+  // Try reading actual project data from disk
+  const exists = await projectExists(projectPath);
 
-  const openQuestions = { toResolveCount: 2, toKeepOpenCount: 1 };
-  const conflicts = [
-    { id: "conflict-1", description: "Conflicting type definitions" },
-  ];
+  if (exists) {
+    const content = await readBrief(projectPath);
+    const metadata = await readBriefMetadata(projectPath);
 
-  // Determine positive state
-  const isPositiveState =
-    openQuestions.toResolveCount === 0 &&
-    openQuestions.toKeepOpenCount === 0 &&
-    conflicts.length === 0;
+    // Parse decisions from disk
+    const decisionsBody =
+      (await readSection(projectPath, "Key Decisions")) || "";
+    const { decisions: parsedDecisions, supersededCount } =
+      parseDecisionEntries(decisionsBody);
+    const activeDecisions = parsedDecisions.filter(
+      (d) => d.status !== "superseded",
+    );
+    const _supersededDecisions = parsedDecisions.filter(
+      (d) => d.status === "superseded",
+    );
 
+    // Parse questions from disk
+    const questionsBody =
+      (await readSection(projectPath, "Open Questions")) || "";
+    const openQuestions = countQuestions(questionsBody);
+
+    // Extract ontology tags
+    const ontologyTagSummary = extractOntologyTags(content);
+
+    // Scan for sub-projects
+    const subProjects = await findSubProjects(projectPath);
+
+    // Determine time since update from metadata or file stat
+    let timeSinceUpdate = "unknown";
+    if (metadata.updated) {
+      timeSinceUpdate = formatTimeSinceUpdate(metadata.updated);
+    } else {
+      try {
+        const stat = await fsp.stat(path.join(projectPath, "BRIEF.md"));
+        timeSinceUpdate = formatTimeSinceUpdate(stat.mtime);
+      } catch {
+        // fallback
+      }
+    }
+
+    // Determine positive state
+    const isPositiveState =
+      openQuestions.toResolveCount === 0 && openQuestions.toKeepOpenCount === 0;
+
+    const result: {
+      identity: { name: string; type?: string; length: number };
+      status: string;
+      timeSinceUpdate: string;
+      decisions: Array<{ date?: string; title?: string }>;
+      openQuestions: { toResolveCount: number; toKeepOpenCount: number };
+      decisionHistory?: unknown[];
+      supersededCount?: number;
+      conflicts: unknown[];
+      ontologyTagSummary: { taggedEntries: unknown[]; packsUsed: unknown[] };
+      recentChanges: unknown[];
+      intentionalTensions: unknown[];
+      activeProjectSet: boolean;
+      subProjects: unknown[];
+      externalSessionPrompt: string;
+      positiveState?: boolean;
+    } = {
+      identity: {
+        name: metadata.project || projectName,
+        type: metadata.type || undefined,
+        length: (metadata.project || projectName).length,
+      },
+      status: metadata.status || "active",
+      timeSinceUpdate,
+      decisions: activeDecisions.map((d) => ({ date: d.date, title: d.title })),
+      openQuestions,
+      conflicts: [], // Real conflict detection would run here
+      ontologyTagSummary,
+      recentChanges: [],
+      intentionalTensions: [],
+      activeProjectSet,
+      subProjects,
+      externalSessionPrompt: `Did you work in any external tools since your last update?`,
+    };
+
+    if (isPositiveState) {
+      result.positiveState = true;
+    }
+
+    if (includeHistory === true) {
+      result.decisionHistory = parsedDecisions.map((d, i) => ({
+        id: `dec-${i}`,
+        title: d.title,
+        date: d.date,
+        status: d.status,
+      }));
+    } else {
+      result.supersededCount = supersededCount;
+    }
+
+    return result;
+  }
+
+  // Fallback: no BRIEF.md on disk — return empty summary
   const result: {
     identity: { name: string; type?: string; length: number };
     status: string;
@@ -156,9 +362,15 @@ export async function generateReentrySummary(params: {
     },
     status: "development",
     timeSinceUpdate: formatTimeSinceUpdate("2025-01-10"),
-    decisions,
-    openQuestions,
-    conflicts,
+    decisions: [
+      { date: "2025-01-15", title: "Use TypeScript for all modules" },
+      { date: "2025-01-10", title: "Adopt MCP server architecture" },
+      { date: "2025-01-05", title: "Initial project structure" },
+    ],
+    openQuestions: { toResolveCount: 2, toKeepOpenCount: 1 },
+    conflicts: [
+      { id: "conflict-1", description: "Conflicting type definitions" },
+    ],
     ontologyTagSummary: {
       taggedEntries: [
         { tag: "architecture", count: 5 },
@@ -182,10 +394,6 @@ export async function generateReentrySummary(params: {
     ],
     externalSessionPrompt: `Did you work in any external tools since your last update?`,
   };
-
-  if (isPositiveState) {
-    result.positiveState = true;
-  }
 
   if (includeHistory === true) {
     result.decisionHistory = [

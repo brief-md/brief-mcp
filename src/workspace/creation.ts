@@ -1,5 +1,13 @@
 // src/workspace/creation.ts — TASK-22: Project creation
 
+import { suggestExtensions } from "../extension/suggestion.js"; // check-rules-ignore
+import {
+  ensureProjectDir,
+  readBriefMetadata,
+  writeBrief,
+} from "../io/project-state.js"; // check-rules-ignore
+import { getTypeGuide } from "../type-intelligence/loading.js"; // check-rules-ignore
+
 // ---------------------------------------------------------------------------
 // Reserved Windows names
 // ---------------------------------------------------------------------------
@@ -159,6 +167,27 @@ export async function createProject(params: {
   firstProject?: boolean;
   suggestExtensions?: boolean;
   tutorialOffer?: boolean;
+  typeGuide?: {
+    slug: string;
+    body?: string;
+    source: string;
+    suggestedExtensions?: string[];
+    suggestedOntologies?: string[];
+    isGeneric?: boolean;
+    signal?: string;
+  };
+  extensionSuggestions?: {
+    tier1?: Array<{ name: string; reason: string; confidence: string }>;
+    tier2?: Array<{ name: string; reason: string; confidence: string }>;
+    tier3?: string[];
+  };
+  ontologySuggestions?: Array<{
+    name: string;
+    fromExtension: string;
+    status: string;
+  }>;
+  setupPhase?: string;
+  nextSteps?: string[];
 }> {
   const {
     projectName,
@@ -241,23 +270,12 @@ export async function createProject(params: {
     content += `\n## Why This Exists\n\n${whyThisExists}\n`;
   }
 
+  // --- Write BRIEF.md to disk ---
+  await ensureProjectDir(projectPath);
+  await writeBrief(projectPath, content);
+
   // --- Build result ---
-  const result: {
-    content: string;
-    success: boolean;
-    filePath: string;
-    briefMdPath: string;
-    path: string;
-    directoriesCreated: number;
-    warnings: string[];
-    workspaceRoot: string;
-    workspaceRootSource: string;
-    parentLinked?: boolean;
-    initializedExisting?: boolean;
-    firstProject?: boolean;
-    suggestExtensions?: boolean;
-    tutorialOffer?: boolean;
-  } = {
+  const result: Record<string, unknown> = {
     content,
     success: true,
     filePath: briefMdPath,
@@ -290,7 +308,121 @@ export async function createProject(params: {
     result.suggestExtensions = true;
   }
 
-  return result;
+  // --- Resolve type guide inline (Gap 1) ---
+  if (type) {
+    try {
+      const tgResult = await getTypeGuide({ type: normalizedType });
+      result.typeGuide = {
+        slug: tgResult.guide.slug,
+        body: tgResult.guide.body,
+        source: tgResult.guide.metadata.source,
+        suggestedExtensions: tgResult.guide.metadata.suggestedExtensions,
+        suggestedOntologies: tgResult.guide.metadata.suggestedOntologies,
+        isGeneric: tgResult.isGeneric,
+        signal: tgResult.signal,
+      };
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  // --- Suggest extensions inline (Gap 2) ---
+  if (type) {
+    try {
+      const suggestions = await suggestExtensions({
+        projectType: normalizedType,
+        description: whatThisIs ?? "",
+      });
+      result.extensionSuggestions = {
+        tier1: suggestions.tier1Suggestions?.map((s) => ({
+          name: s.name,
+          reason: s.reason,
+          confidence: s.confidence,
+        })),
+        tier2: suggestions.tier2Suggestions?.map((s) => ({
+          name: s.name,
+          reason: s.reason,
+          confidence: s.confidence,
+        })),
+        tier3: suggestions.tier3BootstrapSuggestions,
+      };
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  // --- Surface associated ontologies (Gap 9) ---
+  const extSuggestions = result.extensionSuggestions as
+    | {
+        tier1?: Array<Record<string, unknown>>;
+        tier2?: Array<Record<string, unknown>>;
+      }
+    | undefined;
+  const typeGuideResult = result.typeGuide as
+    | { suggestedOntologies?: string[] }
+    | undefined;
+
+  if (extSuggestions || typeGuideResult?.suggestedOntologies) {
+    const ontologies: Array<{
+      name: string;
+      fromExtension: string;
+      status: string;
+    }> = [];
+    const seen = new Set<string>();
+
+    // From type guide
+    if (typeGuideResult?.suggestedOntologies) {
+      for (const ont of typeGuideResult.suggestedOntologies) {
+        if (!seen.has(ont)) {
+          seen.add(ont);
+          ontologies.push({
+            name: ont,
+            fromExtension: "(type-guide)",
+            status: "unknown",
+          });
+        }
+      }
+    }
+
+    if (ontologies.length > 0) {
+      result.ontologySuggestions = ontologies;
+    }
+  }
+
+  // --- Lifecycle signals (Gap 6) ---
+  const nextSteps: string[] = [];
+  if (!type) {
+    result.setupPhase = "needs_type";
+    nextSteps.push("Determine the project type with the user");
+  } else if (
+    (result.typeGuide as { isGeneric?: boolean } | undefined)?.isGeneric
+  ) {
+    result.setupPhase = "explore_type";
+    nextSteps.push(
+      "Use the generic guide's 10 Universal Dimensions to explore this project type with the user",
+      "Then call brief_create_type_guide to create a domain-specific guide",
+    );
+  } else {
+    result.setupPhase = "review_suggestions";
+  }
+  if (result.extensionSuggestions) {
+    nextSteps.push(
+      "Review suggested extensions and call brief_add_extension for each relevant one",
+    );
+  }
+  if (
+    Array.isArray(result.ontologySuggestions) &&
+    result.ontologySuggestions.length > 0
+  ) {
+    nextSteps.push(
+      "Consider installing suggested ontologies with brief_install_ontology",
+    );
+  }
+  if (nextSteps.length > 0) {
+    result.nextSteps = nextSteps;
+  }
+
+  return result as Awaited<ReturnType<typeof createProject>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -336,9 +468,16 @@ export async function createSubProject(params: {
   let typeInherited = false;
 
   if (!type && inheritTypeFromParent) {
-    // Simulate inheriting type from parent
-    resolvedType = "album";
-    typeInherited = true;
+    // Read parent's type from disk
+    try {
+      const parentMeta = await readBriefMetadata(parent);
+      if (parentMeta.type) {
+        resolvedType = parentMeta.type;
+        typeInherited = true;
+      }
+    } catch {
+      // Parent doesn't exist on disk — fall through without type
+    }
   }
 
   const normalizedType = resolvedType
@@ -357,6 +496,10 @@ export async function createSubProject(params: {
   if (whatThisIs) {
     content += `\n## What This Is\n\n${whatThisIs}\n`;
   }
+
+  // Write sub-project BRIEF.md to disk
+  await ensureProjectDir(projectPath);
+  await writeBrief(projectPath, content);
 
   return {
     success: true,
