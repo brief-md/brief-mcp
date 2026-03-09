@@ -415,6 +415,9 @@ export function buildGuide(
       typeof data.created_by_project === "string"
         ? data.created_by_project
         : undefined,
+    referenceSources: Array.isArray(data.reference_sources)
+      ? data.reference_sources.map(String)
+      : undefined,
   };
 
   return {
@@ -778,4 +781,14 @@ export function _resetState(): void {
   guidesLoaded = false;
   mtimeIndex = new Map();
   _mtimeIndexInitialized = false;
+}
+
+/** Read-only accessor for loaded type guides (used by search module). */
+export function getLoadedGuides(): ReadonlyMap<string, TypeGuide> {
+  return guidesByType;
+}
+
+/** Read-only accessor for alias index (used by search module). */
+export function getAliasIndex(): ReadonlyMap<string, string> {
+  return aliasIndex;
 }

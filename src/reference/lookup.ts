@@ -209,6 +209,7 @@ export async function lookupReference(_params: {
   creator?: string;
   title?: string;
   type_filter?: string;
+  webSearch?: boolean;
 }): Promise<{
   results: Array<{
     label?: string;
@@ -310,6 +311,9 @@ export async function lookupReference(_params: {
     } else {
       response.aiKnowledgePrimary = true;
     }
+  } else if (_params.webSearch && matched.length < 3) {
+    // When webSearch requested and local results sparse, signal AI fallback
+    response.aiKnowledgePrimary = true;
   }
 
   return response;

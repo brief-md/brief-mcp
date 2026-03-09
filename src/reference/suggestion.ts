@@ -255,8 +255,9 @@ export async function getEntryReferences(params: {
 export async function suggestReferences(params: {
   context: { section: string; activeExtensions: string[] };
   existingReferences?: Array<{ ontology: string; entryId: string }>;
+  webSearch?: boolean;
 }): Promise<ReferenceSuggestionResult> {
-  const { context, existingReferences } = params;
+  const { context, existingReferences, webSearch } = params;
   const { section, activeExtensions } = context;
 
   // Build exclusion set from existing references
@@ -295,10 +296,11 @@ export async function suggestReferences(params: {
   }
 
   // Tier availability signals: when pack results are sparse/empty,
-  // indicate that AI knowledge and web search tiers are available
+  // indicate that AI knowledge and web search tiers are available.
+  // When webSearch is explicitly true, always signal availability.
   const sparse = suggestions.length < 3;
-  const hasAiKnowledgeTier = sparse;
-  const hasWebSearchTier = sparse;
+  const hasAiKnowledgeTier = sparse || webSearch === true;
+  const hasWebSearchTier = sparse || webSearch === true;
 
   const derivedContext = buildDerivedContext(suggestions, activeExtensions);
 

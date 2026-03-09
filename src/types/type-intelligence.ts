@@ -19,6 +19,7 @@ export interface TypeGuideMetadata {
   readonly createdByProject?: string;
   readonly parentType?: string;
   readonly conflictPatterns?: ReadonlyArray<readonly [string, string]>;
+  readonly referenceSources?: string[];
 }
 
 export interface TypeGuide {
