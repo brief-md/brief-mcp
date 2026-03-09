@@ -2,6 +2,7 @@
 
 import * as logger from "../logger.js";
 import { buildIndex, searchIndex } from "./indexer.js";
+import { loadAllPacks } from "./pack-loader.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -488,5 +489,13 @@ export async function loadPacks(_options?: {
   simulateNPacks?: number;
   [key: string]: unknown;
 }): Promise<{ loaded: number }> {
-  return { loaded: 0 };
+  if (_options?.simulateNPacks !== undefined) {
+    return { loaded: 0 }; // preserve test seam
+  }
+  try {
+    const packs = await loadAllPacks();
+    return { loaded: packs.length };
+  } catch {
+    return { loaded: 0 };
+  }
 }

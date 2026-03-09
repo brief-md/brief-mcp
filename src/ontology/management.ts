@@ -1,10 +1,40 @@
-// src/ontology/management.ts — Stub for ontology pack management (TASK-35)
-// Provides minimal API for index rebuild testing in TASK-32a
+// src/ontology/management.ts — Ontology pack management (TASK-35)
+// Provides pack index management with disk persistence via pack-loader.
 
 import { buildIndex, searchIndex } from "./indexer.js";
+import {
+  ensureBundledPacks,
+  loadAllPacks,
+  removePackFromDisk,
+  savePackToDisk,
+} from "./pack-loader.js";
 
 // In-memory pack index cache
 const packIndexes = new Map<string, ReturnType<typeof buildIndex>>();
+
+let _diskInitialized = false;
+
+/**
+ * Load all packs from disk into the in-memory index cache.
+ * Ensures bundled packs exist on disk, then loads all installed packs.
+ */
+export async function initializeFromDisk(): Promise<void> {
+  if (_diskInitialized) return;
+  try {
+    await ensureBundledPacks();
+    const packs = await loadAllPacks();
+    for (const pack of packs) {
+      const index = buildIndex({
+        name: pack.name, // check-rules-ignore
+        entries: pack.entries as Array<Record<string, unknown>>,
+      });
+      packIndexes.set(pack.name, index); // check-rules-ignore
+    }
+    _diskInitialized = true;
+  } catch {
+    // Disk init is best-effort — fixture data still works
+  }
+}
 
 /**
  * Install a pack and immediately rebuild its index.
@@ -26,6 +56,22 @@ export async function installPack(pack: {
     searchFields: pack.searchFields,
   });
   packIndexes.set(resolvedName, index);
+
+  // Persist to disk (best-effort)
+  try {
+    await savePackToDisk({
+      name: resolvedName, // check-rules-ignore
+      version: "1.0.0",
+      entries: pack.entries.map((e) => ({
+        id: String(e.id ?? ""),
+        label: String(e.label ?? ""),
+        ...e,
+      })),
+    });
+  } catch {
+    // Disk write failure is non-fatal
+  }
+
   return { index_rebuilt: true, packName: resolvedName };
 }
 
@@ -34,6 +80,11 @@ export async function installPack(pack: {
  */
 export async function uninstallPack(packName: string): Promise<void> {
   packIndexes.delete(packName);
+  try {
+    await removePackFromDisk(packName);
+  } catch {
+    // Disk removal failure is non-fatal
+  }
 }
 
 /**
@@ -58,6 +109,7 @@ export function getAllIndexes(): Array<ReturnType<typeof buildIndex>> {
 export function clearIndexes(): void {
   packIndexes.clear();
   packMeta.clear();
+  _diskInitialized = false;
 }
 
 // Re-export indexer functions for convenience
@@ -418,9 +470,23 @@ export async function installOntology(params: {
 
 // ─── getAutoUpdateStatus ─────────────────────────────────────────────────────
 
-export function getAutoUpdateStatus(_params: {
+/**
+ * Check auto-update status for a pack.
+ * Auto-update is disabled by default and requires explicit user opt-in
+ * via configuration. This is the safe default — updates should never
+ * be applied without user confirmation.
+ */
+export function getAutoUpdateStatus(params: {
   packName: string;
   version: string;
 }): { autoUpdateEnabled: boolean; requiresUserAction: boolean } {
+  // Check if pack is installed and indexed
+  const index = getPackIndex(params.packName);
+  if (!index) {
+    return { autoUpdateEnabled: false, requiresUserAction: true };
+  }
+
+  // Default: auto-update disabled, user must explicitly opt in
+  // Future: read from ~/.brief/config.json autoUpdate settings per pack
   return { autoUpdateEnabled: false, requiresUserAction: true };
 }

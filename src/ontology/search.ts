@@ -152,6 +152,9 @@ const JP_PACK_ENTRIES: Array<Record<string, unknown>> = [
 let fixturePromise: Promise<void> | null = null;
 
 async function ensureFixtures(): Promise<void> {
+  // Only install fixtures in test environment — production loads from disk
+  if (!process.env.VITEST && process.env.NODE_ENV !== "test") return;
+
   if (fixturePromise) return fixturePromise;
   fixturePromise = (async () => {
     if (!getPackIndex("theme-pack")) {

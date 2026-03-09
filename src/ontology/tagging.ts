@@ -93,7 +93,13 @@ function installFixtures(): void {
   }
 }
 
-installFixtures();
+// Install fixtures only in test environment — production loads packs from disk
+if (process.env.VITEST || process.env.NODE_ENV === "test") {
+  installFixtures();
+}
+
+/** @internal Install test fixtures on demand (for test setup). */
+export { installFixtures as _installFixtures };
 
 // ─── Exported fixture metadata (for property-test generators) ───────────────
 
