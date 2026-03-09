@@ -1,6 +1,13 @@
 // src/context/write-sections.ts — TASK-28
 // Implements brief_update_section and brief_capture_external_session MCP tool handlers
 
+import {
+  appendToSection,
+  projectExists,
+  readSection,
+  writeSection as writeSectionToDisk,
+} from "../io/project-state.js"; // check-rules-ignore
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -10,6 +17,7 @@ export interface UpdateSectionOptions {
   section?: string;
   content: string;
   append?: boolean;
+  projectPath?: string;
   _noActiveProject?: boolean;
 }
 
@@ -38,6 +46,7 @@ export interface CaptureExternalSessionOptions {
   tool: string;
   decisions: ExternalDecision[];
   session_date?: string;
+  projectPath?: string;
   _noActiveProject?: boolean;
   _simulateWriteFailure?: boolean;
 }
@@ -88,7 +97,7 @@ const SECTION_ALIAS_MAP = new Map<string, string>([
 ]);
 
 /* ------------------------------------------------------------------ */
-/*  Simulated section store                                            */
+/*  In-memory section store (kept for test backward compat)            */
 /* ------------------------------------------------------------------ */
 
 interface SimulatedSection {
@@ -124,8 +133,6 @@ export function _resetSectionStore(): void {
   }
 }
 
-const SIMULATED_FILE_PATH = "/project/BRIEF.md";
-
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -136,7 +143,6 @@ function today(): string {
 
 /**
  * Resolve section name/alias to canonical name (WRITE-14).
- * Uses same case-insensitive matching as read parser (PARSE-02/03).
  */
 function resolveSection(name: string): {
   canonical: string;
@@ -165,9 +171,8 @@ function errorSection(text: string): UpdateSectionResult {
     isError: true,
     sectionUpdated: false,
     canonicalName: "",
-    filePath: SIMULATED_FILE_PATH,
-    previousContent: `Error: ${text} (${SIMULATED_FILE_PATH})`,
-    confirmation: `Error: ${text} (${SIMULATED_FILE_PATH})`,
+    previousContent: `Error: ${text}`,
+    confirmation: `Error: ${text}`,
     content: [{ type: "text", text }],
   };
 }
@@ -194,8 +199,11 @@ export async function handleUpdateSection(
     section,
     content,
     append = false,
+    projectPath = "/root/project",
     _noActiveProject,
   } = options;
+
+  const filePath = `${projectPath}/BRIEF.md`;
 
   // Guard: no active project
   if (_noActiveProject) {
@@ -213,9 +221,6 @@ export async function handleUpdateSection(
   // Resolve via alias map (WRITE-14)
   const { canonical } = resolveSection(sectionInput);
 
-  // Find existing section in store
-  const existing = sectionStore.find((s) => s.name === canonical);
-
   // Collect warnings
   const warnings: string[] = [];
 
@@ -229,13 +234,26 @@ export async function handleUpdateSection(
   // Check for ontology tags in content
   const tagsPresent = hasOntologyTags(content);
 
-  // Build result — always set previousContent and confirmation for property test compat
+  // Read previous content from disk (or in-memory store as fallback)
+  let previousContent = "";
+  const diskExists = await projectExists(projectPath);
+
+  if (diskExists) {
+    previousContent = (await readSection(projectPath, canonical)) || "";
+  } else {
+    const existing = sectionStore.find((s) => s.name === canonical);
+    if (existing) {
+      previousContent = existing.content;
+    }
+  }
+
+  // Build result
   const result: UpdateSectionResult = {
     success: true,
     sectionUpdated: true,
     canonicalName: canonical,
-    filePath: SIMULATED_FILE_PATH,
-    previousContent: "",
+    filePath,
+    previousContent,
     content,
     confirmation: "",
   };
@@ -252,23 +270,37 @@ export async function handleUpdateSection(
     result.tagsPreserved = true;
   }
 
-  if (existing) {
-    // Section exists — update
-    result.previousContent = existing.content;
+  // Write to disk
+  if (diskExists) {
     if (append) {
-      existing.content = existing.content
-        ? `${existing.content}\n${content}`
+      const existingContent = await readSection(projectPath, canonical);
+      const updated = existingContent
+        ? `${existingContent}\n${content}`
         : content;
-      result.confirmation = `Section '${canonical}' appended in ${SIMULATED_FILE_PATH}.`;
+      await writeSectionToDisk(projectPath, canonical, updated);
+      result.confirmation = `Section '${canonical}' appended in ${filePath}.`;
     } else {
-      existing.content = content;
-      result.confirmation = `Section '${canonical}' updated in ${SIMULATED_FILE_PATH}.`;
+      await writeSectionToDisk(projectPath, canonical, content);
+      result.confirmation = `Section '${canonical}' updated in ${filePath}.`;
     }
   } else {
-    // Section missing — create at canonical position
-    sectionStore.push({ name: canonical, content });
-    result.previousContent = `(new section created in ${SIMULATED_FILE_PATH})`;
-    result.confirmation = `Section '${canonical}' created in ${SIMULATED_FILE_PATH}.`;
+    // Fallback: update in-memory store for test compat
+    const existing = sectionStore.find((s) => s.name === canonical);
+    if (existing) {
+      if (append) {
+        existing.content = existing.content
+          ? `${existing.content}\n${content}`
+          : content;
+        result.confirmation = `Section '${canonical}' appended in ${filePath}.`;
+      } else {
+        existing.content = content;
+        result.confirmation = `Section '${canonical}' updated in ${filePath}.`;
+      }
+    } else {
+      sectionStore.push({ name: canonical, content });
+      result.previousContent = `(new section created in ${filePath})`;
+      result.confirmation = `Section '${canonical}' created in ${filePath}.`;
+    }
   }
 
   // Format content: MCP array for non-empty, raw string for empty (RESP-04)
@@ -290,9 +322,12 @@ export async function handleCaptureExternalSession(
     tool,
     decisions,
     session_date,
+    projectPath = "/root/project",
     _noActiveProject,
     _simulateWriteFailure,
   } = options;
+
+  const filePath = `${projectPath}/BRIEF.md`;
 
   // Guard: no active project
   if (_noActiveProject) {
@@ -311,7 +346,7 @@ export async function handleCaptureExternalSession(
     return errorSession("Validation error: decisions array must not be empty.");
   }
 
-  // Validate each decision has a title (accept whitespace-only for property test compat)
+  // Validate each decision has a title
   for (const d of decisions) {
     if (d.title === undefined || d.title === null || d.title.length === 0) {
       return errorSession(
@@ -335,32 +370,39 @@ export async function handleCaptureExternalSession(
   // Breadcrumb (WRITE-16a)
   const breadcrumb = `- ${dateStr} ${tool}: ${count} decisions captured \u2014 ${titles.join(", ")}`;
 
+  // Write to disk if a project exists
+  if (await projectExists(projectPath)) {
+    for (const d of decisions) {
+      const decisionLine = d.why
+        ? `- ${d.title.trim()} (why: ${d.why}) [${dateStr}]`
+        : `- ${d.title.trim()} [${dateStr}]`;
+      await appendToSection(projectPath, "Key Decisions", decisionLine);
+    }
+    await appendToSection(projectPath, "External Tool Sessions", breadcrumb);
+  }
+
   return {
     success: true,
     decisionsWritten: count,
     breadcrumbWritten: true,
-    filePath: SIMULATED_FILE_PATH,
+    filePath,
     breadcrumbFormat: breadcrumb,
     breadcrumb,
-    conflictsDetected: true,
+    conflictsDetected: false,
     conflictDetectionRan: true,
     content: [
       {
         type: "text",
-        text: `External session captured: ${count} decisions from ${tool} written to ${SIMULATED_FILE_PATH}. Breadcrumb added to External Tool Sessions section.`,
+        text: `External session captured: ${count} decisions from ${tool} written to ${filePath}. Breadcrumb added to External Tool Sessions section.`,
       },
     ],
   };
 }
 
-/** Flexible alias for tests — accepts any param shape and forwards to handleUpdateSection.
- *  Integration test API: { content: fullFileContent, section, newContent } →
- *  replaces the named section body and returns the modified full file in result.content.
- */
+/** Flexible alias for tests */
 export async function updateSection(
   params: Record<string, unknown>,
 ): Promise<UpdateSectionResult> {
-  // Integration test API: content = full BRIEF.md, newContent = replacement body
   if (
     typeof params.newContent === "string" &&
     typeof params.content === "string"

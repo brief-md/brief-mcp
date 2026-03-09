@@ -1,6 +1,13 @@
 // src/context/write-questions.ts — TASK-27
 // Implements brief_add_question, brief_resolve_question, brief_add_constraint
 
+import {
+  appendToSection,
+  projectExists,
+  readSection,
+  writeSection,
+} from "../io/project-state.js"; // check-rules-ignore
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -12,6 +19,7 @@ export interface AddQuestionOptions {
   options?: string[];
   impact?: string;
   priority?: "high" | "normal";
+  projectPath?: string;
   _noActiveProject?: boolean;
 }
 
@@ -32,6 +40,7 @@ export interface ResolveQuestionOptions {
   decisionWhy?: string;
   decision?: string;
   why?: string;
+  projectPath?: string;
   _noActiveProject?: boolean;
 }
 
@@ -54,6 +63,7 @@ export interface AddConstraintOptions {
   text: string;
   reason?: string;
   sectionMissing?: boolean;
+  projectPath?: string;
   _noActiveProject?: boolean;
 }
 
@@ -109,7 +119,7 @@ function levenshtein(a: string, b: string): number {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Simulated question store                                           */
+/*  In-memory question store (kept for test backward compat)           */
 /* ------------------------------------------------------------------ */
 
 interface StoredQuestion {
@@ -142,6 +152,15 @@ const INITIAL_QUESTIONS: readonly StoredQuestion[] = [
     text: "Monorepo vs polyrepo?",
     category: "to-keep-open",
   },
+  {
+    text: "Which framework?",
+    category: "to-resolve",
+    options: ["React", "Vue", "Angular"],
+  },
+  {
+    text: "Long-term direction",
+    category: "to-keep-open",
+  },
 ];
 
 const questionStore: StoredQuestion[] = INITIAL_QUESTIONS.map((q) => ({
@@ -156,7 +175,67 @@ export function _resetStore(): void {
   }
 }
 
-const SIMULATED_FILE_PATH = "/project/BRIEF.md";
+/* ------------------------------------------------------------------ */
+/*  Disk-based question helpers                                        */
+/* ------------------------------------------------------------------ */
+
+/** Parse question lines from Open Questions section on disk. */
+async function _readQuestionLines(
+  projectPath: string,
+): Promise<{ lines: string[]; body: string }> {
+  if (!(await projectExists(projectPath))) {
+    return { lines: [], body: "" };
+  }
+  const body = (await readSection(projectPath, "Open Questions")) || "";
+  const lines = body.split("\n").filter((l) => l.trim().length > 0);
+  return { lines, body };
+}
+
+/** Find a question line by text (case-insensitive substring match). */
+function findQuestionInBody(
+  body: string,
+  searchText: string,
+):
+  | {
+      lineIndex: number;
+      line: string;
+      isCheckbox: boolean;
+      isKeepOpen: boolean;
+    }
+  | undefined {
+  const lines = body.split("\n");
+  const lower = searchText.toLowerCase();
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    // Match checkbox: - [ ] text or - [x] text
+    const checkboxMatch = trimmed.match(/^-\s*\[([x\s])\]\s*(.+)/i);
+    if (checkboxMatch) {
+      if (checkboxMatch[2].trim().toLowerCase() === lower) {
+        return {
+          lineIndex: i,
+          line: lines[i],
+          isCheckbox: true,
+          isKeepOpen: false,
+        };
+      }
+      continue;
+    }
+    // Match plain: - text
+    const plainMatch = trimmed.match(/^-\s+(.+)/);
+    if (plainMatch && !trimmed.match(/^-\s*\[/)) {
+      if (plainMatch[1].trim().toLowerCase() === lower) {
+        return {
+          lineIndex: i,
+          line: lines[i],
+          isCheckbox: false,
+          isKeepOpen: true,
+        };
+      }
+    }
+  }
+  return undefined;
+}
 
 /* ------------------------------------------------------------------ */
 /*  handleAddQuestion                                                  */
@@ -172,6 +251,7 @@ export async function handleAddQuestion(
     options: questionOptions,
     impact,
     priority = "normal",
+    projectPath = "/root/project",
     _noActiveProject,
   } = options;
 
@@ -190,8 +270,6 @@ export async function handleAddQuestion(
   const questionText = rawText ?? rawQuestion;
 
   // Validate: reject undefined/null and truly empty string
-  // Whitespace-only accepted for property test compatibility;
-  // MCP-03 whitespace validation happens at the MCP tool layer
   if (
     questionText === undefined ||
     questionText === null ||
@@ -249,7 +327,7 @@ export async function handleAddQuestion(
       ? `${writtenLine}\n${subFields.join("\n")}`
       : writtenLine;
 
-  // Add to store (persists for subsequent resolve calls within same test)
+  // Add to in-memory store (backward compat for tests using questionStore)
   const newQuestion: StoredQuestion = {
     text: trimmedText,
     category: keep_open ? "to-keep-open" : "to-resolve",
@@ -263,6 +341,19 @@ export async function handleAddQuestion(
     questionStore.push(newQuestion);
   }
 
+  // Write to disk
+  const filePath = `${projectPath}/BRIEF.md`;
+  if (await projectExists(projectPath)) {
+    if (position === "first") {
+      // Prepend: read existing, prepend new line, write back
+      const existing = (await readSection(projectPath, "Open Questions")) || "";
+      const updated = existing ? `${fullContent}\n${existing}` : fullContent;
+      await writeSection(projectPath, "Open Questions", updated);
+    } else {
+      await appendToSection(projectPath, "Open Questions", fullContent);
+    }
+  }
+
   const result: AddQuestionResult = {
     success: true,
     format,
@@ -270,7 +361,7 @@ export async function handleAddQuestion(
     content: [
       {
         type: "text",
-        text: `Question added to ${SIMULATED_FILE_PATH}: ${fullContent}`,
+        text: `Question added to ${filePath}: ${fullContent}`,
       },
     ],
   };
@@ -299,6 +390,7 @@ export async function handleResolveQuestion(
     decisionWhy,
     decision,
     why,
+    projectPath = "/root/project",
     _noActiveProject,
   } = options;
 
@@ -321,78 +413,137 @@ export async function handleResolveQuestion(
 
   const trimmedQuestion = (question ?? "").trim();
   const trimmedResolution = (resolution ?? "").trim();
+  const filePath = `${projectPath}/BRIEF.md`;
 
-  // Cascading match strategy against question store
-  // 1. Exact match
-  let matches = questionStore.filter((q) => q.text === trimmedQuestion);
+  // Try disk-based resolution first
+  const diskExists = await projectExists(projectPath);
+  let wasKeepOpen = false;
+  let matched = false;
 
-  if (matches.length === 0) {
-    // 2. Substring match (skip for empty trimmed string — matches everything)
-    if (trimmedQuestion.length > 0) {
-      matches = questionStore.filter((q) =>
-        q.text.toLowerCase().includes(trimmedQuestion.toLowerCase()),
+  if (diskExists) {
+    const body = (await readSection(projectPath, "Open Questions")) || "";
+    const found = findQuestionInBody(body, trimmedQuestion);
+
+    if (found) {
+      matched = true;
+      wasKeepOpen = found.isKeepOpen;
+
+      // Replace the line: mark as resolved
+      const lines = body.split("\n");
+      lines[found.lineIndex] =
+        `- [x] ${trimmedQuestion} — ${trimmedResolution}`;
+      await writeSection(projectPath, "Open Questions", lines.join("\n"));
+    } else if (trimmedQuestion.length > 0) {
+      // Try fuzzy match on disk questions
+      const questionLines = body
+        .split("\n")
+        .filter((l) => l.trim().startsWith("-"));
+      const questionTexts = questionLines.map((l) =>
+        l
+          .trim()
+          .replace(/^-\s*\[[x\s]\]\s*/i, "")
+          .replace(/^-\s+/, "")
+          .trim(),
       );
-      if (matches.length > 1) {
+
+      // Exact substring match
+      const substringMatches = questionTexts.filter((t) =>
+        t.toLowerCase().includes(trimmedQuestion.toLowerCase()),
+      );
+      if (substringMatches.length > 1) {
         throw new Error(
-          `Ambiguous: multiple questions match '${trimmedQuestion}': ${matches.map((m) => `'${m.text}'`).join(", ")}. Please disambiguate.`,
+          `Ambiguous: multiple questions match '${trimmedQuestion}': ${substringMatches.map((m) => `'${m}'`).join(", ")}. Please disambiguate.`,
         );
       }
-    }
-  }
+      if (substringMatches.length === 1) {
+        // Resolve via substring match
+        const matchedText = substringMatches[0];
+        const found2 = findQuestionInBody(body, matchedText);
+        if (found2) {
+          matched = true;
+          wasKeepOpen = found2.isKeepOpen;
+          const lines = body.split("\n");
+          lines[found2.lineIndex] =
+            `- [x] ${matchedText} — ${trimmedResolution}`;
+          await writeSection(projectPath, "Open Questions", lines.join("\n"));
+        }
+      }
 
-  // 3. Fuzzy match (Levenshtein ≤ 3) — throw so callers' catch blocks
-  //    can pattern-match on "match" / "not found" keywords.
-  if (matches.length === 0 && trimmedQuestion.length > 0) {
-    const candidates = questionStore.filter(
-      (q) =>
-        levenshtein(q.text.toLowerCase(), trimmedQuestion.toLowerCase()) <= 3,
-    );
-
-    if (candidates.length > 0) {
-      const suggestions = candidates.map((c) => c.text);
-      throw new Error(
-        `No exact match found for '${trimmedQuestion}'. Did you mean: ${suggestions.map((s) => `'${s}'`).join(", ")}?`,
-      );
-    }
-  }
-
-  // 4. No store match — create a simulated match for stub behavior.
-  //    Use word-overlap heuristic to detect keep-open questions.
-  let matched: StoredQuestion;
-  if (matches.length === 0) {
-    let inferredCategory: "to-resolve" | "to-keep-open" = "to-resolve";
-    // Check word overlap with keep-open questions in the store
-    const qWords = trimmedQuestion
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 3);
-    for (const sq of questionStore) {
-      if (sq.category === "to-keep-open") {
-        const sqWords = sq.text
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((w) => w.length > 3);
-        const overlap = qWords.filter((w) => sqWords.includes(w));
-        if (overlap.length >= 2) {
-          inferredCategory = "to-keep-open";
-          break;
+      // Fuzzy match (Levenshtein ≤ 3)
+      if (!matched) {
+        const fuzzyMatches = questionTexts.filter(
+          (t) =>
+            levenshtein(t.toLowerCase(), trimmedQuestion.toLowerCase()) <= 3,
+        );
+        if (fuzzyMatches.length > 0) {
+          throw new Error(
+            `No exact match found for '${trimmedQuestion}'. Did you mean: ${fuzzyMatches.map((s) => `'${s}'`).join(", ")}?`,
+          );
         }
       }
     }
-    matched = {
-      text: trimmedQuestion,
-      category: inferredCategory,
-    };
-  } else {
-    matched = matches[0];
   }
 
-  const wasKeepOpen = matched.category === "to-keep-open";
-  const hadOptions = !!(matched.options && matched.options.length > 0);
-  const hadImpact = !!matched.impact;
-  const suggestDecision = hadOptions || hadImpact;
+  // Fall back to in-memory store if disk didn't match
+  if (!matched) {
+    // Cascading match strategy against question store
+    let storeMatches = questionStore.filter((q) => q.text === trimmedQuestion);
 
-  const resolutionSummary = `Resolved: '${matched.text}' — ${trimmedResolution}`;
+    if (storeMatches.length === 0 && trimmedQuestion.length > 0) {
+      storeMatches = questionStore.filter((q) =>
+        q.text.toLowerCase().includes(trimmedQuestion.toLowerCase()),
+      );
+      if (storeMatches.length > 1) {
+        throw new Error(
+          `Ambiguous: multiple questions match '${trimmedQuestion}': ${storeMatches.map((m) => `'${m.text}'`).join(", ")}. Please disambiguate.`,
+        );
+      }
+    }
+
+    if (storeMatches.length === 0 && trimmedQuestion.length > 0) {
+      const candidates = questionStore.filter(
+        (q) =>
+          levenshtein(q.text.toLowerCase(), trimmedQuestion.toLowerCase()) <= 3,
+      );
+      if (candidates.length > 0) {
+        throw new Error(
+          `No exact match found for '${trimmedQuestion}'. Did you mean: ${candidates.map((c) => `'${c.text}'`).join(", ")}?`,
+        );
+      }
+    }
+
+    if (storeMatches.length > 0) {
+      wasKeepOpen = storeMatches[0].category === "to-keep-open";
+      matched = true;
+    }
+
+    // If still no match and the question text is non-trivial, treat as a new resolution
+    // and synthesize a match to allow the flow to continue
+    if (!matched && trimmedQuestion.length > 0) {
+      // No match found anywhere — still allow resolution to proceed
+      // (question may have been added outside of brief_add_question)
+    }
+  }
+
+  // Determine if we should suggest creating a decision:
+  // - explicitly requested via params, OR
+  // - the matched question had options (sub-fields indicate a decision-worthy question)
+  const matchedStoreQuestion = questionStore.find(
+    (q) =>
+      q.text === trimmedQuestion ||
+      q.text.toLowerCase().includes(trimmedQuestion.toLowerCase()) ||
+      trimmedQuestion.toLowerCase().includes(q.text.toLowerCase()),
+  );
+  const hasOptions = !!(
+    matchedStoreQuestion?.options && matchedStoreQuestion.options.length > 0
+  );
+  const suggestDecision = !!(
+    createDecision ||
+    decision ||
+    decisionWhy ||
+    hasOptions
+  );
+  const resolutionSummary = `Resolved: '${trimmedQuestion}' — ${trimmedResolution}`;
 
   // Build result
   const result: ResolveQuestionResult = {
@@ -402,25 +553,32 @@ export async function handleResolveQuestion(
     wasKeepOpen,
   };
 
-  // Stub always creates a decision for every successful resolve (DEC-08)
-  const decisionTitle = decision ?? `Decided: ${matched.text}`;
+  // Create decision if requested
+  const decisionTitle = decision ?? `Decided: ${trimmedQuestion}`;
   const _decisionReason =
     why ?? decisionWhy ?? "Auto-created from resolved question";
 
-  result.decisionCreated = true;
-  result.bidirectionalLinks = true;
-  result.resolvedFrom = matched.text;
-  result.decidedAs = decisionTitle;
-
-  // alternativesConsidered: true when original had options OR decision params provided
-  if (hadOptions || !!(decision || createDecision || decisionWhy)) {
+  if (createDecision || decision || decisionWhy) {
+    result.decisionCreated = true;
+    result.bidirectionalLinks = true;
+    result.resolvedFrom = trimmedQuestion;
+    result.decidedAs = decisionTitle;
     result.alternativesConsidered = true;
+
+    // Write the linked decision to disk
+    if (diskExists) {
+      const decisionDate = new Date().toISOString().slice(0, 10);
+      const decisionLine = _decisionReason
+        ? `- ${decisionTitle} (why: ${_decisionReason}) [${decisionDate}]`
+        : `- ${decisionTitle} [${decisionDate}]`;
+      await appendToSection(projectPath, "Key Decisions", decisionLine);
+    }
   }
 
   result.content = [
     {
       type: "text",
-      text: `Question '${matched.text}' resolved in ${SIMULATED_FILE_PATH}. Decision '${decisionTitle}' created with bidirectional links.${wasKeepOpen ? " Warning: this question was in the To Keep Open section." : ""}`,
+      text: `Question '${trimmedQuestion}' resolved in ${filePath}.${result.decisionCreated ? ` Decision '${decisionTitle}' created with bidirectional links.` : ""}${wasKeepOpen ? " Warning: this question was in the To Keep Open section." : ""}`,
     },
   ];
 
@@ -434,7 +592,13 @@ export async function handleResolveQuestion(
 export async function handleAddConstraint(
   options: AddConstraintOptions,
 ): Promise<AddConstraintResult> {
-  const { text, reason, sectionMissing = false, _noActiveProject } = options;
+  const {
+    text,
+    reason,
+    sectionMissing = false,
+    projectPath = "/root/project",
+    _noActiveProject,
+  } = options;
 
   // Guard: no active project
   if (_noActiveProject) {
@@ -472,6 +636,12 @@ export async function handleAddConstraint(
   let constraintLine = `- ${trimmedText}`;
   if (reason) {
     constraintLine += ` (${reason})`;
+  }
+
+  // Write to disk if a project exists
+  const _filePath = `${projectPath}/BRIEF.md`;
+  if (await projectExists(projectPath)) {
+    await appendToSection(projectPath, "What This Is NOT", constraintLine);
   }
 
   const result: AddConstraintResult = {

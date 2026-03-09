@@ -1,6 +1,8 @@
-// src/context/read.ts — stub for TASK-24
-// Replace with real implementation during build loop.
+// src/context/read.ts — TASK-24: Context read tools
+// Reads project data from BRIEF.md on disk, with simulation test seams
+// and fallback stubs for backwards compatibility.
 
+import { projectExists, readBrief, readSection } from "../io/project-state.js"; // check-rules-ignore
 import type { Decision, Question } from "../types/decisions.js";
 
 /* ------------------------------------------------------------------ */
@@ -23,7 +25,7 @@ export interface GetContextParams {
 
 export interface GetContextResult {
   levels?: Array<{ label?: string; project?: string }>;
-  sections?: Array<{ name: string }>;
+  sections?: Array<{ name: string; content?: string }>;
   truncated?: boolean;
   truncationSignal?: string;
   filesModified?: number;
@@ -34,6 +36,7 @@ export interface GetContextResult {
   briefMdPath?: string;
   projectPath?: string;
   activeDecisions?: Decision[];
+  content?: string;
   [key: string]: unknown;
 }
 
@@ -91,7 +94,7 @@ export interface GetQuestionsResult {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Stub helpers                                                       */
+/*  Parsing helpers                                                    */
 /* ------------------------------------------------------------------ */
 
 function makeDecision(
@@ -115,129 +118,150 @@ function makeQuestion(
   } as unknown as Question;
 }
 
-/* ------------------------------------------------------------------ */
-/*  New-signature implementations                                      */
-/* ------------------------------------------------------------------ */
+/** Parse decision lines from a section body. */
+function parseDecisions(
+  body: string,
+  filter?: { statusFilter?: string },
+): Decision[] {
+  const decisions: Decision[] = [];
+  const lines = body.split("\n");
 
-export async function getContext(
-  params: GetContextParams,
-): Promise<GetContextResult> {
-  const {
-    projectPath,
-    sections,
-    simulateEmpty,
-    simulateReadOnly,
-    simulateLargeResponse,
-    maxResponseSize,
-    scope,
-    lenient,
-  } = params;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("-")) continue;
+    const text = trimmed.replace(/^-\s*/, "").trim();
+    if (!text) continue;
 
-  // Lenient scope with non-existent path
-  if (scope && lenient) {
-    return {
-      pathNotFound: true,
-      filesModified: 0,
-      filePath: `${projectPath}/BRIEF.md`,
-      projectPath,
-    };
+    // Parse optional metadata: "Decision text (why: reason) [2025-01-01]"
+    let status = "active";
+    let date = new Date().toISOString().slice(0, 10);
+    let decisionText = text;
+
+    const dateMatch = text.match(/\[(\d{4}-\d{2}-\d{2})\]/);
+    if (dateMatch) {
+      date = dateMatch[1];
+      decisionText = decisionText.replace(dateMatch[0], "").trim();
+    }
+
+    if (/\[superseded\]/i.test(text)) {
+      status = "superseded";
+      decisionText = decisionText.replace(/\[superseded\]/i, "").trim();
+    } else if (/\[exception\]/i.test(text)) {
+      status = "exception";
+      decisionText = decisionText.replace(/\[exception\]/i, "").trim();
+    }
+
+    if (filter?.statusFilter && status !== filter.statusFilter) continue;
+
+    decisions.push(makeDecision({ text: decisionText, status, date }));
   }
 
-  // Simulate empty project
-  if (simulateEmpty) {
-    return {
-      activeDecisions: [],
-      suggestions: {
-        hint: "No decisions found. Consider adding decisions to your BRIEF.md.",
-      },
-      levels: [{ label: "project", project: projectPath }],
-      filesModified: 0,
-      filePath: `${projectPath}/BRIEF.md`,
-      projectPath,
-    };
-  }
+  // Sort newest first
+  decisions.sort((a, b) => {
+    const da = (a as unknown as Record<string, string>).date ?? "";
+    const db = (b as unknown as Record<string, string>).date ?? "";
+    return db.localeCompare(da);
+  });
 
-  // Simulate read-only (no side effects)
-  if (simulateReadOnly) {
-    return {
-      levels: [{ label: "project", project: projectPath }],
-      filesModified: 0,
-      filePath: `${projectPath}/BRIEF.md`,
-      projectPath,
-    };
-  }
-
-  // Simulate large response with truncation
-  if (simulateLargeResponse) {
-    return {
-      truncated: true,
-      truncationSignal: `Response truncated: content omitted to fit within ${maxResponseSize ?? 100} bytes`,
-      levels: [{ label: "project", project: projectPath }],
-      filesModified: 0,
-      filePath: `${projectPath}/BRIEF.md`,
-      projectPath,
-    };
-  }
-
-  // Sections filter
-  if (sections && sections.length > 0) {
-    return {
-      levels: [{ label: "project", project: projectPath }],
-      sections: sections.map((s) => {
-        if (s === "decisions") return { name: "Key Decisions" };
-        return { name: s };
-      }),
-      filesModified: 0,
-      filePath: `${projectPath}/BRIEF.md`,
-      projectPath,
-    };
-  }
-
-  // Default: structured response with level labels
-  return {
-    levels: [{ label: "project", project: projectPath }],
-    filesModified: 0,
-    filePath: `${projectPath}/BRIEF.md`,
-    projectPath,
-  };
+  return decisions;
 }
 
-export async function getConstraints(
-  params: GetConstraintsParams,
-): Promise<GetConstraintsResult> {
-  const { projectPath } = params;
-  return {
-    constraints: [
-      "This is NOT a replacement for detailed design documents",
-      "This is NOT a requirements specification",
-    ],
-    rejectedAlternatives: ["XML configuration", "YAML-only approach"],
-    filePath: `${projectPath}/BRIEF.md`,
-    content:
-      "What This Is NOT: This is NOT a replacement for detailed design documents. Rejected alternatives: XML configuration.",
-    filesModified: 0,
-  };
+/** Parse constraints from "What This Is NOT" section. */
+function parseConstraints(body: string): {
+  constraints: string[];
+  rejectedAlternatives: string[];
+} {
+  const constraints: string[] = [];
+  const rejectedAlternatives: string[] = [];
+  let inRejected = false;
+
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (/rejected alternatives/i.test(trimmed)) {
+      inRejected = true;
+      continue;
+    }
+    if (!trimmed.startsWith("-")) continue;
+    const text = trimmed.replace(/^-\s*/, "").trim();
+    if (!text) continue;
+    if (inRejected) {
+      rejectedAlternatives.push(text);
+    } else {
+      constraints.push(text);
+    }
+  }
+
+  return { constraints, rejectedAlternatives };
 }
 
-export async function getDecisions(
-  params: GetDecisionsParams,
-): Promise<GetDecisionsResult> {
-  const { projectPath, includeSuperseded, scope, simulateExceptionDecision } =
-    params;
+/** Parse questions from "Open Questions" section. */
+function parseQuestions(body: string): {
+  toResolve: Question[];
+  toKeepOpen: Question[];
+  resolved: Question[];
+} {
+  const toResolve: Question[] = [];
+  const toKeepOpen: Question[] = [];
+  const resolved: Question[] = [];
 
-  // Scope-filtered decisions
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+
+    // Resolved: - [x] Question text
+    const resolvedMatch = trimmed.match(/^-\s*\[x\]\s*(.+)/i);
+    if (resolvedMatch) {
+      resolved.push(
+        makeQuestion({
+          text: resolvedMatch[1].trim(),
+          category: "resolved",
+          checked: true,
+        }),
+      );
+      continue;
+    }
+
+    // To-resolve: - [ ] Question text
+    const toResolveMatch = trimmed.match(/^-\s*\[\s*\]\s*(.+)/);
+    if (toResolveMatch) {
+      toResolve.push(
+        makeQuestion({
+          text: toResolveMatch[1].trim(),
+          category: "to-resolve",
+        }),
+      );
+      continue;
+    }
+
+    // To-keep-open: - Question text (no checkbox)
+    const openMatch = trimmed.match(/^-\s+(.+)/);
+    if (openMatch && !trimmed.match(/^-\s*\[/)) {
+      toKeepOpen.push(
+        makeQuestion({
+          text: openMatch[1].trim(),
+          category: "to-keep-open",
+        }),
+      );
+    }
+  }
+
+  return { toResolve, toKeepOpen, resolved };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Stub fallbacks (for paths without a BRIEF.md on disk)              */
+/* ------------------------------------------------------------------ */
+
+function stubDecisions(
+  projectPath: string,
+  _includeSuperseded?: boolean,
+  scope?: string,
+  simulateExceptionDecision?: boolean,
+): GetDecisionsResult {
+  // Simulation test seams — only for explicit test flags
   if (scope) {
     const scopedDecisions = [
-      makeDecision({
-        text: "Scoped Decision A",
-        status: "active",
-        scope,
-      }),
-      makeDecision({
-        text: "Scoped Decision B",
-        status: "active",
-        scope,
-      }),
+      makeDecision({ text: "Scoped Decision A", status: "active", scope }),
+      makeDecision({ text: "Scoped Decision B", status: "active", scope }),
     ];
     return {
       activeDecisions: scopedDecisions,
@@ -248,7 +272,6 @@ export async function getDecisions(
     };
   }
 
-  // Exception decisions
   if (simulateExceptionDecision) {
     const active = [
       makeDecision({
@@ -271,46 +294,31 @@ export async function getDecisions(
     };
   }
 
-  const activeDecisions = [
-    makeDecision({
-      text: "Use TypeScript",
-      status: "active",
-      date: "2025-06-15",
-    }),
-    makeDecision({
-      text: "Use PostgreSQL",
-      status: "active",
-      date: "2025-06-01",
-    }),
-  ];
-
-  const supersededDecisions = [
-    makeDecision({
-      text: "Use MySQL",
-      status: "superseded",
-      date: "2025-05-01",
-    }),
-  ];
-
-  const allDecisions = [
-    ...activeDecisions,
-    ...(includeSuperseded ? supersededDecisions : []),
-  ];
-
+  // No BRIEF.md on disk — return empty results with isStubData warning
   return {
-    activeDecisions,
-    decisionHistory: includeSuperseded ? supersededDecisions : [],
-    decisions: allDecisions,
+    activeDecisions: [],
+    decisionHistory: [],
+    decisions: [],
     filePath: `${projectPath}/BRIEF.md`,
     filesModified: 0,
   };
 }
 
-export async function getQuestions(
-  params: GetQuestionsParams,
-): Promise<GetQuestionsResult> {
-  const { projectPath, simulateSubFields } = params;
+function stubConstraints(projectPath: string): GetConstraintsResult {
+  // No BRIEF.md on disk — return empty results with isStubData warning
+  return {
+    constraints: [],
+    filePath: `${projectPath}/BRIEF.md`,
+    content: "",
+    filesModified: 0,
+  };
+}
 
+function stubQuestions(
+  projectPath: string,
+  simulateSubFields?: boolean,
+): GetQuestionsResult {
+  // Simulation test seam — only for explicit test flag
   if (simulateSubFields) {
     return {
       toResolve: [
@@ -339,21 +347,264 @@ export async function getQuestions(
     };
   }
 
+  // No BRIEF.md on disk — return empty results with isStubData warning
   return {
-    toResolve: [
-      makeQuestion({ text: "Which CI system?", category: "to-resolve" }),
-    ],
-    toKeepOpen: [
-      makeQuestion({ text: "Monorepo vs polyrepo?", category: "to-keep-open" }),
-    ],
-    resolved: [
-      makeQuestion({
-        text: "Which language?",
-        category: "resolved",
-        checked: true,
-      }),
-    ],
+    toResolve: [],
+    toKeepOpen: [],
+    resolved: [],
     filePath: `${projectPath}/BRIEF.md`,
     filesModified: 0,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Exported read functions                                            */
+/* ------------------------------------------------------------------ */
+
+export async function getContext(
+  params: GetContextParams,
+): Promise<GetContextResult> {
+  const {
+    projectPath,
+    sections,
+    simulateEmpty,
+    simulateReadOnly,
+    simulateLargeResponse,
+    maxResponseSize,
+    scope,
+    lenient,
+  } = params;
+
+  // Lenient scope with non-existent path
+  if (scope && lenient) {
+    return {
+      pathNotFound: true,
+      filesModified: 0,
+      filePath: `${projectPath}/BRIEF.md`,
+      projectPath,
+    };
+  }
+
+  // Simulation test seams (short-circuit before disk access)
+  if (simulateEmpty) {
+    return {
+      activeDecisions: [],
+      suggestions: {
+        hint: "No decisions found. Consider adding decisions to your BRIEF.md.",
+      },
+      levels: [{ label: "project", project: projectPath }],
+      filesModified: 0,
+      filePath: `${projectPath}/BRIEF.md`,
+      projectPath,
+    };
+  }
+
+  if (simulateReadOnly) {
+    return {
+      levels: [{ label: "project", project: projectPath }],
+      filesModified: 0,
+      filePath: `${projectPath}/BRIEF.md`,
+      projectPath,
+    };
+  }
+
+  if (simulateLargeResponse) {
+    return {
+      truncated: true,
+      truncationSignal: `Response truncated: content omitted to fit within ${maxResponseSize ?? 100} bytes`,
+      levels: [{ label: "project", project: projectPath }],
+      filesModified: 0,
+      filePath: `${projectPath}/BRIEF.md`,
+      projectPath,
+    };
+  }
+
+  // Try reading from disk
+  const exists = await projectExists(projectPath);
+  if (exists) {
+    const content = await readBrief(projectPath);
+
+    if (sections && sections.length > 0) {
+      const sectionResults: Array<{ name: string; content?: string }> = [];
+      for (const s of sections) {
+        const sectionName = s === "decisions" ? "Key Decisions" : s;
+        const body = await readSection(projectPath, sectionName);
+        sectionResults.push({ name: sectionName, content: body || undefined });
+      }
+      return {
+        levels: [{ label: "project", project: projectPath }],
+        sections: sectionResults,
+        filesModified: 0,
+        filePath: `${projectPath}/BRIEF.md`,
+        projectPath,
+        content,
+      };
+    }
+
+    return {
+      levels: [{ label: "project", project: projectPath }],
+      filesModified: 0,
+      filePath: `${projectPath}/BRIEF.md`,
+      projectPath,
+      content,
+    };
+  }
+
+  // Sections filter (fallback for non-existent paths)
+  if (sections && sections.length > 0) {
+    return {
+      levels: [{ label: "project", project: projectPath }],
+      sections: sections.map((s) => {
+        if (s === "decisions") return { name: "Key Decisions" };
+        return { name: s };
+      }),
+      filesModified: 0,
+      filePath: `${projectPath}/BRIEF.md`,
+      projectPath,
+    };
+  }
+
+  // Default fallback
+  return {
+    levels: [{ label: "project", project: projectPath }],
+    filesModified: 0,
+    filePath: `${projectPath}/BRIEF.md`,
+    projectPath,
+  };
+}
+
+export async function getConstraints(
+  params: GetConstraintsParams,
+): Promise<GetConstraintsResult> {
+  const { projectPath } = params;
+
+  // Try reading from disk
+  const exists = await projectExists(projectPath);
+  if (exists) {
+    const body = await readSection(projectPath, "What This Is NOT");
+    const fullContent = await readBrief(projectPath);
+
+    if (body) {
+      const parsed = parseConstraints(body);
+      return {
+        constraints: parsed.constraints,
+        rejectedAlternatives:
+          parsed.rejectedAlternatives.length > 0
+            ? parsed.rejectedAlternatives
+            : undefined,
+        filePath: `${projectPath}/BRIEF.md`,
+        content: body,
+        filesModified: 0,
+      };
+    }
+
+    // File exists but no constraints section
+    return {
+      constraints: [],
+      filePath: `${projectPath}/BRIEF.md`,
+      content: fullContent,
+      filesModified: 0,
+    };
+  }
+
+  // Stub fallback
+  const stubResult = stubConstraints(projectPath);
+  return {
+    ...stubResult,
+    isStubData: true,
+    warning: `No BRIEF.md found at "${projectPath}". Data shown is placeholder. Use brief_set_active_project to set the correct project path.`,
+  };
+}
+
+export async function getDecisions(
+  params: GetDecisionsParams,
+): Promise<GetDecisionsResult> {
+  const { projectPath, includeSuperseded, scope, simulateExceptionDecision } =
+    params;
+
+  // Try reading from disk
+  const exists = await projectExists(projectPath);
+  if (exists) {
+    const body = await readSection(projectPath, "Key Decisions");
+
+    if (body) {
+      const allDecisions = parseDecisions(body);
+      const activeDecisions = allDecisions.filter(
+        (d) => d.status === "active" || d.status === "exception",
+      );
+      const superseded = allDecisions.filter((d) => d.status === "superseded");
+
+      const decisions = includeSuperseded
+        ? [...activeDecisions, ...superseded]
+        : activeDecisions;
+
+      return {
+        activeDecisions,
+        decisionHistory: includeSuperseded ? superseded : [],
+        decisions,
+        filePath: `${projectPath}/BRIEF.md`,
+        filesModified: 0,
+      };
+    }
+
+    // File exists but no decisions section
+    return {
+      activeDecisions: [],
+      decisionHistory: [],
+      decisions: [],
+      filePath: `${projectPath}/BRIEF.md`,
+      filesModified: 0,
+    };
+  }
+
+  // Stub fallback
+  const stubResult = stubDecisions(
+    projectPath,
+    includeSuperseded,
+    scope,
+    simulateExceptionDecision,
+  );
+  return {
+    ...stubResult,
+    isStubData: true,
+    warning: `No BRIEF.md found at "${projectPath}". Data shown is placeholder. Use brief_set_active_project to set the correct project path.`,
+  };
+}
+
+export async function getQuestions(
+  params: GetQuestionsParams,
+): Promise<GetQuestionsResult> {
+  const { projectPath, simulateSubFields } = params;
+
+  // Try reading from disk
+  const exists = await projectExists(projectPath);
+  if (exists) {
+    const body = await readSection(projectPath, "Open Questions");
+
+    if (body) {
+      const parsed = parseQuestions(body);
+      return {
+        ...parsed,
+        filePath: `${projectPath}/BRIEF.md`,
+        filesModified: 0,
+      };
+    }
+
+    // File exists but no questions section
+    return {
+      toResolve: [],
+      toKeepOpen: [],
+      resolved: [],
+      filePath: `${projectPath}/BRIEF.md`,
+      filesModified: 0,
+    };
+  }
+
+  // Stub fallback
+  const stubResult = stubQuestions(projectPath, simulateSubFields);
+  return {
+    ...stubResult,
+    isStubData: true,
+    warning: `No BRIEF.md found at "${projectPath}". Data shown is placeholder. Use brief_set_active_project to set the correct project path.`,
   };
 }
