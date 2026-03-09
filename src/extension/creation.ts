@@ -220,6 +220,7 @@ export async function addExtension(params: {
   subsections?: string[];
   simulateOrphanHeading?: boolean;
   projectPath?: string;
+  sectionModes?: Record<string, "freeform" | "structured">;
 }): Promise<{
   created: boolean;
   alreadyExists?: boolean;
@@ -313,10 +314,15 @@ export async function addExtension(params: {
   }
 
   /* Generate content with guidance prompts */
+  const sectionModes = params.sectionModes;
   const contentLines = [`# ${headingFormat}`, ""];
-  const specPrompts = SUBSECTION_PROMPTS[metadataFormat];
   for (const sub of resolvedSubsections) {
     contentLines.push(`## ${sub}`, "");
+    // Insert section-dataset marker for structured sections (WP7/GAP-G)
+    if (sectionModes?.[sub] === "structured") {
+      contentLines.push(`<!-- brief:section-dataset -->`, "");
+    }
+    const specPrompts = SUBSECTION_PROMPTS[metadataFormat];
     const prompt = specPrompts?.[sub] ?? DEFAULT_SUBSECTION_PROMPTS[sub];
     if (prompt) {
       contentLines.push(`*${prompt}*`, "");
@@ -359,6 +365,16 @@ export async function addExtension(params: {
       ? `Consider installing: ${associatedOntologies.join(", ")}`
       : undefined;
 
+  /* Reference prompt (WP6/GAP-F) */
+  const referencePrompt = `Consider adding references for this extension via brief_add_reference or brief_suggest_references.`;
+
+  /* Structured section next steps (WP7/GAP-G) */
+  const hasStructured =
+    sectionModes && Object.values(sectionModes).some((m) => m === "structured");
+  const nextSteps = hasStructured
+    ? "For structured sections: use brief_ontology_draft, brief_search_ontology, or brief_discover_ontologies to link a dataset."
+    : undefined;
+
   return {
     created: true,
     alreadyExists: false,
@@ -369,6 +385,9 @@ export async function addExtension(params: {
     subsections: resolvedSubsections,
     success: true,
     content,
+    referencePrompt,
+    ...(sectionModes && { sectionModes }),
+    ...(nextSteps && { nextSteps }),
     ...(persisted && { persisted: true }),
     ...(resultFilePath && { filePath: resultFilePath }),
     ...(associatedOntologies &&
@@ -379,6 +398,27 @@ export async function addExtension(params: {
 
 /** @deprecated Use addExtension */
 export const createExtension = addExtension;
+
+/**
+ * Get known extension slugs and their subsections.
+ * Returns both spec-defined and session-created extensions.
+ * Used by tag scoping (WP2/GAP-A+E) to validate sections belong to extensions.
+ */
+export function getKnownExtensions(): Map<
+  string,
+  { name: string; subsections: string[] }
+> {
+  const result = new Map<string, { name: string; subsections: string[] }>();
+  for (const [slug, ext] of Object.entries(SPEC_EXTENSIONS)) {
+    result.set(slug, { name: ext.name, subsections: ext.subsections });
+  }
+  for (const [slug, ext] of createdExtensions) {
+    if (!result.has(slug)) {
+      result.set(slug, { name: ext.name, subsections: ext.subsections });
+    }
+  }
+  return result;
+}
 
 /* ------------------------------------------------------------------ */
 /*  listExtensions (COMPAT-05)                                         */

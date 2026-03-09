@@ -8,6 +8,7 @@ import {
   readBriefSection,
   writeBriefSection,
 } from "../writer/core.js"; // check-rules-ignore
+import { syncUpdatedTimestamp } from "../writer/metadata-sync.js"; // check-rules-ignore
 import { atomicWriteFile, readFileSafe } from "./file-io.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -95,13 +96,63 @@ export async function readBriefMetadata(
   return parseMetadata(content);
 }
 
-/** Write raw content to a project's BRIEF.md atomically. */
+/** Write raw content to a project's BRIEF.md atomically.
+ *  Auto-updates the **Updated:** timestamp on every write. */
 export async function writeBrief(
   projectPath: string,
   content: string,
 ): Promise<void> {
   await ensureProjectDir(projectPath);
-  await atomicWriteFile(briefPath(projectPath), content);
+  const updated = syncUpdatedTimestamp(content);
+  await atomicWriteFile(briefPath(projectPath), updated);
+}
+
+/** Link an ontology dataset to a section via an HTML comment marker (WP7/GAP-G).
+ *  Idempotent: replaces existing link if present, inserts if not. */
+export async function linkSectionDataset(
+  projectPath: string,
+  section: string,
+  ontologyName: string,
+): Promise<void> {
+  let content = await readBrief(projectPath);
+  const marker = `<!-- brief:section-dataset ${ontologyName} -->`;
+  const oldMarkerRe = new RegExp(
+    `(## ${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\n)(?:<!-- brief:section-dataset [^>]*-->\\s*\\n)?`,
+  );
+
+  if (oldMarkerRe.test(content)) {
+    content = content.replace(oldMarkerRe, `$1${marker}\n`);
+  } else {
+    // Section heading not found — append at end
+    content = `${content.trimEnd()}\n\n## ${section}\n${marker}\n`;
+  }
+
+  await writeBrief(projectPath, content);
+}
+
+/** Parse section-dataset comments from BRIEF.md content (WP7/GAP-G). */
+export function parseSectionDatasets(
+  content: string,
+): Array<{ section: string; ontologyName: string }> {
+  const results: Array<{ section: string; ontologyName: string }> = [];
+  const lines = content.split("\n");
+  let currentSection = "";
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^## (.+)$/);
+    if (headingMatch) {
+      currentSection = headingMatch[1].trim();
+      continue;
+    }
+    const datasetMatch = line.match(/<!-- brief:section-dataset (.+?) -->/);
+    if (datasetMatch && currentSection) {
+      results.push({
+        section: currentSection,
+        ontologyName: datasetMatch[1],
+      });
+    }
+  }
+  return results;
 }
 
 /** Create a new BRIEF.md for a project and write it to disk. */
