@@ -11,8 +11,13 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { checkNodeVersion } from "../check-node-version.js";
+import { loadWizardState } from "../cli/setup-wizard.js"; // check-rules-ignore
 import { createLogger } from "../observability/logger.js";
-import { TOOL_HANDLERS } from "./dispatch.js";
+import { initializeFromDisk as initOntology } from "../ontology/management.js"; // check-rules-ignore
+import { initializeFromDisk as initLookup } from "../reference/lookup.js"; // check-rules-ignore
+import { initializeFromDisk as initSuggestion } from "../reference/suggestion.js"; // check-rules-ignore
+import { initializeFromDisk as initTypeCreation } from "../type-intelligence/creation.js"; // check-rules-ignore
+import { setServer, TOOL_HANDLERS } from "./dispatch.js";
 
 // ---------------------------------------------------------------------------
 // Logger
@@ -199,6 +204,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         scope: { type: "string", description: "Project scope path." },
       },
     },
@@ -210,6 +220,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         scope: { type: "string", description: "Project scope path." },
         status: {
           type: "string",
@@ -226,6 +241,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         scope: { type: "string", description: "Project scope path." },
         category: {
           type: "string",
@@ -244,6 +264,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         title: {
           type: "string",
           description: "Decision title (required, 1-500 chars).",
@@ -277,6 +302,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         constraint: { type: "string", description: "Constraint text." },
         section: {
           type: "string",
@@ -293,6 +323,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         text: { type: "string", description: "Question text." },
         category: {
           type: "string",
@@ -324,6 +359,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         text: { type: "string", description: "Question text to resolve." },
         decision: {
           type: "string",
@@ -341,6 +381,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         tool_name: { type: "string", description: "External tool name." },
         date: { type: "string", description: "Session date (YYYY-MM-DD)." },
         summary: { type: "string", description: "Session summary." },
@@ -364,6 +409,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project if not specified.",
+        },
         heading: { type: "string", description: "Section heading to update." },
         content: {
           type: "string",
@@ -397,11 +447,21 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_check_conflicts",
     description:
-      "Check for conflicting decisions in BRIEF.md hierarchy. brief-mcp scope: conflict detection. Walks the hierarchy for contradictions.",
+      "Check for conflicting decisions in BRIEF.md hierarchy. brief-mcp scope: conflict detection. Set semantic=true for AI-powered deep analysis (requires client sampling support).",
     inputSchema: {
       type: "object",
       properties: {
         scope: { type: "string", description: "Project scope path." },
+        semantic: {
+          type: "boolean",
+          description:
+            "Enable AI semantic conflict detection via sampling. Default: false.",
+        },
+        project_type: {
+          type: "string",
+          description:
+            "Project type for domain-aware analysis (e.g. 'music-release'). Loads domain-specific conflict patterns from the type guide.",
+        },
       },
     },
   },
@@ -607,7 +667,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_create_type_guide",
     description:
-      "Create or update a type guide file. brief-mcp scope: type guide authoring. Defines recommended structure for a project type.",
+      "Create or update a type guide file. brief-mcp scope: type guide authoring. If body is empty, a template with sections (Overview, Key Dimensions, Suggested Workflow, Known Tensions, Quality Signals) is generated. Include a '## Known Tensions' section to enable domain-aware conflict detection.",
     inputSchema: {
       type: "object",
       properties: {
@@ -681,6 +741,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "array",
           items: { type: "string" },
           description: "Optional subsections to include.",
+        },
+        project_path: {
+          type: "string",
+          description:
+            "Project path. Defaults to active project. Extension content is persisted to BRIEF.md.",
         },
       },
       required: ["extension_name"],
@@ -1201,6 +1266,9 @@ export function createServer(): Server {
     { capabilities: { tools: {} } },
   );
 
+  // Wire server instance to dispatch layer for sampling access
+  setServer(server);
+
   // List tools handler
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return { tools: getRegisteredTools() };
@@ -1229,6 +1297,19 @@ export function createServer(): Server {
 // ---------------------------------------------------------------------------
 
 export async function startServer(): Promise<void> {
+  // Initialize all modules from disk (best-effort, non-fatal)
+  try {
+    await Promise.all([
+      initOntology(),
+      initSuggestion(),
+      initLookup(),
+      initTypeCreation(),
+      loadWizardState(),
+    ]);
+  } catch {
+    // Disk init failures are non-fatal — fixture data still works
+  }
+
   const server = createServer();
   const transport = new StdioServerTransport();
   try {

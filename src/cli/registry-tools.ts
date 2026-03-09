@@ -1,5 +1,9 @@
 // src/cli/registry-tools.ts — TASK-49 Compatible MCP Registry, Add-Tool & Registry Search
 
+import path from "node:path";
+import { getConfigDir } from "../config/config.js"; // check-rules-ignore
+import { readFileSafe } from "../io/file-io.js"; // check-rules-ignore
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -97,6 +101,26 @@ function loadBundledRegistry(): RegistryEntry[] {
   return BUNDLED_REGISTRY.map((e) => ({ ...e }));
 }
 
+/** Load user-added registry entries from ~/.brief/registry.json (best-effort). */
+async function loadUserRegistry(): Promise<RegistryEntry[]> {
+  try {
+    const configDir = getConfigDir();
+    const registryPath = path.join(configDir, "registry.json");
+    const raw = await readFileSafe(registryPath);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed as RegistryEntry[];
+    }
+    if (parsed && Array.isArray(parsed.entries)) {
+      return parsed.entries as RegistryEntry[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 function isCacheValid(cache: CacheState): boolean {
   return Date.now() - cache.timestamp < cache.ttl;
 }
@@ -108,6 +132,23 @@ function ensureCache(): RegistryEntry[] {
       timestamp: Date.now(),
       ttl: CACHE_TTL,
     };
+    // Async merge of user registry entries (best-effort, non-blocking)
+    loadUserRegistry()
+      .then((userEntries) => {
+        if (userEntries.length > 0 && registryCache) {
+          const existingNames = new Set(
+            registryCache.entries.map((e) => e.name),
+          );
+          for (const entry of userEntries) {
+            if (!existingNames.has(entry.name)) {
+              registryCache.entries.push(entry);
+            }
+          }
+        }
+      })
+      .catch(() => {
+        /* best-effort */
+      });
   }
   return registryCache.entries;
 }

@@ -1,7 +1,11 @@
 // src/server/signal-handling.ts — TASK-50: Signal handling, graceful shutdown & crash recovery
 
+import * as fsp from "node:fs/promises";
+import * as path from "node:path";
+import { getConfigDir } from "../config/config.js";
 import type { Logger } from "../observability/logger.js";
 import { createLogger } from "../observability/logger.js";
+import { listInstalledPacks } from "../ontology/pack-loader.js"; // check-rules-ignore
 import type { ShutdownState } from "../types/server.js";
 
 // ---------------------------------------------------------------------------
@@ -321,6 +325,43 @@ export function getStartupInfo(): {
     packCount: 0,
     guidesCount: 0,
     duration: 0,
+  };
+}
+
+export async function getStartupInfoFromDisk(): Promise<{
+  version: string;
+  transport: string;
+  workspaceRoots: string[];
+  packCount: number;
+  guidesCount: number;
+  duration: number;
+}> {
+  const start = Date.now();
+  let packCount = 0;
+  let guidesCount = 0;
+
+  try {
+    const packs = await listInstalledPacks();
+    packCount = packs.length;
+  } catch {
+    // best-effort
+  }
+
+  try {
+    const guidesDir = path.join(getConfigDir(), "type-guides");
+    const files = await fsp.readdir(guidesDir);
+    guidesCount = files.filter((f) => f.endsWith(".md")).length;
+  } catch {
+    // best-effort
+  }
+
+  return {
+    version: "0.4.0",
+    transport: "stdio",
+    workspaceRoots: ["/workspace"],
+    packCount,
+    guidesCount,
+    duration: Date.now() - start,
   };
 }
 

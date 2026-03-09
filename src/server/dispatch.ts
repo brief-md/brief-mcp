@@ -2,6 +2,7 @@
 // Maps MCP tool names to their implementation functions.
 // Cross-module imports are intentional: this is the server's composition root.
 
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js"; // check-rules-ignore
 import { searchRegistry } from "../cli/registry-tools.js"; // check-rules-ignore
 import {
   getConstraints,
@@ -31,15 +32,24 @@ import {
   suggestReferences,
 } from "../reference/suggestion.js"; // check-rules-ignore
 import { addReference } from "../reference/writing.js"; // check-rules-ignore
+import { extractConflictPatterns } from "../type-intelligence/conflict-patterns.js"; // check-rules-ignore
 import { createTypeGuide } from "../type-intelligence/creation.js"; // check-rules-ignore
 import { getTypeGuide } from "../type-intelligence/loading.js"; // check-rules-ignore
-import { checkConflicts } from "../validation/conflicts.js"; // check-rules-ignore
+import type { CheckConflictsParams } from "../validation/conflicts.js"; // check-rules-ignore
 import { lintBrief } from "../validation/lint.js"; // check-rules-ignore
+import {
+  checkConflictsWithSemantic,
+  type SamplingFn,
+} from "../validation/semantic-conflicts.js"; // check-rules-ignore
 import {
   getProjectFrameworks,
   removeOntology,
 } from "../visibility/frameworks.js"; // check-rules-ignore
-import { addWorkspace, setActiveProject } from "../workspace/active.js"; // check-rules-ignore
+import {
+  addWorkspace,
+  getActiveProject,
+  setActiveProject,
+} from "../workspace/active.js"; // check-rules-ignore
 import { createProject, createSubProject } from "../workspace/creation.js"; // check-rules-ignore
 import { listProjects } from "../workspace/listing.js"; // check-rules-ignore
 import {
@@ -48,6 +58,16 @@ import {
   startTutorial,
 } from "../workspace/reentry.js"; // check-rules-ignore
 
+// ---------------------------------------------------------------------------
+// Server reference for sampling access
+// ---------------------------------------------------------------------------
+
+let _server: Server | undefined;
+
+export function setServer(server: Server): void {
+  _server = server;
+}
+
 type Args = Record<string, unknown>;
 
 type ToolHandler = (args: Args) => Promise<unknown> | unknown;
@@ -55,6 +75,17 @@ type ToolHandler = (args: Args) => Promise<unknown> | unknown;
 /** Cast args to a typed param object. Safe because MCP param validation runs first. */
 function typed<T>(args: Args): T {
   return args as unknown as T;
+}
+
+/** Inject active project path when project_path is not explicitly provided. */
+function withProjectPath(args: Args): Args {
+  if (!args.project_path && !args.projectPath) {
+    const active = getActiveProject();
+    if (active?.path) {
+      return { ...args, project_path: active.path };
+    }
+  }
+  return args;
 }
 
 /** Remap MCP snake_case param names to function camelCase param names. */
@@ -116,35 +147,105 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
   // Context read
   brief_get_context: (args) =>
-    getContext(typed<Parameters<typeof getContext>[0]>(args)),
+    getContext(
+      typed<Parameters<typeof getContext>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
   brief_get_constraints: (args) =>
-    getConstraints(typed<Parameters<typeof getConstraints>[0]>(args)),
+    getConstraints(
+      typed<Parameters<typeof getConstraints>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
   brief_get_decisions: (args) =>
-    getDecisions(typed<Parameters<typeof getDecisions>[0]>(args)),
+    getDecisions(
+      typed<Parameters<typeof getDecisions>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
   brief_get_questions: (args) =>
-    getQuestions(typed<Parameters<typeof getQuestions>[0]>(args)),
+    getQuestions(
+      typed<Parameters<typeof getQuestions>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
 
   // Context write
-  brief_add_decision: (args) => addDecision(args),
+  brief_add_decision: (args) =>
+    addDecision(remap(withProjectPath(args), { project_path: "projectPath" })),
   brief_add_constraint: (args) =>
-    handleAddConstraint(typed<Parameters<typeof handleAddConstraint>[0]>(args)),
+    handleAddConstraint(
+      typed<Parameters<typeof handleAddConstraint>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
   brief_add_question: (args) =>
-    handleAddQuestion(typed<Parameters<typeof handleAddQuestion>[0]>(args)),
+    handleAddQuestion(
+      typed<Parameters<typeof handleAddQuestion>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
   brief_resolve_question: (args) =>
     handleResolveQuestion(
-      typed<Parameters<typeof handleResolveQuestion>[0]>(args),
+      typed<Parameters<typeof handleResolveQuestion>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
     ),
   brief_capture_external_session: (args) =>
     handleCaptureExternalSession(
-      typed<Parameters<typeof handleCaptureExternalSession>[0]>(args),
+      typed<Parameters<typeof handleCaptureExternalSession>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
     ),
   brief_update_section: (args) =>
-    handleUpdateSection(typed<Parameters<typeof handleUpdateSection>[0]>(args)),
+    handleUpdateSection(
+      typed<Parameters<typeof handleUpdateSection>[0]>(
+        remap(withProjectPath(args), { project_path: "projectPath" }),
+      ),
+    ),
 
   // Validation
   brief_lint: (args) => lintBrief(String(args.content ?? "")),
-  brief_check_conflicts: (args) =>
-    checkConflicts(typed<Parameters<typeof checkConflicts>[0]>(args)),
+  brief_check_conflicts: async (args) => {
+    const server = _server;
+    const samplingFn: SamplingFn | undefined = server
+      ? (params) =>
+          server.createMessage(
+            params as Parameters<typeof server.createMessage>[0],
+          )
+      : undefined;
+    const isSamplingAvailable = server
+      ? () => !!server.getClientCapabilities()?.sampling
+      : undefined;
+
+    // Resolve domain conflict patterns from type guide (best-effort)
+    let domainPairs: ReadonlyArray<readonly [string, string]> | undefined;
+    let tensionProse: string | undefined;
+    if (args.project_type) {
+      try {
+        const result = await getTypeGuide({ type: String(args.project_type) });
+        if (result.guide && !result.isGeneric) {
+          const patterns = extractConflictPatterns(result.guide);
+          domainPairs = patterns.pairs.length > 0 ? patterns.pairs : undefined;
+          tensionProse = patterns.tensionProse;
+        }
+      } catch {
+        /* type guide lookup is best-effort */
+      }
+    }
+
+    return checkConflictsWithSemantic(
+      {
+        ...typed<CheckConflictsParams>(args),
+        domainPatterns: domainPairs,
+        semantic: !!args.semantic,
+      },
+      samplingFn,
+      isSamplingAvailable,
+      tensionProse ? { tensionProse } : undefined,
+    );
+  },
 
   // Ontology
   brief_search_ontology: (args) =>
@@ -221,7 +322,10 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   brief_add_extension: (args) =>
     addExtension(
       typed<Parameters<typeof addExtension>[0]>(
-        remap(args, { extension_name: "extensionName" }), // check-rules-ignore
+        remap(withProjectPath(args), {
+          extension_name: "extensionName", // check-rules-ignore
+          project_path: "projectPath",
+        }),
       ),
     ),
   brief_list_extensions: (args) => listExtensions(args),
@@ -229,7 +333,9 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   // Visibility
   brief_get_project_frameworks: (args) =>
     getProjectFrameworks(
-      typed<Parameters<typeof getProjectFrameworks>[0]>(args),
+      typed<Parameters<typeof getProjectFrameworks>[0]>(
+        remap(args, { project_path: "projectPath" }),
+      ),
     ),
   brief_remove_ontology: (args) =>
     removeOntology(

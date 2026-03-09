@@ -1,6 +1,9 @@
 // src/cli/setup-wizard.ts — TASK-48 Setup Wizard
 
 import fs from "node:fs";
+import * as path from "node:path";
+import { getConfigDir } from "../config/config.js";
+import { atomicWriteFile, readFileSafe } from "../io/file-io.js"; // check-rules-ignore
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -18,6 +21,50 @@ export function _resetState(): void {
   lastCompletedStep = undefined;
   wizardCompleted = false;
   storedConfig = {};
+}
+
+// ---------------------------------------------------------------------------
+// Wizard state persistence (cross-session resume)
+// ---------------------------------------------------------------------------
+
+function wizardStatePath(): string {
+  return path.join(getConfigDir(), "wizard-state.json");
+}
+
+async function saveWizardState(): Promise<void> {
+  try {
+    const state = JSON.stringify({
+      lastCompletedStep,
+      wizardCompleted,
+      storedConfig,
+    });
+    await atomicWriteFile(wizardStatePath(), state);
+  } catch {
+    // Non-fatal — wizard still works in-memory
+  }
+}
+
+export async function loadWizardState(): Promise<void> {
+  try {
+    const raw = await readFileSafe(wizardStatePath());
+    if (!raw) return;
+    const state = JSON.parse(raw) as {
+      lastCompletedStep?: number;
+      wizardCompleted?: boolean;
+      storedConfig?: Record<string, unknown>;
+    };
+    if (state.lastCompletedStep !== undefined) {
+      lastCompletedStep = state.lastCompletedStep;
+    }
+    if (state.wizardCompleted) {
+      wizardCompleted = true;
+    }
+    if (state.storedConfig) {
+      storedConfig = state.storedConfig;
+    }
+  } catch {
+    // Non-fatal — start fresh
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -278,6 +325,7 @@ export async function initWizard(options?: {
   // All steps complete
   wizardCompleted = true;
   result.lastCompletedStep = lastCompletedStep;
+  await saveWizardState();
   return result;
 }
 
