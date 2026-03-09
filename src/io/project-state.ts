@@ -1,0 +1,163 @@
+// src/io/project-state.ts — Central BRIEF.md read/write manager
+// Wraps writer/core.ts and file-io.ts into project-level operations.
+
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+import {
+  createNewFile,
+  readBriefSection,
+  writeBriefSection,
+} from "../writer/core.js"; // check-rules-ignore
+import { atomicWriteFile, readFileSafe } from "./file-io.js";
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const BRIEF_FILENAME = "BRIEF.md";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function briefPath(projectPath: string): string {
+  return path.join(projectPath, BRIEF_FILENAME);
+}
+
+// ── Metadata parsing ─────────────────────────────────────────────────────────
+
+export interface BriefMetadata {
+  project: string;
+  type: string;
+  status: string;
+  created: string;
+  updated: string;
+  extensions: string[];
+  ontologies: string[];
+  version: number;
+  [key: string]: unknown;
+}
+
+/** Parse **Key:** Value metadata lines from BRIEF.md content. */
+export function parseMetadata(content: string): BriefMetadata {
+  const meta: Record<string, string> = {};
+  const metaRegex = /^\*\*(\w[\w\s]*):\*\*\s*(.*)$/gm;
+  let match = metaRegex.exec(content);
+  while (match !== null) {
+    const key = match[1].trim().toLowerCase();
+    meta[key] = match[2].trim();
+    match = metaRegex.exec(content);
+  }
+
+  const parseList = (val: string | undefined): string[] => {
+    if (!val) return [];
+    return val
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  };
+
+  return {
+    project: meta.project ?? "",
+    type: meta.type ?? "",
+    status: meta.status ?? "active",
+    created: meta.created ?? "",
+    updated: meta.updated ?? "",
+    extensions: parseList(meta.extensions),
+    ontologies: parseList(meta.ontologies),
+    version: Number.parseInt(meta.version ?? "1", 10) || 1,
+  };
+}
+
+// ── Project-level operations ─────────────────────────────────────────────────
+
+/** Check whether a BRIEF.md exists at the given project path. */
+export async function projectExists(projectPath: string): Promise<boolean> {
+  try {
+    await fsp.stat(briefPath(projectPath));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Create the project directory if it doesn't exist. */
+export async function ensureProjectDir(projectPath: string): Promise<void> {
+  await fsp.mkdir(projectPath, { recursive: true });
+}
+
+/** Read the raw content of a project's BRIEF.md. */
+export async function readBrief(projectPath: string): Promise<string> {
+  return readFileSafe(briefPath(projectPath));
+}
+
+/** Read and parse a project's BRIEF.md metadata. */
+export async function readBriefMetadata(
+  projectPath: string,
+): Promise<BriefMetadata> {
+  const content = await readBrief(projectPath);
+  return parseMetadata(content);
+}
+
+/** Write raw content to a project's BRIEF.md atomically. */
+export async function writeBrief(
+  projectPath: string,
+  content: string,
+): Promise<void> {
+  await ensureProjectDir(projectPath);
+  await atomicWriteFile(briefPath(projectPath), content);
+}
+
+/** Create a new BRIEF.md for a project and write it to disk. */
+export async function createProject(params: {
+  projectPath: string;
+  project: string;
+  type: string;
+  sectionContent?: Record<string, string>;
+}): Promise<string> {
+  const content = await createNewFile({
+    project: params.project,
+    type: params.type,
+    sectionContent: params.sectionContent,
+  });
+  await writeBrief(params.projectPath, content);
+  return content;
+}
+
+/** Read a specific section from a project's BRIEF.md. */
+export async function readSection(
+  projectPath: string,
+  sectionName: string,
+): Promise<string> {
+  const { content } = await readBriefSection(
+    briefPath(projectPath),
+    sectionName,
+  );
+  return content;
+}
+
+/** Write a specific section to a project's BRIEF.md. */
+export async function writeSection(
+  projectPath: string,
+  sectionName: string,
+  content: string,
+): Promise<boolean> {
+  const result = await writeBriefSection(
+    briefPath(projectPath),
+    sectionName,
+    content,
+  );
+  return result.success;
+}
+
+/** Append a line to a section, creating it if needed. */
+export async function appendToSection(
+  projectPath: string,
+  sectionName: string,
+  line: string,
+): Promise<boolean> {
+  const existing = await readSection(projectPath, sectionName);
+  const updated = existing ? `${existing}\n${line}` : line;
+  return writeSection(projectPath, sectionName, updated);
+}
+
+/** Get the resolved path to BRIEF.md for a project. */
+export function getBriefPath(projectPath: string): string {
+  return briefPath(projectPath);
+}
