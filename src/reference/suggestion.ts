@@ -4,110 +4,14 @@ import type {
   ReferenceSuggestionResult,
   SuggestedReference,
 } from "../types/references.js";
+import {
+  FALLBACK_REFERENCE_PACKS,
+  loadReferencePacks,
+} from "./pack-references.js";
 
-// ── Default fixture data (mirrors lookup.ts DEFAULT_FIXTURE_PACKS) ────
+// ── Default fixture data (loaded from shared pack-references) ────
 
-const DEFAULT_FIXTURE_PACKS = [
-  {
-    name: "theme-pack",
-    entries: [
-      {
-        id: "nostalgia",
-        label: "Nostalgia",
-        references: [
-          {
-            creator: "Bon Iver",
-            title: "For Emma, Forever Ago",
-            type: "album",
-          },
-          {
-            creator: "Jean-Pierre Jeunet",
-            title: "Amélie",
-            type: "film",
-          },
-        ],
-        categories: ["emotion"],
-        tags: ["indie-folk", "cinema"],
-      },
-      {
-        id: "freedom",
-        label: "Freedom",
-        references: [
-          {
-            creator: "Jon Krakauer",
-            title: "Into the Wild",
-            type: "book",
-          },
-          { creator: "Sean Penn", title: "Into the Wild", type: "film" },
-        ],
-        categories: ["theme"],
-        tags: ["adventure", "wilderness"],
-      },
-      {
-        id: "spirit",
-        label: "千と千尋の神隠し",
-        references: [
-          {
-            creator: "Hayao Miyazaki",
-            title: "千と千尋の神隠し",
-            type: "film",
-          },
-        ],
-        categories: ["theme"],
-        tags: ["animation", "japanese"],
-      },
-      {
-        id: "crosspack-a",
-        label: "Shared",
-        references: [
-          { creator: "Various", title: "Common Title", type: "song" },
-        ],
-        categories: ["misc"],
-        tags: ["shared"],
-      },
-      {
-        id: "new-entry",
-        label: "New Discovery",
-        references: [
-          {
-            creator: "Newly Installed Artist",
-            title: "New Work",
-            type: "album",
-          },
-        ],
-        categories: ["discovery"],
-        tags: ["new"],
-      },
-    ],
-  },
-  {
-    name: "film-pack",
-    entries: [
-      {
-        id: "wild-song",
-        label: "Wild Soundtrack",
-        references: [
-          {
-            creator: "Eddie Vedder",
-            title: "Into the Wild",
-            type: "song",
-          },
-        ],
-        categories: ["soundtrack"],
-        tags: ["rock"],
-      },
-      {
-        id: "crosspack-b",
-        label: "Shared B",
-        references: [
-          { creator: "Various", title: "Common Title", type: "book" },
-        ],
-        categories: ["misc"],
-        tags: ["shared"],
-      },
-    ],
-  },
-];
+const DEFAULT_FIXTURE_PACKS = FALLBACK_REFERENCE_PACKS;
 
 // ── Extension configuration ──────────────────────────────────────────
 
@@ -409,4 +313,14 @@ export async function suggestReferences(params: {
 /** @internal Reset module-level state for test isolation */
 export function _resetState(): void {
   _buildState(DEFAULT_FIXTURE_PACKS);
+}
+
+/** Load reference packs from disk (called at server startup). */
+export async function initializeFromDisk(): Promise<void> {
+  try {
+    const packs = await loadReferencePacks();
+    _buildState(packs);
+  } catch {
+    // Disk load failed — keep fixture data
+  }
 }

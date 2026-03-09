@@ -1,3 +1,7 @@
+import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
+import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
+import { syncExtensionMetadata } from "../writer/metadata-sync.js"; // check-rules-ignore
+
 /* ------------------------------------------------------------------ */
 /*  Bundled Extension Registry — six spec-defined extensions (COMPAT-05) */
 /* ------------------------------------------------------------------ */
@@ -61,12 +65,80 @@ const SPEC_EXTENSIONS: Record<string, ExtensionInfo> = {
 
 const ALL_SPEC_SLUGS = Object.keys(SPEC_EXTENSIONS);
 
+/** Valid extension slugs for validation (the 6 spec-defined extensions). */
+export const VALID_EXTENSION_SLUGS: ReadonlySet<string> = new Set(
+  ALL_SPEC_SLUGS,
+);
+
 const DEFAULT_CUSTOM_SUBSECTIONS = [
   "Direction/Intent",
   "Constraints",
   "References",
   "Open Questions",
 ];
+
+/* ------------------------------------------------------------------ */
+/*  Subsection Guidance Prompts (Gap 8)                                */
+/* ------------------------------------------------------------------ */
+
+const SUBSECTION_PROMPTS: Record<string, Record<string, string>> = {
+  sonic_arts: {
+    "Sound Palette":
+      "Define the sonic character: instruments, textures, frequency ranges, spatial qualities.",
+    "Production Approach":
+      "Recording methods, mixing philosophy, production tools and constraints.",
+    "Sonic References":
+      "Reference tracks, artists, or sonic qualities to draw from or avoid.",
+  },
+  narrative_creative: {
+    "Narrative Arc":
+      "Story structure, pacing, key plot points or narrative milestones.",
+    "Character Development":
+      "Core characters, their arcs, voice, and relationships.",
+    "Voice & Tone":
+      "Narrative voice (first/third person), tone, register, emotional range.",
+  },
+  lyrical_craft: {
+    "Lyrical Themes":
+      "Core themes, imagery, emotional territory, subject matter boundaries.",
+    "Rhyme Scheme":
+      "Rhyme pattern, internal rhymes, syllabic constraints, flow priorities.",
+    "Verse Structure":
+      "Verse/chorus/bridge structure, line lengths, stanza patterns.",
+  },
+  visual_storytelling: {
+    "Visual Language":
+      "Visual style, color grading approach, lighting philosophy, aspect ratio.",
+    "Shot Composition":
+      "Framing conventions, camera movement, lens choices, blocking approach.",
+    "Color Palette":
+      "Dominant colors, color symbolism, palette constraints, mood mapping.",
+  },
+  strategic_planning: {
+    "Strategic Objectives":
+      "Primary goals, success metrics, timeline milestones, priority ranking.",
+    "Market Analysis":
+      "Target market, competitive landscape, positioning, differentiation.",
+    "Success Metrics":
+      "KPIs, measurement frequency, targets, reporting structure.",
+  },
+  system_design: {
+    "Architecture Overview":
+      "System topology, component relationships, data flow, deployment model.",
+    "Component Design":
+      "Key components, interfaces, responsibilities, dependency direction.",
+    "Integration Points":
+      "External APIs, data sources, authentication, protocol choices.",
+  },
+};
+
+const DEFAULT_SUBSECTION_PROMPTS: Record<string, string> = {
+  "Direction/Intent":
+    "What is the creative or strategic direction for this area?",
+  Constraints: "What boundaries, limitations, or rules apply?",
+  References: "What existing works, standards, or examples inform this?",
+  "Open Questions": "What remains unresolved or needs exploration?",
+};
 
 /* ------------------------------------------------------------------ */
 /*  Name Conversion (PARSE-13, WRITE-08)                               */
@@ -147,6 +219,7 @@ export async function addExtension(params: {
   simulateAmbiguous?: boolean;
   subsections?: string[];
   simulateOrphanHeading?: boolean;
+  projectPath?: string;
 }): Promise<{
   created: boolean;
   alreadyExists?: boolean;
@@ -239,10 +312,15 @@ export async function addExtension(params: {
     };
   }
 
-  /* Generate content */
+  /* Generate content with guidance prompts */
   const contentLines = [`# ${headingFormat}`, ""];
+  const specPrompts = SUBSECTION_PROMPTS[metadataFormat];
   for (const sub of resolvedSubsections) {
-    contentLines.push(`## ${sub}`, "", "");
+    contentLines.push(`## ${sub}`, "");
+    const prompt = specPrompts?.[sub] ?? DEFAULT_SUBSECTION_PROMPTS[sub];
+    if (prompt) {
+      contentLines.push(`*${prompt}*`, "");
+    }
   }
   const content = contentLines.join("\n").trimEnd();
 
@@ -254,6 +332,33 @@ export async function addExtension(params: {
     description: specExt?.description ?? `Custom extension: ${headingFormat}`,
   });
 
+  /* Persist to BRIEF.md if there's an active project (Gap 4) */
+  let persisted = false;
+  let resultFilePath: string | undefined;
+  const targetPath = params.projectPath ?? getActiveProject()?.path;
+  if (targetPath) {
+    try {
+      let briefContent = await readBrief(targetPath);
+      briefContent = `${briefContent.trimEnd()}\n\n${content}\n`;
+      briefContent = await syncExtensionMetadata(briefContent, {
+        action: "add",
+        extensionName: metadataFormat,
+      });
+      await writeBrief(targetPath, briefContent);
+      persisted = true;
+      resultFilePath = `${targetPath}/BRIEF.md`;
+    } catch {
+      /* best-effort: in-memory creation succeeds even if disk write fails */
+    }
+  }
+
+  /* Chain associated ontologies (Gap 9) */
+  const associatedOntologies = specExt?.associatedOntologies;
+  const ontologyHint =
+    associatedOntologies && associatedOntologies.length > 0
+      ? `Consider installing: ${associatedOntologies.join(", ")}`
+      : undefined;
+
   return {
     created: true,
     alreadyExists: false,
@@ -264,6 +369,11 @@ export async function addExtension(params: {
     subsections: resolvedSubsections,
     success: true,
     content,
+    ...(persisted && { persisted: true }),
+    ...(resultFilePath && { filePath: resultFilePath }),
+    ...(associatedOntologies &&
+      associatedOntologies.length > 0 && { associatedOntologies }),
+    ...(ontologyHint && { ontologyHint }),
   };
 }
 

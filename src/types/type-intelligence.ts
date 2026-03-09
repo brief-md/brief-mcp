@@ -18,6 +18,7 @@ export interface TypeGuideMetadata {
   readonly bootstrapping?: boolean;
   readonly createdByProject?: string;
   readonly parentType?: string;
+  readonly conflictPatterns?: ReadonlyArray<readonly [string, string]>;
 }
 
 export interface TypeGuide {

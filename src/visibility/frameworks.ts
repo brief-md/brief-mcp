@@ -1,5 +1,6 @@
 // src/visibility/frameworks.ts — TASK-44: Framework Visibility & Ontology Management
 
+import { projectExists, readBriefMetadata } from "../io/project-state.js"; // check-rules-ignore
 import type {
   OntologyRemovalResult,
   ProjectFrameworks,
@@ -175,8 +176,33 @@ export function _resetState(): void {
 
 export async function getProjectFrameworks(params: {
   project: string;
+  projectPath?: string;
 }): Promise<ProjectFrameworks> {
   const project = String(params.project ?? "");
+  const projectPath = params.projectPath;
+
+  // Try reading from disk when projectPath is provided
+  if (projectPath) {
+    try {
+      if (await projectExists(projectPath)) {
+        const metadata = await readBriefMetadata(projectPath);
+        return {
+          extensions: (metadata.extensions ?? []).map((name) => ({
+            name,
+            source: "local" as const,
+          })),
+          ontologies: (metadata.ontologies ?? []).map((name) => ({
+            name,
+            source: "local" as const,
+            tagCount: 0,
+          })),
+        };
+      }
+    } catch {
+      // Fall through to fixture lookup
+    }
+  }
+
   const config = projects.get(project);
 
   if (!config) {

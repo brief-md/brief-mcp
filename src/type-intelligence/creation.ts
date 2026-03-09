@@ -3,11 +3,14 @@
 // validates alias uniqueness, detects existing guides, backs up on force.
 
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import path from "node:path";
 import { getConfigDir } from "../config/config.js";
+import { VALID_EXTENSION_SLUGS } from "../extension/creation.js"; // check-rules-ignore
 import { atomicWriteFile } from "../io/file-io.js";
 import { sanitizeObject } from "../security/input-sanitisation.js";
 import type { TypeGuideSource } from "../types/type-intelligence.js";
+import { buildGuide, registerGuide } from "./loading.js"; // check-rules-ignore
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -33,9 +36,8 @@ interface FixtureEntry {
 // ─── Initial fixtures ────────────────────────────────────────────────────────
 // Seed collision-test fixtures PLUS the types used by fc.constantFrom in the
 // forAll(existing guide) property test: "album", "fiction", "film", "existing-type".
-// CRITICAL: Do NOT register newly created guides — property tests must be able
-// to create fresh guides freely across multiple fast-check runs without
-// accumulating state that turns subsequent runs into existingGuide:true.
+// NOTE: Newly created guides ARE registered in-memory (for getTypeGuide() parity).
+// Property tests must call _resetState() in beforeEach to avoid accumulation.
 
 const ALL_INITIAL_FIXTURES: FixtureEntry[] = [
   // collider-bundled: alias collision with lower-precedence (bundled < ai_generated → warn)
@@ -83,6 +85,24 @@ export function _resetState(): void {
   existingTypes = Object.create(null);
   existingAliases = Object.create(null);
   stateInitialized = false;
+}
+
+/** Scan ~/.brief/type-guides/ for existing guides and register them. */
+export async function initializeFromDisk(): Promise<void> {
+  ensureInitialized();
+  try {
+    const dir = getTypeGuidesDir();
+    const files = await fsp.readdir(dir);
+    for (const file of files) {
+      if (!file.endsWith(".md")) continue;
+      const typeName = file.replace(/\.md$/, "");
+      if (!(typeName in existingTypes)) {
+        existingTypes[typeName] = "ai_generated";
+      }
+    }
+  } catch {
+    // Directory may not exist yet — that's fine
+  }
 }
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
@@ -191,6 +211,65 @@ function checkAliases(
   return {};
 }
 
+// ─── Type guide body template ─────────────────────────────────────────────────
+
+/**
+ * Generate a structured template for a type guide body when no body is provided.
+ * Sections follow the pattern: Overview, Key Dimensions, Suggested Workflow,
+ * Known Tensions (feeds conflict detection), Quality Signals.
+ */
+export function generateTypeGuideTemplate(params: {
+  type: string;
+  suggestedExtensions?: string[];
+  suggestedOntologies?: string[];
+}): string {
+  const title =
+    params.type.charAt(0).toUpperCase() +
+    params.type.slice(1).replace(/-/g, " ");
+  const lines: string[] = [
+    `# ${title} Type Guide`,
+    "",
+    "## Overview",
+    "",
+    `Brief description of what a ${params.type} project involves and its core goals.`,
+    "",
+    "## Key Dimensions",
+    "",
+    "What makes this project type unique? Which of the 10 Universal Dimensions",
+    "(Purpose, Audience, Tone, Structure, Scope, Identity, Vision, Direction,",
+    "Constraints, Timeline) are most critical for this type?",
+    "",
+    "## Suggested Workflow",
+    "",
+    "Recommended order of operations for this project type.",
+    "",
+    "## Known Tensions",
+    "",
+    "Common trade-offs and tensions specific to this project type.",
+    "These feed into conflict detection when available.",
+    "",
+    "## Quality Signals",
+    "",
+    "How to know when a project of this type is well-defined.",
+  ];
+
+  if (params.suggestedExtensions && params.suggestedExtensions.length > 0) {
+    lines.push("", "## Recommended Extensions", "");
+    for (const ext of params.suggestedExtensions) {
+      lines.push(`- ${ext}`);
+    }
+  }
+
+  if (params.suggestedOntologies && params.suggestedOntologies.length > 0) {
+    lines.push("", "## Recommended Ontologies", "");
+    for (const ont of params.suggestedOntologies) {
+      lines.push(`- ${ont}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 // ─── Main function ────────────────────────────────────────────────────────────
 
 export async function createTypeGuide(
@@ -234,7 +313,8 @@ export async function createTypeGuide(
     typeof params.type === "string" ? params.type.trim().toLowerCase() : "";
   if (!type) return { created: false };
 
-  const body = typeof params.body === "string" ? params.body : "";
+  let body = typeof params.body === "string" ? params.body : "";
+  let templateUsed = false;
   const source: TypeGuideSource = "ai_generated";
 
   // Deduplicate aliases: property test invariant requires Set(aliases).size === aliases.length
@@ -245,11 +325,26 @@ export async function createTypeGuide(
         ),
       ]
     : [];
-  const suggestedExtensions = Array.isArray(params.suggestedExtensions)
+  const warnings: string[] = [];
+  let suggestedExtensions = Array.isArray(params.suggestedExtensions)
     ? params.suggestedExtensions
         .filter((a) => typeof a === "string")
         .map(String)
     : [];
+
+  // Validate suggested_extensions against known bundled extensions
+  const invalidExts = suggestedExtensions.filter(
+    (e) => !VALID_EXTENSION_SLUGS.has(e),
+  );
+  if (invalidExts.length > 0) {
+    warnings.push(
+      `Unknown suggested_extensions removed: ${invalidExts.join(", ")}. Valid: ${[...VALID_EXTENSION_SLUGS].join(", ")}`,
+    );
+    suggestedExtensions = suggestedExtensions.filter((e) =>
+      VALID_EXTENSION_SLUGS.has(e),
+    );
+  }
+
   const suggestedOntologies = Array.isArray(params.suggestedOntologies)
     ? params.suggestedOntologies
         .filter((a) => typeof a === "string")
@@ -268,6 +363,18 @@ export async function createTypeGuide(
   const simulateServerUpdate = params.simulateServerUpdate === true;
   const createdByProject =
     !noActiveProject && activeProject ? activeProject : undefined;
+
+  // Generate template body if none provided or too minimal
+  if (!body || body.trim().length < 20) {
+    body = generateTypeGuideTemplate({
+      type,
+      suggestedExtensions:
+        suggestedExtensions.length > 0 ? suggestedExtensions : undefined,
+      suggestedOntologies:
+        suggestedOntologies.length > 0 ? suggestedOntologies : undefined,
+    });
+    templateUsed = true;
+  }
 
   // SEC-13: File size limit applies to body (100 KB)
   if (Buffer.byteLength(body, "utf-8") > MAX_FILE_SIZE) {
@@ -384,11 +491,19 @@ export async function createTypeGuide(
     return { created: false, filePath, source };
   }
 
-  // CRITICAL: Do NOT register newly created guides into existingTypes/existingAliases.
-  // Property tests run multiple fast-check iterations sharing module state. If we
-  // register here, a type generated twice in numRuns=5 would return existingGuide:true
-  // on the second run, failing the "source is always ai_generated" invariant.
-  // Fixture pre-registration (ALL_INITIAL_FIXTURES) is sufficient for existence checks.
+  // Register in loading.ts guide cache so getTypeGuide() finds it immediately
+  try {
+    const guide = buildGuide(type, fullContent, filePath);
+    registerGuide(guide);
+  } catch {
+    /* registration is best-effort */
+  }
+
+  // Register in creation.ts existence maps
+  existingTypes[type] = source;
+  for (const alias of typeAliases) {
+    existingAliases[alias.toLowerCase()] = type;
+  }
 
   return {
     created: true,
@@ -402,5 +517,7 @@ export async function createTypeGuide(
     ...(createdByProject && { createdByProject }),
     scriptExecuted: false,
     ...(hasScript && { sanitized: true }),
+    ...(warnings.length > 0 && { warnings }),
+    ...(templateUsed && { templateUsed: true }),
   };
 }

@@ -373,7 +373,11 @@ function toDisplayName(type: string): string {
     .join(" ");
 }
 
-function buildGuide(slug: string, raw: string, filepath: string): TypeGuide {
+export function buildGuide(
+  slug: string,
+  raw: string,
+  filepath: string,
+): TypeGuide {
   const { data, body, failed } = parseFrontmatter(raw);
   if (failed) {
     yamlFailedSlugs.add(slug);
@@ -431,7 +435,7 @@ function shouldReplace(existing: TypeGuide, candidate: TypeGuide): boolean {
   return cp > ep;
 }
 
-function registerGuide(guide: TypeGuide): void {
+export function registerGuide(guide: TypeGuide): void {
   const type = guide.metadata.type.toLowerCase();
   const existing = guidesByType.get(type);
   if (existing && !shouldReplace(existing, guide)) {

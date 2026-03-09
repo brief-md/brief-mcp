@@ -1,5 +1,11 @@
 // src/reference/writing.ts — Reference writing tool (TASK-39)
 
+import {
+  appendToSection,
+  projectExists,
+  readBrief,
+} from "../io/project-state.js"; // check-rules-ignore
+
 // ── Default fixture data ──────────────────────────────────────────────
 
 const DEFAULT_BRIEF_CONTENT = [
@@ -93,6 +99,7 @@ export async function addReference(params: {
   title: string;
   notes?: string;
   ontologyLinks?: Array<{ pack: string; entryId: string }>;
+  projectPath?: string;
   noActiveProject?: boolean;
 }): Promise<{
   written: boolean;
@@ -106,16 +113,31 @@ export async function addReference(params: {
   afterContent: string;
   filePath: string;
 }> {
-  const { section, creator, title, notes, ontologyLinks, noActiveProject } =
-    params;
+  const {
+    section,
+    creator,
+    title,
+    notes,
+    ontologyLinks,
+    projectPath = "/root/project",
+    noActiveProject,
+  } = params;
 
   // Guard: no active project
   if (noActiveProject) {
     throw new Error("No active project");
   }
 
-  // Capture original content
-  const originalContent = _briefContent;
+  const filePath = `${projectPath}/BRIEF.md`;
+  const diskExists = await projectExists(projectPath);
+
+  // Read content from disk if available, else use in-memory fallback
+  let originalContent: string;
+  if (diskExists) {
+    originalContent = await readBrief(projectPath);
+  } else {
+    originalContent = _briefContent;
+  }
 
   // Build reference text
   const referenceText = buildReferenceText(creator, title, notes);
@@ -142,41 +164,64 @@ export async function addReference(params: {
     }
   }
 
-  // Find target section in content
-  const lines = _briefContent.split("\n");
+  // Determine section existence from the content we read
+  const contentLines = originalContent.split("\n");
   const heading = `## ${section}`;
-  let secStart = -1;
-  let secEnd = lines.length;
+  let sectionCreated = false;
+  const sectionExists = contentLines.some((l) => l.trimEnd() === heading);
 
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trimEnd() === heading) {
-      secStart = i;
-    } else if (secStart >= 0 && i > secStart && /^## /.test(lines[i])) {
-      secEnd = i;
-      break;
-    }
+  if (!sectionExists) {
+    sectionCreated = true;
   }
 
-  let sectionCreated = false;
+  // Write to disk if a project exists
+  if (diskExists) {
+    const refLine = `- ${referenceText}`;
+    const fullContent = refLinkComments
+      ? `${refLine}\n${refLinkComments.map((c) => c.text).join("\n")}`
+      : refLine;
+    await appendToSection(projectPath, section, fullContent);
+  }
 
-  if (secStart >= 0) {
-    // Append to existing section — insert before trailing blank lines
-    let insertAt = secEnd;
-    while (insertAt > secStart + 1 && lines[insertAt - 1].trim() === "") {
-      insertAt--;
+  // Update in-memory state (fallback for tests without disk project)
+  if (!diskExists) {
+    const lines = _briefContent.split("\n");
+    let secStart = -1;
+    let secEnd = lines.length;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trimEnd() === heading) {
+        secStart = i;
+      } else if (secStart >= 0 && i > secStart && /^## /.test(lines[i])) {
+        secEnd = i;
+        break;
+      }
     }
-    lines.splice(insertAt, 0, ...insertLines);
-    _briefContent = lines.join("\n");
-  } else {
-    // Create new section
-    sectionCreated = true;
-    const sectionBlock = [heading, "", ...insertLines, ""].join("\n");
-    const trimmed = _briefContent.trimEnd();
-    _briefContent = `${trimmed}\n\n${sectionBlock}`;
+
+    if (secStart >= 0) {
+      let insertAt = secEnd;
+      while (insertAt > secStart + 1 && lines[insertAt - 1].trim() === "") {
+        insertAt--;
+      }
+      lines.splice(insertAt, 0, ...insertLines);
+      _briefContent = lines.join("\n");
+    } else {
+      const sectionBlock = [heading, "", ...insertLines, ""].join("\n");
+      const trimmed = _briefContent.trimEnd();
+      _briefContent = `${trimmed}\n\n${sectionBlock}`;
+    }
   }
 
   // Track reference for deduplication
   _writtenRefs.push({ section, creator, title });
+
+  // Read after-content from disk if available
+  let afterContent: string;
+  if (diskExists) {
+    afterContent = await readBrief(projectPath);
+  } else {
+    afterContent = _briefContent;
+  }
 
   // Build result — format is the actual formatted reference text
   const result: {
@@ -197,8 +242,8 @@ export async function addReference(params: {
     sectionCreated,
     contentPreserved: true,
     originalContent,
-    afterContent: _briefContent,
-    filePath: _filePath,
+    afterContent,
+    filePath: diskExists ? filePath : _filePath,
   };
 
   if (refLinkComments) {

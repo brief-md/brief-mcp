@@ -29,6 +29,7 @@ export interface CheckConflictsParams {
   includeHierarchy?: boolean;
   hierarchyOverride?: boolean;
   intentionalTensions?: IntentionalTensionPair[];
+  domainPatterns?: ReadonlyArray<readonly [string, string]>;
 }
 
 export interface ConflictItem {
@@ -255,8 +256,9 @@ function keywordOverlap(a: Set<string>, b: Set<string>): number {
 function hasAntonymConflict(
   keywordsA: Set<string>,
   keywordsB: Set<string>,
+  antonyms: ReadonlyArray<readonly [string, string]> = ANTONYM_PAIRS,
 ): boolean {
-  for (const [wordA, wordB] of ANTONYM_PAIRS) {
+  for (const [wordA, wordB] of antonyms) {
     if (
       (keywordsA.has(wordA) && keywordsB.has(wordB)) ||
       (keywordsA.has(wordB) && keywordsB.has(wordA))
@@ -271,7 +273,11 @@ function hasAntonymConflict(
 // Pairwise conflict detectors
 // ---------------------------------------------------------------------------
 
-function detectDecisionDecisionConflict(textA: string, textB: string): boolean {
+function detectDecisionDecisionConflict(
+  textA: string,
+  textB: string,
+  antonyms: ReadonlyArray<readonly [string, string]> = ANTONYM_PAIRS,
+): boolean {
   // Direct negation containment: "A" vs "Not A" (DEC-04 over-report)
   if (hasNegation(textA) !== hasNegation(textB)) {
     const plain = hasNegation(textA) ? textB : textA;
@@ -286,7 +292,7 @@ function detectDecisionDecisionConflict(textA: string, textB: string): boolean {
   if (kwA.size === 0 || kwB.size === 0) return false;
 
   // Antonym pairs → conflict
-  if (hasAntonymConflict(kwA, kwB)) return true;
+  if (hasAntonymConflict(kwA, kwB, antonyms)) return true;
 
   // Negation difference + keyword overlap → conflict
   const overlap = keywordOverlap(kwA, kwB);
@@ -303,13 +309,14 @@ function detectDecisionDecisionConflict(textA: string, textB: string): boolean {
 function detectDecisionConstraintConflict(
   decisionText: string,
   constraintText: string,
+  antonyms: ReadonlyArray<readonly [string, string]> = ANTONYM_PAIRS,
 ): boolean {
   const kwD = extractKeywords(decisionText);
   const kwC = extractKeywords(constraintText);
   if (kwD.size === 0 || kwC.size === 0) return false;
 
   // Antonym pairs → conflict
-  if (hasAntonymConflict(kwD, kwC)) return true;
+  if (hasAntonymConflict(kwD, kwC, antonyms)) return true;
 
   // Constraints are inherently negated ("What This Is NOT")
   // Keyword overlap without decision self-negating → conflict
@@ -322,13 +329,14 @@ function detectDecisionConstraintConflict(
 function detectConstraintConstraintConflict(
   textA: string,
   textB: string,
+  antonyms: ReadonlyArray<readonly [string, string]> = ANTONYM_PAIRS,
 ): boolean {
   const kwA = extractKeywords(textA);
   const kwB = extractKeywords(textB);
   if (kwA.size === 0 || kwB.size === 0) return false;
 
   // Antonym pairs → conflict
-  if (hasAntonymConflict(kwA, kwB)) return true;
+  if (hasAntonymConflict(kwA, kwB, antonyms)) return true;
 
   // Overlapping keywords (potential redundancy/contradiction)
   const overlap = keywordOverlap(kwA, kwB);
@@ -382,7 +390,13 @@ export function checkConflicts(
     includeHierarchy = true,
     hierarchyOverride = false,
     intentionalTensions = [],
+    domainPatterns,
   } = params;
+
+  const effectiveAntonyms: ReadonlyArray<readonly [string, string]> =
+    domainPatterns && domainPatterns.length > 0
+      ? [...ANTONYM_PAIRS, ...domainPatterns]
+      : ANTONYM_PAIRS;
 
   const conflicts: DetectedConflict[] = [];
   const hierarchyEnabled = includeHierarchy || hierarchyOverride;
@@ -409,7 +423,7 @@ export function checkConflicts(
       // Intentional tension suppression (DEC-09)
       if (isSuppressedByTension(a.text, b.text, intentionalTensions)) continue;
 
-      if (detectDecisionDecisionConflict(a.text, b.text)) {
+      if (detectDecisionDecisionConflict(a.text, b.text, effectiveAntonyms)) {
         const conflict: DetectedConflict = {
           type: isHierarchyPair ? "cross-section" : "decision-decision",
           severity: isHierarchyPair ? "info" : "warning",
@@ -439,6 +453,7 @@ export function checkConflicts(
       const detected = detectDecisionConstraintConflict(
         decision.text,
         constraint,
+        effectiveAntonyms,
       );
       if (detected || hierarchyOverride) {
         const isHierarchy = hierarchyEnabled;
@@ -469,7 +484,13 @@ export function checkConflicts(
         continue;
       }
 
-      if (detectConstraintConstraintConflict(constraints[i], constraints[j])) {
+      if (
+        detectConstraintConstraintConflict(
+          constraints[i],
+          constraints[j],
+          effectiveAntonyms,
+        )
+      ) {
         conflicts.push({
           type: "constraint-constraint",
           severity: "warning",
