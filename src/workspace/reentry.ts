@@ -9,6 +9,7 @@ import {
   readSection,
 } from "../io/project-state.js"; // check-rules-ignore
 import type { SubProjectInfo } from "../types/workspace.js";
+import { checkConflicts } from "../validation/conflicts.js"; // check-rules-ignore
 import { setActiveProject } from "./active.js";
 import { getTutorialContent, setDismissedFlag } from "./tutorial.js";
 
@@ -108,9 +109,11 @@ function parseDecisionEntries(body: string): {
 function countQuestions(body: string): {
   toResolveCount: number;
   toKeepOpenCount: number;
+  tensions: string[];
 } {
   let toResolveCount = 0;
   let toKeepOpenCount = 0;
+  const tensions: string[] = [];
 
   for (const line of body.split("\n")) {
     const trimmed = line.trim();
@@ -118,10 +121,11 @@ function countQuestions(body: string): {
       toResolveCount++;
     } else if (/^-\s+/.test(trimmed) && !/^-\s*\[/.test(trimmed)) {
       toKeepOpenCount++;
+      tensions.push(trimmed.replace(/^-\s+/, ""));
     }
   }
 
-  return { toResolveCount, toKeepOpenCount };
+  return { toResolveCount, toKeepOpenCount, tensions };
 }
 
 /** Extract ontology tags from BRIEF.md content. */
@@ -172,6 +176,73 @@ async function findSubProjects(
   }
 
   return subProjects;
+}
+
+// ---------------------------------------------------------------------------
+// Section overview — parse headings and check fill state
+// ---------------------------------------------------------------------------
+
+interface SectionOverviewItem {
+  name: string;
+  hasContent: boolean;
+  wordCount?: number;
+}
+
+function getSectionOverview(
+  content: string,
+  detail: "summary" | "detailed" = "summary",
+): SectionOverviewItem[] {
+  const items: SectionOverviewItem[] = [];
+  // Match # or ## headings (skip metadata block at top)
+  const lines = content.split("\n");
+  let currentHeading: string | null = null;
+  let bodyLines: string[] = [];
+  let inMetadata = true;
+
+  for (const line of lines) {
+    // Skip metadata block (lines starting with key: value before first heading)
+    if (inMetadata) {
+      if (/^#{1,2}\s/.test(line)) {
+        inMetadata = false;
+      } else {
+        continue;
+      }
+    }
+
+    if (/^#{1,2}\s/.test(line)) {
+      // Flush previous section
+      if (currentHeading !== null) {
+        const body = bodyLines.join("\n").trim();
+        const item: SectionOverviewItem = {
+          name: currentHeading,
+          hasContent: body.length > 0,
+        };
+        if (detail === "detailed" && body.length > 0) {
+          item.wordCount = body.split(/\s+/).filter(Boolean).length;
+        }
+        items.push(item);
+      }
+      currentHeading = line.replace(/^#{1,2}\s+/, "").trim();
+      bodyLines = [];
+    } else if (currentHeading !== null) {
+      bodyLines.push(line);
+    }
+  }
+
+  // Flush last section
+  if (currentHeading !== null) {
+    const body = bodyLines.join("\n").trim();
+    const item: SectionOverviewItem = {
+      name: currentHeading,
+      hasContent: body.length > 0,
+    };
+    if (detail === "detailed" && body.length > 0) {
+      item.wordCount = body.split(/\s+/).filter(Boolean).length;
+    }
+    items.push(item);
+  }
+
+  return items;
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +357,7 @@ export async function generateReentrySummary(params: {
   projectPath: string;
   includeHistory?: boolean;
   simulateEmpty?: boolean;
+  detail?: "summary" | "detailed";
 }): Promise<{
   identity: { name: string; type?: string; length: number };
   status: string;
@@ -298,6 +370,7 @@ export async function generateReentrySummary(params: {
   ontologyTagSummary: { taggedEntries: unknown[]; packsUsed: unknown[] };
   recentChanges: unknown[];
   intentionalTensions: unknown[];
+  sectionOverview: SectionOverviewItem[];
   activeProjectSet: boolean;
   subProjects: unknown[];
   externalSessionPrompt: string;
@@ -305,7 +378,12 @@ export async function generateReentrySummary(params: {
   setupPhase?: string;
   nextSteps?: string[];
 }> {
-  const { projectPath, includeHistory, simulateEmpty } = params;
+  const {
+    projectPath,
+    includeHistory,
+    simulateEmpty,
+    detail = "summary",
+  } = params;
 
   // Derive project name from path (handle both / and \ separators)
   const segments = projectPath.replace(/\\/g, "/").split("/");
@@ -336,6 +414,7 @@ export async function generateReentrySummary(params: {
       ontologyTagSummary: { taggedEntries: [], packsUsed: [] },
       recentChanges: [],
       intentionalTensions: [],
+      sectionOverview: [],
       activeProjectSet,
       subProjects: [],
       externalSessionPrompt: `Did you work in any external tools since your last update?`,
@@ -365,10 +444,34 @@ export async function generateReentrySummary(params: {
     // Parse questions from disk
     const questionsBody =
       (await readSection(projectPath, "Open Questions")) || "";
-    const openQuestions = countQuestions(questionsBody);
+    const { toResolveCount, toKeepOpenCount, tensions } =
+      countQuestions(questionsBody);
+    const openQuestions = { toResolveCount, toKeepOpenCount };
+
+    // Read constraints for conflict detection
+    const constraintsBody =
+      (await readSection(projectPath, "Constraints")) || "";
+    const constraintLines = constraintsBody
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("- "))
+      .map((l) => l.replace(/^-\s+/, ""));
+
+    // Run conflict detection
+    const conflictInput = parsedDecisions.map((d) => ({
+      text: d.title || "",
+      status: d.status,
+    }));
+    const conflictResult = checkConflicts({
+      decisions: conflictInput,
+      constraints: constraintLines,
+    });
 
     // Extract ontology tags
     const ontologyTagSummary = extractOntologyTags(content);
+
+    // Section overview
+    const sectionOverview = getSectionOverview(content, detail);
 
     // Scan for sub-projects
     const subProjects = await findSubProjects(projectPath);
@@ -388,7 +491,9 @@ export async function generateReentrySummary(params: {
 
     // Determine positive state
     const isPositiveState =
-      openQuestions.toResolveCount === 0 && openQuestions.toKeepOpenCount === 0;
+      openQuestions.toResolveCount === 0 &&
+      openQuestions.toKeepOpenCount === 0 &&
+      conflictResult.conflicts.length === 0;
 
     const result: {
       identity: { name: string; type?: string; length: number };
@@ -402,6 +507,7 @@ export async function generateReentrySummary(params: {
       ontologyTagSummary: { taggedEntries: unknown[]; packsUsed: unknown[] };
       recentChanges: unknown[];
       intentionalTensions: unknown[];
+      sectionOverview: SectionOverviewItem[];
       activeProjectSet: boolean;
       subProjects: unknown[];
       externalSessionPrompt: string;
@@ -418,10 +524,13 @@ export async function generateReentrySummary(params: {
       timeSinceUpdate,
       decisions: activeDecisions.map((d) => ({ date: d.date, title: d.title })),
       openQuestions,
-      conflicts: [], // Real conflict detection would run here
+      conflicts: conflictResult.conflicts,
       ontologyTagSummary,
-      recentChanges: [],
-      intentionalTensions: [],
+      recentChanges: metadata.updated
+        ? [{ timestamp: metadata.updated, description: "Brief last updated" }]
+        : [],
+      intentionalTensions: tensions,
+      sectionOverview,
       activeProjectSet,
       subProjects,
       externalSessionPrompt: `Did you work in any external tools since your last update?`,
@@ -467,6 +576,7 @@ export async function generateReentrySummary(params: {
     ontologyTagSummary: { taggedEntries: unknown[]; packsUsed: unknown[] };
     recentChanges: unknown[];
     intentionalTensions: unknown[];
+    sectionOverview: SectionOverviewItem[];
     activeProjectSet: boolean;
     subProjects: unknown[];
     externalSessionPrompt: string;
@@ -505,6 +615,7 @@ export async function generateReentrySummary(params: {
     intentionalTensions: [
       { id: "tension-1", description: "Speed vs quality trade-off" },
     ],
+    sectionOverview: [],
     activeProjectSet,
     subProjects: [
       { name: "sub-a", type: "song", path: `${projectPath}/sub-a` },
