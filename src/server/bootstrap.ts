@@ -775,19 +775,29 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_add_extension",
     description:
-      "Activate an extension in BRIEF.md to add specialised sections. brief-mcp scope: extension management. Accepts any extension name and optional subsections — users can define their own extensions beyond the predefined registry. Ask what the extension should cover and what sections it needs.",
+      "Add an extension to BRIEF.md. An extension has a title and subsections. Each subsection is either freeform (user writes text, use Pattern 9) or structured (linked to an ontology — entries appear as table rows). Workflow: create extension with section_modes → for structured subsections, call brief_link_section_dataset to link an ontology, then brief_tag_entry to add entries. brief-mcp scope: extension management.",
     inputSchema: {
       type: "object",
       properties: {
         extension_name: {
           type: "string",
           description:
-            "Name of the extension to activate (e.g. 'sensory_palette', 'narrative_structure').",
+            "Name of the extension (e.g. 'story_development', 'world_building'). Any name is accepted — not limited to predefined extensions.",
         },
         subsections: {
           type: "array",
           items: { type: "string" },
-          description: "Optional subsections to include.",
+          description:
+            "Subsection names (e.g. ['Themes', 'Plot Points', 'Tone & Mood']). Each subsection becomes a ## heading under the extension.",
+        },
+        section_modes: {
+          type: "object",
+          description:
+            "Map of subsection name → 'freeform' or 'structured'. Structured subsections get an ontology dataset marker — follow up with brief_link_section_dataset to link an ontology and brief_tag_entry to add entries as table rows (multiple entries per section). Default: all freeform.",
+          additionalProperties: {
+            type: "string",
+            enum: ["freeform", "structured"],
+          },
         },
         project_path: {
           type: "string",

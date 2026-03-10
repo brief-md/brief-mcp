@@ -640,6 +640,13 @@ describe("TASK-08: Property Tests", () => {
       expect(text).not.toContain("Missing required parameter");
     });
 
+    it("brief_add_extension schema includes section_modes property", async () => {
+      const tools = await getRegisteredTools();
+      const ext = tools.find((t: any) => t.name === "brief_add_extension");
+      expect(ext.inputSchema.properties.section_modes).toBeDefined();
+      expect(ext.inputSchema.properties.section_modes.type).toBe("object");
+    });
+
     it("brief_add_extension accepts 'extension' as alias for 'extension_name'", async () => {
       const result = await handleToolCall({
         name: "brief_add_extension",

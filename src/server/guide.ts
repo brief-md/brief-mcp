@@ -84,14 +84,36 @@ superseding a decision (\`brief_add_decision\` with \`replaces\`), adding an exc
 
 ### Pattern 7: Extension Setup
 
-Extensions add specialised sections to BRIEF.md for specific domains. Use
-\`brief_suggest_extensions\` to recommend extensions for the project type, then
-present them to the user — explain what each extension adds. After presenting
-suggestions, invite the user to describe any additional extensions their project
-needs that aren't listed. \`brief_add_extension\` accepts any extension name and
-optional subsections — it is not limited to the predefined registry. If the user
-describes a need, create an extension with a descriptive name and relevant subsections.
-Only activate extensions the user approves.
+Extensions hold **source material, creative inputs, and structured data** that inform the
+project. They are NOT deliverables or outputs. If a user suggests subsections like "Logline",
+"Synopsis", "Treatment", or "Screenplay", clarify: those are outputs generated from the brief
+data, not extensions. Extensions hold the raw inputs (themes, narrative arcs, character
+profiles, visual references, etc.). Decisions and questions are also NOT part of extensions —
+they are tracked separately via \`brief_add_decision\` and \`brief_add_question\`.
+
+An extension has a **title** and **subsections**. Each subsection is either:
+- **Freeform**: user writes text (use Pattern 9 — collaborative authoring)
+- **Structured**: linked to exactly **one** ontology, holds **multiple entries** from
+  that ontology as table rows (e.g. a "Themes" subsection linked to theme-pack contains
+  Nostalgia, Teamwork, etc. as rows — do NOT create one subsection per entry)
+
+A subsection can only use one ontology. If a project needs entries from two different
+ontologies, use two separate subsections.
+
+**Workflow:**
+1. Call \`brief_suggest_extensions\` to recommend extensions for the project type.
+   Present them to the user — explain what each adds. Invite the user to describe
+   additional extensions not listed. \`brief_add_extension\` accepts any name and
+   subsections — it is not limited to the predefined registry.
+2. For each extension the user approves, determine which subsections it needs and
+   whether each is freeform or structured. Ask the user.
+3. Call \`brief_add_extension\` with \`subsections\` and \`section_modes\` (map of
+   subsection name → "freeform" or "structured").
+4. For each **structured** subsection:
+   a. \`brief_link_section_dataset\` — link the ontology to the subsection with columns
+   b. \`brief_tag_entry\` — add entries from the ontology (repeat for each entry)
+5. For each **freeform** subsection: use Pattern 9 (collaborative authoring).
+6. Only activate extensions the user approves.
 
 During extension setup, proactively surface known decision points as questions
 (QUEST-02) and offer the deferral escape hatch (QUEST-11) for questions the user
