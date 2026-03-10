@@ -431,7 +431,7 @@ export async function createProject(params: {
       result.coreIdentity as { missing: string[] }
     ).missing.join(", ");
     nextSteps.push(
-      `Collect the project's core identity before proceeding. Missing: ${missingNames}`,
+      `Collaboratively author the project's core identity sections. Missing: ${missingNames}. For each section, ask the user to express their thoughts in their own words first, then offer to refine — do not generate content without user input (Pattern 9).`,
     );
   } else if (!type) {
     result.setupPhase = "needs_type";
@@ -443,30 +443,46 @@ export async function createProject(params: {
   ) {
     result.setupPhase = "choose_type_guide";
     nextSteps.push(
-      "Present type guide suggestions to the user — let them choose or create custom",
+      "Present type guide suggestions to the user — summarise each candidate, let them choose or create a custom guide. Do not auto-apply; the user should review what each guide entails (Pattern 10).",
     );
   } else if (
     (result.typeGuide as { isGeneric?: boolean } | undefined)?.isGeneric
   ) {
     result.setupPhase = "explore_type";
     nextSteps.push(
-      "Use the generic guide's 10 Universal Dimensions to explore this project type with the user",
-      "Then call brief_create_type_guide to create a domain-specific guide",
+      "The resolved type guide is generic. Use the guide's Domain Discovery and Hierarchy sections to collaboratively explore this project type with the user (Pattern 10).",
+      "After exploration, call brief_create_type_guide with body omitted to get a template. Present each section to the user for input — do NOT pre-write the guide body without user collaboration (Pattern 10).",
     );
   } else {
     result.setupPhase = "review_suggestions";
+    if (
+      result.typeGuide &&
+      !(result.typeGuide as { isGeneric?: boolean }).isGeneric
+    ) {
+      nextSteps.push(
+        "A type guide was resolved for this project. Present its key dimensions and suggested workflow to the user for review before proceeding (Pattern 10).",
+      );
+    }
   }
-  if (result.extensionSuggestions) {
+  if (result.setupPhase === "review_suggestions") {
+    // Only present extensions/ontologies when identity + type guide are done
+    if (result.extensionSuggestions) {
+      nextSteps.push(
+        "Present suggested extensions to the user — explain what each adds. Invite the user to describe any additional extensions they need; brief_add_extension accepts any name and subsections. Only activate extensions the user approves.",
+      );
+    }
+    if (
+      Array.isArray(result.ontologySuggestions) &&
+      result.ontologySuggestions.length > 0
+    ) {
+      nextSteps.push(
+        "Consider installing suggested ontologies with brief_install_ontology",
+      );
+    }
+  } else {
+    // Earlier phases: direct Claude to re-enter after completing current step
     nextSteps.push(
-      "Review suggested extensions and call brief_add_extension for each relevant one",
-    );
-  }
-  if (
-    Array.isArray(result.ontologySuggestions) &&
-    result.ontologySuggestions.length > 0
-  ) {
-    nextSteps.push(
-      "Consider installing suggested ontologies with brief_install_ontology",
+      "After completing the above, call brief_reenter_project to continue setup — do NOT skip ahead to extensions or ontologies.",
     );
   }
   if (nextSteps.length > 0) {

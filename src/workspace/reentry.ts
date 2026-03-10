@@ -175,6 +175,110 @@ async function findSubProjects(
 }
 
 // ---------------------------------------------------------------------------
+// Lifecycle re-evaluation (setupPhase + nextSteps)
+// ---------------------------------------------------------------------------
+
+async function computeSetupPhase(
+  projectPath: string,
+  metadata: { type?: string; project?: string },
+): Promise<{ setupPhase: string | undefined; nextSteps: string[] }> {
+  const nextSteps: string[] = [];
+
+  // Check identity completeness
+  const whatThisIs = await readSection(projectPath, "What This Is");
+  const whatThisIsNot = await readSection(projectPath, "What This Is Not");
+  const whyThisExists = await readSection(projectPath, "Why This Exists");
+  const identityComplete = !!(whatThisIs && whatThisIsNot && whyThisExists);
+
+  const type = metadata.type;
+
+  if (!identityComplete) {
+    const missing = [
+      ...(!whatThisIs ? ["What This Is"] : []),
+      ...(!whatThisIsNot ? ["What This Is Not"] : []),
+      ...(!whyThisExists ? ["Why This Exists"] : []),
+    ];
+    nextSteps.push(
+      `Collaboratively author the project's core identity sections. Missing: ${missing.join(", ")}. Ask the user first (Pattern 9).`,
+      "After completing the above, call brief_reenter_project to continue setup — do NOT skip ahead to extensions or ontologies.",
+    );
+    return { setupPhase: "needs_identity", nextSteps };
+  }
+
+  if (!type) {
+    nextSteps.push(
+      "Determine the project type with the user.",
+      "After completing the above, call brief_reenter_project to continue setup — do NOT skip ahead to extensions or ontologies.",
+    );
+    return { setupPhase: "needs_type", nextSteps };
+  }
+
+  // Check type guide status
+  try {
+    const { getTypeGuide } = await import("../type-intelligence/loading.js");
+    const typeGuide = await getTypeGuide({ type });
+    const isGeneric = (typeGuide as { isGeneric?: boolean })?.isGeneric;
+
+    if (isGeneric) {
+      // Check for suggestions
+      try {
+        const { suggestTypeGuides } = await import(
+          "../type-intelligence/search.js"
+        );
+        const suggestions = await suggestTypeGuides({
+          query: type,
+          description: whatThisIs ?? "",
+        });
+        if (suggestions.candidates.length > 0) {
+          nextSteps.push(
+            "Present type guide suggestions to the user — summarise each candidate, let them choose or create a custom guide (Pattern 10).",
+            "After completing the above, call brief_reenter_project to continue setup — do NOT skip ahead to extensions or ontologies.",
+          );
+          return { setupPhase: "choose_type_guide", nextSteps };
+        }
+      } catch {
+        /* best-effort */
+      }
+
+      nextSteps.push(
+        "The resolved type guide is generic. Present it to the user and ask if it fits their project (Pattern 10).",
+        "After exploration, call brief_create_type_guide with body omitted to get a template. Present each section to the user for input — do NOT pre-write the guide body without user collaboration (Pattern 10).",
+        "After completing the above, call brief_reenter_project to continue setup — do NOT skip ahead to extensions or ontologies.",
+      );
+      return { setupPhase: "explore_type", nextSteps };
+    }
+
+    // Non-generic guide resolved — review it before extensions
+    nextSteps.push(
+      "A type guide was resolved for this project. Present its key dimensions and suggested workflow to the user for review before proceeding (Pattern 10).",
+    );
+  } catch {
+    /* type guide resolution failed — skip to extensions */
+  }
+
+  // Identity complete + type guide reviewed → ready for extensions
+  try {
+    const { suggestExtensions } = await import("../extension/suggestion.js");
+    const extResult = await suggestExtensions({
+      projectType: type,
+      description: whatThisIs ?? "",
+    });
+    const hasExtensions =
+      (extResult.tier1Suggestions && extResult.tier1Suggestions.length > 0) ||
+      (extResult.tier2Suggestions && extResult.tier2Suggestions.length > 0);
+    if (hasExtensions) {
+      nextSteps.push(
+        "Present suggested extensions to the user — explain what each adds. Invite the user to describe any additional extensions they need. Only activate extensions the user approves.",
+      );
+    }
+  } catch {
+    /* best-effort */
+  }
+
+  return { setupPhase: "review_suggestions", nextSteps };
+}
+
+// ---------------------------------------------------------------------------
 // generateReentrySummary
 // ---------------------------------------------------------------------------
 
@@ -198,6 +302,8 @@ export async function generateReentrySummary(params: {
   subProjects: unknown[];
   externalSessionPrompt: string;
   positiveState?: boolean;
+  setupPhase?: string;
+  nextSteps?: string[];
 }> {
   const { projectPath, includeHistory, simulateEmpty } = params;
 
@@ -300,6 +406,8 @@ export async function generateReentrySummary(params: {
       subProjects: unknown[];
       externalSessionPrompt: string;
       positiveState?: boolean;
+      setupPhase?: string;
+      nextSteps?: string[];
     } = {
       identity: {
         name: metadata.project || projectName,
@@ -332,6 +440,15 @@ export async function generateReentrySummary(params: {
       }));
     } else {
       result.supersededCount = supersededCount;
+    }
+
+    // --- Lifecycle re-evaluation (setupPhase + nextSteps) ---
+    const lifecycleSteps = await computeSetupPhase(projectPath, metadata);
+    if (lifecycleSteps.setupPhase) {
+      result.setupPhase = lifecycleSteps.setupPhase;
+    }
+    if (lifecycleSteps.nextSteps.length > 0) {
+      result.nextSteps = lifecycleSteps.nextSteps;
     }
 
     return result;

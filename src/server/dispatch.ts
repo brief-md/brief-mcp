@@ -25,7 +25,17 @@ import { removeExtension } from "../extension/removal.js"; // check-rules-ignore
 import { suggestExtensions } from "../extension/suggestion.js"; // check-rules-ignore
 import { getHierarchyPosition } from "../hierarchy/position.js"; // check-rules-ignore
 import { buildHierarchyTree } from "../hierarchy/tree.js"; // check-rules-ignore
-import { browseOntology, getOntologyEntry } from "../ontology/browse.js"; // check-rules-ignore
+import {
+  linkSectionDataset,
+  parseSectionDatasets,
+  readBrief,
+} from "../io/project-state.js"; // check-rules-ignore
+import {
+  browseOntology,
+  getOntologyEntry,
+  listOntologyColumns,
+} from "../ontology/browse.js"; // check-rules-ignore
+import { convertToStructured } from "../ontology/conversion.js"; // check-rules-ignore
 import { createOntology } from "../ontology/creation.js"; // check-rules-ignore
 import { fetchAndConvert, previewDataset } from "../ontology/dataset.js"; // check-rules-ignore
 import { discoverOntologies } from "../ontology/discovery.js"; // check-rules-ignore
@@ -130,24 +140,55 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
         remap(args, { path: "identifier", workspace_roots: "workspaceRoots" }),
       ),
     ),
-  brief_create_project: (args) =>
-    createProject(
+  brief_create_project: async (args) => {
+    const result = await createProject(
       typed<Parameters<typeof createProject>[0]>(
         remap(args, { name: "projectName", workspace: "workspaceRoot" }), // check-rules-ignore
       ),
-    ),
+    );
+    // Set the newly created project as active so subsequent tool calls
+    // (e.g. brief_update_section) target the correct path
+    const projectPath = (result as Record<string, unknown>).path as
+      | string
+      | undefined;
+    if (projectPath) {
+      await setActiveProject({
+        identifier: projectPath,
+        workspaceRoots: [],
+      });
+    }
+    // Surface nextSteps as a prominent directive block so the LLM doesn't skip them
+    const steps = (result as Record<string, unknown>).nextSteps as
+      | string[]
+      | undefined;
+    if (steps && steps.length > 0) {
+      (result as Record<string, unknown>).__REQUIRED_NEXT_STEPS__ =
+        `STOP and follow these steps IN ORDER before doing anything else:\n${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
+    }
+    return result;
+  },
   brief_create_sub_project: (args) =>
     createSubProject(
       typed<Parameters<typeof createSubProject>[0]>(
         remap(args, { parent_path: "parentPath" }),
       ),
     ),
-  brief_reenter_project: (args) =>
-    generateReentrySummary(
+  brief_reenter_project: async (args) => {
+    const result = await generateReentrySummary(
       typed<Parameters<typeof generateReentrySummary>[0]>(
         remap(args, { path: "projectPath" }),
       ),
-    ),
+    );
+    // Surface nextSteps as a prominent directive block (same as brief_create_project)
+    const steps = (result as Record<string, unknown>).nextSteps as
+      | string[]
+      | undefined;
+    if (steps && steps.length > 0) {
+      (result as Record<string, unknown>).__REQUIRED_NEXT_STEPS__ =
+        `STOP and follow these steps IN ORDER before doing anything else:\n${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
+    }
+    return result;
+  },
   brief_start_tutorial: () => startTutorial(),
   brief_set_tutorial_dismissed: (args) =>
     setTutorialDismissed(
@@ -279,13 +320,37 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
     ),
   brief_list_ontologies: (args) => listOntologies(args),
   brief_install_ontology: (args) =>
-    installOntology(typed<Parameters<typeof installOntology>[0]>(args)),
-  brief_tag_entry: (args) =>
-    tagEntry(
-      typed<Parameters<typeof tagEntry>[0]>(
-        remap(args, { entry_id: "entryId", label_override: "labelOverride" }),
+    installOntology(
+      typed<Parameters<typeof installOntology>[0]>(
+        remap(args, { source: "url" }),
       ),
     ),
+  brief_tag_entry: async (args) => {
+    const remapped = remap(withProjectPath(args), {
+      entry_id: "entryId",
+      label_override: "labelOverride",
+      project_path: "projectPath",
+    });
+    // Auto-detect structured section: check for section-dataset marker with columns
+    const pp = (remapped as Record<string, unknown>).projectPath as
+      | string
+      | undefined;
+    if (pp) {
+      try {
+        const content = await readBrief(pp);
+        const datasets = parseSectionDatasets(content);
+        const section = (remapped as Record<string, unknown>).section as string;
+        const match = datasets.find((d) => d.section === section);
+        if (match?.columns) {
+          (remapped as Record<string, unknown>).structuredColumns =
+            match.columns;
+        }
+      } catch {
+        /* best-effort */
+      }
+    }
+    return tagEntry(typed<Parameters<typeof tagEntry>[0]>(remapped));
+  },
   brief_list_tags: (args) =>
     listTags(
       typed<Parameters<typeof listTags>[0]>(
@@ -382,6 +447,34 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
         remap(args, { remove_tags: "removeTags" }),
       ),
     ),
+
+  // Structured sections
+  brief_list_ontology_columns: (args) =>
+    listOntologyColumns(typed<Parameters<typeof listOntologyColumns>[0]>(args)),
+  brief_link_section_dataset: async (args) => {
+    const a = remap(withProjectPath(args), {
+      project_path: "projectPath",
+    }) as Record<string, unknown>;
+    const projectPath = a.projectPath as string;
+    const section = a.section as string;
+    const ontology = a.ontology as string;
+    const columns = a.columns as string[];
+    await linkSectionDataset(projectPath, section, ontology, columns);
+    return { linked: true, section, ontology, columns };
+  },
+  brief_convert_to_structured: async (args) => {
+    const a = remap(withProjectPath(args), {
+      project_path: "projectPath",
+      match_threshold: "matchThreshold",
+    }) as Record<string, unknown>;
+    return convertToStructured({
+      projectPath: a.projectPath as string,
+      section: a.section as string,
+      ontology: a.ontology as string,
+      columns: a.columns as string[],
+      matchThreshold: a.matchThreshold as number | undefined,
+    });
+  },
 
   // Registry
   brief_search_registry: (args) =>

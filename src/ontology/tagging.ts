@@ -4,6 +4,7 @@ import { getKnownExtensions } from "../extension/creation.js"; // check-rules-ig
 import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
 import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
 import { getPackIndex, installPack } from "./management.js";
+import { appendTableRow } from "./table-render.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,10 @@ export interface TagEntryParams {
   section: string;
   paragraph?: string;
   labelOverride?: string;
+  /** When set, writes a visible table row with these columns (structured section). */
+  structuredColumns?: string[];
+  /** Project path — required for structured section writes. */
+  projectPath?: string;
   [key: string]: unknown;
 }
 
@@ -35,6 +40,7 @@ export interface TagEntryResult {
   extensionName?: string;
   scopeWarning?: string;
   entryReferences?: unknown[];
+  tableRowWritten?: boolean;
   [key: string]: unknown;
 }
 
@@ -146,7 +152,15 @@ export function _resetState(): void {
 export async function tagEntry(
   params: TagEntryParams,
 ): Promise<TagEntryResult> {
-  const { ontology, entryId, section, paragraph, labelOverride } = params;
+  const {
+    ontology,
+    entryId,
+    section,
+    paragraph,
+    labelOverride,
+    structuredColumns,
+    projectPath,
+  } = params;
 
   // Validate paragraph exists in brief content (if content available)
   if (paragraph !== undefined && briefContent !== undefined) {
@@ -273,6 +287,33 @@ export async function tagEntry(
       .join(", ");
   }
 
+  // Structured section: write visible table row to BRIEF.md
+  let tableRowWritten: boolean | undefined;
+  if (structuredColumns && structuredColumns.length > 0 && projectPath) {
+    try {
+      const briefContent_ = await readBrief(projectPath);
+      // Find the section content by locating the ## heading
+      const sectionHeadingRe = new RegExp(
+        `(## ${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?)(?=\\n## |\\n# |$)`,
+      );
+      const sectionMatch = briefContent_.match(sectionHeadingRe);
+      if (sectionMatch) {
+        const oldSection = sectionMatch[1];
+        const newSection = appendTableRow(
+          oldSection,
+          entryData,
+          structuredColumns,
+          comment,
+        );
+        const updatedBrief = briefContent_.replace(oldSection, newSection);
+        await writeBrief(projectPath, updatedBrief);
+        tableRowWritten = true;
+      }
+    } catch {
+      /* best-effort: tag registration succeeds even if table write fails */
+    }
+  }
+
   return {
     tagged: true,
     comment,
@@ -290,6 +331,7 @@ export async function tagEntry(
     extensionName,
     scopeWarning,
     entryReferences,
+    tableRowWritten,
   };
 }
 

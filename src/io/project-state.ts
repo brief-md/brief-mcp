@@ -108,14 +108,17 @@ export async function writeBrief(
 }
 
 /** Link an ontology dataset to a section via an HTML comment marker (WP7/GAP-G).
- *  Idempotent: replaces existing link if present, inserts if not. */
+ *  Idempotent: replaces existing link if present, inserts if not.
+ *  Optional `columns` array specifies which ontology fields to display as table columns. */
 export async function linkSectionDataset(
   projectPath: string,
   section: string,
   ontologyName: string,
+  columns?: string[],
 ): Promise<void> {
   let content = await readBrief(projectPath);
-  const marker = `<!-- brief:section-dataset ${ontologyName} -->`;
+  const colSuffix = columns?.length ? ` columns:${columns.join(",")}` : "";
+  const marker = `<!-- brief:section-dataset ${ontologyName}${colSuffix} -->`;
   const oldMarkerRe = new RegExp(
     `(## ${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\n)(?:<!-- brief:section-dataset [^>]*-->\\s*\\n)?`,
   );
@@ -133,8 +136,12 @@ export async function linkSectionDataset(
 /** Parse section-dataset comments from BRIEF.md content (WP7/GAP-G). */
 export function parseSectionDatasets(
   content: string,
-): Array<{ section: string; ontologyName: string }> {
-  const results: Array<{ section: string; ontologyName: string }> = [];
+): Array<{ section: string; ontologyName: string; columns?: string[] }> {
+  const results: Array<{
+    section: string;
+    ontologyName: string;
+    columns?: string[];
+  }> = [];
   const lines = content.split("\n");
   let currentSection = "";
 
@@ -144,11 +151,14 @@ export function parseSectionDatasets(
       currentSection = headingMatch[1].trim();
       continue;
     }
-    const datasetMatch = line.match(/<!-- brief:section-dataset (.+?) -->/);
+    const datasetMatch = line.match(
+      /<!-- brief:section-dataset (.+?)(?:\s+columns:([^\s]+))? -->/,
+    );
     if (datasetMatch && currentSection) {
       results.push({
         section: currentSection,
         ontologyName: datasetMatch[1],
+        columns: datasetMatch[2]?.split(","),
       });
     }
   }

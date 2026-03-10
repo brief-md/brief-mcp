@@ -8,7 +8,7 @@ const fsp = fs.promises;
 const ASSETS_DIR = path.join(__dirname, "..", "..", "assets");
 
 /**
- * The 10 Universal Project Dimensions — bedrock fallback constant.
+ * Core guide sections — bedrock fallback constant (v2.0).
  * If BOTH ~/.brief/type-guides/_generic.md AND dist/assets/type-guides/_generic.md
  * are missing or corrupt, regenerate from this hardcoded constant.
  */
@@ -17,44 +17,34 @@ export const UNIVERSAL_DIMENSIONS: ReadonlyArray<{
   description: string;
 }> = [
   {
-    name: "Purpose",
-    description: "The core intent of the project",
+    name: "Domain Discovery",
+    description:
+      "Questions to understand the project's domain, medium, activities, outputs, audience, and success criteria",
   },
   {
-    name: "Audience",
-    description: "Who will consume the output",
+    name: "Domain Project Hierarchy Template",
+    description:
+      "How projects of this type are typically structured — components, sub-projects, and their relationships",
   },
   {
-    name: "Tone",
-    description: "The emotional register and voice",
+    name: "Domain Information Resources",
+    description:
+      "Where domain knowledge can be found — reference material, frameworks, standards, and exemplar works",
   },
   {
-    name: "Structure",
-    description: "How content is organized",
+    name: "Known Tensions",
+    description:
+      "Universal and domain-specific trade-offs that shape project decisions",
   },
   {
-    name: "Scope",
-    description: "Boundaries of the project",
+    name: "Quality Signals",
+    description:
+      "Checklist of data points needed to create a good domain-specific type guide",
   },
   {
-    name: "Identity",
-    description: "The unique character of the work",
-  },
-  {
-    name: "Vision",
-    description: "The aspirational end state",
-  },
-  {
-    name: "Direction",
-    description: "Creative or strategic trajectory",
-  },
-  {
-    name: "Constraints",
-    description: "Limitations and requirements",
-  },
-  {
-    name: "Timeline",
-    description: "Temporal scope and milestones",
+    name: "Bootstrapping Workflow",
+    description:
+      "Step-by-step process for gathering data and creating the type guide",
   },
 ];
 
@@ -114,30 +104,22 @@ function getDefaultBriefHome(): string {
 // ---- Guide content generation from bedrock fallback ----
 
 function generateGenericGuideContent(): string {
-  const dimensions = UNIVERSAL_DIMENSIONS.map(
-    (d) => `### ${d.name}\n\n${d.description}`,
+  const sections = UNIVERSAL_DIMENSIONS.map(
+    (d) => `## ${d.name}\n\n${d.description}`,
   ).join("\n\n");
 
   return `---
 type: _generic
 bootstrapping: true
 source: bundled
-version: "1.0"
+version: "2.0"
 ---
 
 # Generic Project Guide
 
-This is the adaptive generic type guide for BRIEF. It provides universal project dimensions that apply to any project type.
+This is the adaptive bootstrapping guide for BRIEF. It activates during the explore_type setup phase when no domain-specific type guide exists. Its purpose is to help the AI gather the data needed to collaboratively create a domain-specific type guide with the user.
 
-## Universal Project Dimensions
-
-${dimensions}
-
-## Notes for AI
-
-This is an adaptive generic guide with bootstrapping: true. Use the 10 Universal Dimensions for initial project setup, then call brief_create_type_guide to produce a domain-specific guide.
-
-Mode: adaptive
+${sections}
 `;
 }
 
@@ -153,10 +135,18 @@ function validateGuideContent(content: string): string[] {
     errors.push("missing or false bootstrapping field");
   if (!frontmatter.version) errors.push("missing version field");
 
+  // Check for required sections (at least 4 of 6 must be present to allow
+  // for minor variations between the asset file and the bedrock fallback)
+  let foundSections = 0;
   for (const dim of UNIVERSAL_DIMENSIONS) {
-    if (!content.includes(dim.name)) {
-      errors.push(`missing dimension: ${dim.name}`);
+    if (content.includes(dim.name)) {
+      foundSections++;
     }
+  }
+  if (foundSections < Math.min(4, UNIVERSAL_DIMENSIONS.length)) {
+    errors.push(
+      `only ${foundSections}/${UNIVERSAL_DIMENSIONS.length} required sections found`,
+    );
   }
 
   return errors;

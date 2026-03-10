@@ -21,14 +21,14 @@ export const GUIDE_RESOURCE: GuideResource = {
 
 // ---------------------------------------------------------------------------
 // Guide content — built once at module load, cached in memory (static per
-// server version). Covers all 8 interaction patterns, DR-01..08,
+// server version). Covers all 10 interaction patterns, DR-01..08,
 // QUEST-01..11, tool recommendations, multi-MCP guidance, signal format.
 // ---------------------------------------------------------------------------
 
 const GUIDE_CONTENT = `# BRIEF.md Interaction Guide
 
 This guide describes how an AI assistant should interact with the brief-mcp server.
-It covers the 8 interaction patterns, decision recognition rules (DR-01 through DR-08),
+It covers the 10 interaction patterns, decision recognition rules (DR-01 through DR-08),
 question surfacing rules (QUEST-01 through QUEST-11), tool usage recommendations,
 and signal block format documentation.
 
@@ -86,9 +86,16 @@ superseding a decision (\`brief_add_decision\` with \`replaces\`), adding an exc
 
 Extensions add specialised sections to BRIEF.md for specific domains. Use
 \`brief_suggest_extensions\` to recommend extensions for the project type, then
-\`brief_add_extension\` to activate them. During extension setup, proactively surface
-known decision points as questions (QUEST-02) and offer the deferral escape hatch
-(QUEST-11) for questions the user may not be ready to answer.
+present them to the user — explain what each extension adds. After presenting
+suggestions, invite the user to describe any additional extensions their project
+needs that aren't listed. \`brief_add_extension\` accepts any extension name and
+optional subsections — it is not limited to the predefined registry. If the user
+describes a need, create an extension with a descriptive name and relevant subsections.
+Only activate extensions the user approves.
+
+During extension setup, proactively surface known decision points as questions
+(QUEST-02) and offer the deferral escape hatch (QUEST-11) for questions the user
+may not be ready to answer.
 
 ### Pattern 8: Ontology Exploration
 
@@ -99,6 +106,46 @@ Data in ontology packs is user-contributed — always verify before relying on i
 
 In planning sessions, combine \`brief_get_context\` + \`brief_get_questions\` +
 \`brief_check_conflicts\` for a structured state summary (QUEST-07).
+
+### Pattern 9: Collaborative Section Authoring
+
+When populating BRIEF.md sections (What This Is, What This Is NOT, Why This Exists, or any
+extension section), do NOT generate content autonomously. Instead, follow this sequence:
+
+1. **Ask first**: Ask the user to express their thoughts in their own words. Example: "What
+   would you say this project is, in your own words?"
+2. **Listen and reflect**: After the user responds, reflect back what you heard. Identify the
+   core ideas, note any gaps or ambiguities, and ask clarifying questions.
+3. **Offer to refine**: Once the ideas are clear, offer to help polish or structure the text.
+   Example: "Here's a tightened version — does this capture what you mean?"
+4. **Write only after approval**: Call \`brief_update_section\` only after the user confirms
+   the content. Never pre-fill sections with AI-generated content that the user hasn't
+   reviewed.
+
+This applies to all identity sections during project setup (setupPhase: "needs_identity")
+and to extension sections during extension setup. The user's voice should be preserved —
+the AI's role is editor, not author.
+
+### Pattern 10: Type Guide Review
+
+After project creation, if the response includes a \`typeGuide\`, present it to the user
+for review before proceeding. Follow this sequence:
+
+1. **Summarise the guide**: Present the key dimensions, suggested workflow, and known
+   tensions from the type guide in a readable format. Do not dump raw content.
+2. **Ask for fit**: "Does this match what you're going for, or should we look at other
+   type guides?" If \`typeGuideSuggestions\` are present, list them as alternatives.
+3. **Offer alternatives**: If the user wants something different, call
+   \`brief_suggest_type_guides\` with their description, then \`brief_apply_type_guide\`
+   for their chosen guide.
+4. **Apply only after confirmation**: Call \`brief_apply_type_guide\` only after the user
+   agrees to the guide. The guide drives extension and ontology suggestions, so the
+   user should understand what it entails.
+
+If \`setupPhase\` is "choose_type_guide" or "explore_type", type guide review takes
+priority over extension setup. If the guide is generic (\`isGeneric: true\`), use the
+10 Universal Dimensions to explore the project type collaboratively before creating
+a domain-specific guide with \`brief_create_type_guide\`.
 
 ---
 

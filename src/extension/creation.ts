@@ -72,9 +72,8 @@ export const VALID_EXTENSION_SLUGS: ReadonlySet<string> = new Set(
 
 const DEFAULT_CUSTOM_SUBSECTIONS = [
   "Direction/Intent",
-  "Constraints",
+  "Key Elements",
   "References",
-  "Open Questions",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -135,9 +134,9 @@ const SUBSECTION_PROMPTS: Record<string, Record<string, string>> = {
 const DEFAULT_SUBSECTION_PROMPTS: Record<string, string> = {
   "Direction/Intent":
     "What is the creative or strategic direction for this area?",
-  Constraints: "What boundaries, limitations, or rules apply?",
+  "Key Elements":
+    "What are the defining elements, components, or characteristics?",
   References: "What existing works, standards, or examples inform this?",
-  "Open Questions": "What remains unresolved or needs exploration?",
 };
 
 /* ------------------------------------------------------------------ */

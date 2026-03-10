@@ -84,7 +84,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_create_project",
     description:
-      "Create a new BRIEF.md project file. brief-mcp scope: project initialisation. Specify name, type, optional workspace, and extensions.",
+      "Create a new BRIEF.md project file. brief-mcp scope: project initialisation. Specify name, type, optional workspace, and extensions. After creation, follow the setupPhase signal in the response: 'needs_identity' means collaboratively author identity sections with the user (Pattern 9), 'choose_type_guide' or 'explore_type' means review the type guide with the user before proceeding (Pattern 10), 'review_suggestions' means present extension and ontology suggestions for user approval.",
     inputSchema: {
       type: "object",
       properties: {
@@ -120,7 +120,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_reenter_project",
     description:
-      "Resume work on a project by loading its full context. brief-mcp scope: session continuity. Returns decisions, open questions, and recent activity.",
+      "Resume work on a brief-mcp project by loading its full context and re-evaluating setup lifecycle. Returns decisions, open questions, recent activity, AND a setupPhase + nextSteps directive. Always call this after completing a setup phase (identity, type guide) to get the next required step. Follow the __REQUIRED_NEXT_STEPS__ in the response.",
     inputSchema: {
       type: "object",
       properties: {
@@ -405,7 +405,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_update_section",
     description:
-      "Update or clear a section in BRIEF.md. brief-mcp scope: section editing. Pass empty string to clear a section.",
+      "Update or clear a section in BRIEF.md. brief-mcp scope: section editing. IMPORTANT: Follow the collaborative authoring flow (Pattern 9) before calling — ask the user to express their thoughts first, refine collaboratively, and only write after the user approves the content. Pass empty string to clear a section.",
     inputSchema: {
       type: "object",
       properties: {
@@ -414,7 +414,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           description:
             "Project path. Defaults to active project if not specified.",
         },
-        heading: { type: "string", description: "Section heading to update." },
+        heading: {
+          type: "string",
+          description:
+            "Section heading to update (e.g. 'What This Is', 'Key Decisions').",
+        },
         content: {
           type: "string",
           description: "New section content (empty string clears the section).",
@@ -705,7 +709,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_create_type_guide",
     description:
-      "Create or update a type guide file. brief-mcp scope: type guide authoring. If body is empty, a template with sections (Overview, Key Dimensions, Suggested Workflow, Known Tensions, Quality Signals) is generated. Include a '## Known Tensions' section to enable domain-aware conflict detection.",
+      "Create or update a type guide file. brief-mcp scope: type guide authoring. IMPORTANT — Pattern 10: Do NOT pre-write the full body. First call with body omitted or empty to get the template, then present each section (Overview, Key Dimensions, Suggested Workflow, Known Tensions, Quality Signals) to the user for collaborative input. Only write the final body after the user has reviewed and approved the content. Include a '## Known Tensions' section to enable domain-aware conflict detection.",
     inputSchema: {
       type: "object",
       properties: {
@@ -735,10 +739,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: { type: "string" },
           description: "Common child types.",
         },
-        body: { type: "string", description: "Guide body content." },
+        body: {
+          type: "string",
+          description:
+            "Guide body content. Omit or leave empty on first call to get a template. Only provide the full body after collaborating with the user on each section (Pattern 10).",
+        },
         force: { type: "boolean", description: "Overwrite if already exists." },
       },
-      required: ["type", "body"],
+      required: ["type"],
     },
   },
 
@@ -746,7 +754,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_suggest_extensions",
     description:
-      "Suggest BRIEF.md extensions for a project type. brief-mcp scope: extension discovery.",
+      "Suggest BRIEF.md extensions for a project type. brief-mcp scope: extension discovery. After presenting suggestions, invite the user to describe any additional extensions they need — brief_add_extension accepts any name and subsections, not just predefined ones.",
     inputSchema: {
       type: "object",
       properties: {
@@ -767,13 +775,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_add_extension",
     description:
-      "Activate an extension in BRIEF.md to add specialised sections. brief-mcp scope: extension management.",
+      "Activate an extension in BRIEF.md to add specialised sections. brief-mcp scope: extension management. Accepts any extension name and optional subsections — users can define their own extensions beyond the predefined registry. Ask what the extension should cover and what sections it needs.",
     inputSchema: {
       type: "object",
       properties: {
         extension_name: {
           type: "string",
-          description: "Extension to activate.",
+          description:
+            "Name of the extension to activate (e.g. 'sensory_palette', 'narrative_structure').",
         },
         subsections: {
           type: "array",
@@ -853,6 +862,84 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["ontology"],
+    },
+  },
+
+  // --- Structured section tools ---
+  {
+    name: "brief_list_ontology_columns",
+    description:
+      "List available columns for an ontology pack. Use this to discover which fields can be displayed when linking an ontology to a structured section. brief-mcp scope: ontology introspection.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ontology: {
+          type: "string",
+          description: "Pack name to inspect.",
+        },
+      },
+      required: ["ontology"],
+    },
+  },
+  {
+    name: "brief_link_section_dataset",
+    description:
+      "Link an ontology to a structured section with column selection. This makes the section display ontology entries as a visible markdown table with the chosen columns. brief-mcp scope: section management.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        section: {
+          type: "string",
+          description: "Section heading name.",
+        },
+        ontology: {
+          type: "string",
+          description: "Ontology pack name.",
+        },
+        columns: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Columns to display in the table (e.g. ['label', 'description', 'keywords']). Use brief_list_ontology_columns to see available columns.",
+        },
+        project_path: {
+          type: "string",
+          description: "Project path. Defaults to active project.",
+        },
+      },
+      required: ["section", "ontology", "columns"],
+    },
+  },
+  {
+    name: "brief_convert_to_structured",
+    description:
+      "Convert a freeform section to structured. Matches existing text against ontology entries and renders matched entries as a visible markdown table. Preserves unmatched text. brief-mcp scope: section management.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        section: {
+          type: "string",
+          description: "Section heading to convert.",
+        },
+        ontology: {
+          type: "string",
+          description: "Ontology pack to match against.",
+        },
+        columns: {
+          type: "array",
+          items: { type: "string" },
+          description: "Columns to display in the table.",
+        },
+        match_threshold: {
+          type: "number",
+          description: "Minimum match score (0-1). Default: 0.5.",
+        },
+        project_path: {
+          type: "string",
+          description: "Project path. Defaults to active project.",
+        },
+      },
+      required: ["section", "ontology", "columns"],
     },
   },
 
@@ -1105,14 +1192,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_preview_dataset",
     description:
-      "Preview rows and columns from a HuggingFace dataset before converting it to an ontology pack. brief-mcp scope: dataset inspection.",
+      "Preview rows and columns from a dataset before converting it to an ontology pack. Supports any HTTPS URL returning JSON (flat array or HuggingFace format). For HuggingFace dataset IDs, set HF_TOKEN environment variable first. brief-mcp scope: dataset inspection.",
     inputSchema: {
       type: "object",
       properties: {
         source: {
           type: "string",
           description:
-            "HuggingFace dataset ID (e.g., 'huggingface/dataset-name') or HTTPS URL.",
+            "HTTPS URL returning JSON, or HuggingFace dataset ID (e.g., 'org/dataset-name' — requires HF_TOKEN env var).",
         },
         max_rows: {
           type: "number",
@@ -1125,14 +1212,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_fetch_dataset",
     description:
-      "Fetch a dataset and convert it to an ontology pack by mapping columns to entry fields. brief-mcp scope: dataset conversion.",
+      "Fetch a dataset and convert it to an ontology pack by mapping columns to entry fields. Supports any HTTPS URL returning JSON (flat array or HuggingFace format). For HuggingFace dataset IDs, set HF_TOKEN environment variable first. brief-mcp scope: dataset conversion.",
     inputSchema: {
       type: "object",
       properties: {
         source: {
           type: "string",
           description:
-            "HuggingFace dataset ID (e.g., 'huggingface/dataset-name') or HTTPS URL.",
+            "HTTPS URL returning JSON, or HuggingFace dataset ID (e.g., 'org/dataset-name' — requires HF_TOKEN env var).",
         },
         name: {
           type: "string",
@@ -1266,11 +1353,14 @@ const REQUIRED_STRING_PARAMS: Record<string, readonly string[]> = {
   brief_suggest_references: ["context"],
   brief_add_reference: ["section", "title"],
   brief_get_type_guide: ["type"],
-  brief_create_type_guide: ["type", "body"],
+  brief_create_type_guide: ["type"],
   brief_suggest_extensions: ["project_type"],
   brief_add_extension: ["extension_name"],
   brief_remove_extension: ["extension_name"],
   brief_remove_ontology: ["ontology"],
+  brief_list_ontology_columns: ["ontology"],
+  brief_link_section_dataset: ["section", "ontology"],
+  brief_convert_to_structured: ["section", "ontology"],
   brief_create_parent_project: [
     "child_path",
     "parent_directory",
@@ -1350,6 +1440,68 @@ const PARAM_LENGTH_LIMITS: Record<string, number> = {
   label_override: 200,
   notes: 200,
 };
+
+/* ------------------------------------------------------------------ */
+/*  Parameter alias normalization (LLM guess tolerance)                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Common parameter name aliases that LLMs tend to guess instead of the
+ * canonical names defined in TOOL_DEFINITIONS inputSchema.
+ * Tool-specific entries override __global__ entries.
+ */
+const PARAM_ALIASES: Record<string, Record<string, string>> = {
+  brief_update_section: { section: "heading" },
+  brief_add_extension: { extension: "extension_name" },
+  brief_remove_extension: { extension: "extension_name" },
+  __global__: { path: "project_path" },
+};
+
+/**
+ * Normalize aliased parameter names to their canonical equivalents.
+ * - Only remaps if the alias is present AND the canonical name is absent.
+ * - Global aliases only apply when the canonical name is a required param
+ *   for the tool AND the alias name is NOT (avoids breaking tools like
+ *   brief_set_active_project where "path" is the actual canonical name).
+ */
+function normalizeAliases(
+  toolName: string,
+  args: Record<string, unknown>,
+): Record<string, unknown> {
+  const toolAliases = PARAM_ALIASES[toolName];
+  const globalAliases = PARAM_ALIASES.__global__;
+  if (!toolAliases && !globalAliases) return args;
+
+  const result = { ...args };
+
+  // Apply tool-specific aliases
+  if (toolAliases) {
+    for (const [alias, canonical] of Object.entries(toolAliases)) {
+      if (alias in result && !(canonical in result)) {
+        result[canonical] = result[alias];
+        delete result[alias];
+      }
+    }
+  }
+
+  // Apply global aliases (only when canonical is expected but alias is not)
+  if (globalAliases) {
+    const toolRequired = REQUIRED_STRING_PARAMS[toolName] ?? [];
+    for (const [alias, canonical] of Object.entries(globalAliases)) {
+      if (
+        alias in result &&
+        !(canonical in result) &&
+        toolRequired.includes(canonical) &&
+        !toolRequired.includes(alias)
+      ) {
+        result[canonical] = result[alias];
+        delete result[alias];
+      }
+    }
+  }
+
+  return result;
+}
 
 /**
  * Validate tool arguments. Returns an error message string, or null if valid.
@@ -1459,6 +1611,9 @@ const WRITE_TOOLS = new Set<string>([
   "brief_add_workspace",
   "brief_install_ontology",
   "brief_remove_ontology",
+  "brief_list_ontology_columns",
+  "brief_link_section_dataset",
+  "brief_convert_to_structured",
   "brief_tag_entry",
   "brief_remove_tag",
   "brief_add_reference",
@@ -1477,6 +1632,305 @@ function checkRateLimit(toolName: string): boolean {
   return WRITE_TOOLS.has(toolName)
     ? writeBucket.consume()
     : readBucket.consume();
+}
+
+// ---------------------------------------------------------------------------
+// Response formatting — convert tool results to readable output
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a tool result into readable text.
+ * Extracts key content as markdown for tools with large text bodies,
+ * and falls back to indented JSON for everything else.
+ */
+function formatToolResult(toolName: string, result: unknown): string {
+  if (result === null || result === undefined) {
+    return "null";
+  }
+  const r = result as Record<string, unknown>;
+
+  // Surface __REQUIRED_NEXT_STEPS__ prominently at the top
+  const parts: string[] = [];
+  if (r.__REQUIRED_NEXT_STEPS__) {
+    parts.push(`⚠️ ${r.__REQUIRED_NEXT_STEPS__}`);
+  }
+
+  // Tool-specific formatting
+  switch (toolName) {
+    case "brief_get_type_guide": {
+      const guide = r.guide as Record<string, unknown> | undefined;
+      if (guide) {
+        const name = guide.displayName ?? guide.slug ?? "";
+        if (name) parts.push(`# Type Guide: ${name}`);
+        const body = guide.body ?? guide.content;
+        if (typeof body === "string" && body.length > 0) {
+          parts.push(body);
+        }
+        // Add key metadata
+        const meta: string[] = [];
+        if (r.isGeneric) meta.push("generic: true");
+        if (r.matchedViaAlias) meta.push(`alias: ${r.aliasUsed ?? "yes"}`);
+        if (r.signal) meta.push(`signal: ${r.signal}`);
+        if (meta.length > 0) {
+          parts.push(`\n---\n_${meta.join(" | ")}_`);
+        }
+      } else {
+        parts.push(JSON.stringify(result, null, 2));
+      }
+      break;
+    }
+
+    case "brief_create_type_guide": {
+      if (r.created) {
+        parts.push(`Type guide created: ${r.filePath ?? r.type ?? "unknown"}`);
+        if (r.aliases && Array.isArray(r.aliases) && r.aliases.length > 0) {
+          parts.push(`Aliases: ${(r.aliases as string[]).join(", ")}`);
+        }
+        // If body/template was generated, show it
+        const body = r.body ?? r.template;
+        if (typeof body === "string" && body.length > 0) {
+          parts.push(`\n${body}`);
+        }
+      }
+      // Include remaining metadata
+      const meta = { ...r };
+      for (const k of ["__REQUIRED_NEXT_STEPS__", "body", "template"])
+        delete meta[k];
+      parts.push(`\n---\n${JSON.stringify(meta, null, 2)}`);
+      break;
+    }
+
+    case "brief_create_project":
+    case "brief_reenter_project": {
+      // Show identity and setup phase prominently
+      const identity = r.identity as Record<string, unknown> | undefined;
+      if (identity) {
+        parts.push(
+          `**Project:** ${identity.name ?? "unknown"}${identity.type ? ` (${identity.type})` : ""}`,
+        );
+      }
+      if (r.setupPhase) {
+        parts.push(`**Setup Phase:** ${r.setupPhase}`);
+      }
+      if (r.status) {
+        parts.push(`**Status:** ${r.status}`);
+      }
+      // Show nextSteps as a numbered list (if not already in __REQUIRED_NEXT_STEPS__)
+      if (!r.__REQUIRED_NEXT_STEPS__ && Array.isArray(r.nextSteps)) {
+        parts.push(
+          "\n**Next Steps:**",
+          ...(r.nextSteps as string[]).map((s, i) => `${i + 1}. ${s}`),
+        );
+      }
+      // Compact remaining metadata
+      const rest = { ...r };
+      for (const k of [
+        "__REQUIRED_NEXT_STEPS__",
+        "identity",
+        "setupPhase",
+        "status",
+        "nextSteps",
+      ])
+        delete rest[k];
+      if (Object.keys(rest).length > 0) {
+        parts.push(`\n---\n${JSON.stringify(rest, null, 2)}`);
+      }
+      break;
+    }
+
+    case "brief_get_context": {
+      // Format sections as readable text
+      if (r.sections && typeof r.sections === "object") {
+        const sections = r.sections as Record<string, unknown>;
+        for (const [heading, content] of Object.entries(sections)) {
+          if (typeof content === "string" && content.trim()) {
+            parts.push(`## ${heading}\n${content}`);
+          }
+        }
+      }
+      // Compact remaining metadata
+      const rest = { ...r };
+      delete rest.sections;
+      delete rest.__REQUIRED_NEXT_STEPS__;
+      if (Object.keys(rest).length > 0) {
+        parts.push(`\n---\n${JSON.stringify(rest, null, 2)}`);
+      }
+      break;
+    }
+
+    case "brief_browse_ontology":
+    case "brief_get_ontology_entry": {
+      // Format ontology entries readably
+      const entry = (r.entry ?? r) as Record<string, unknown>;
+      if (entry.label || entry.id) {
+        parts.push(`**${entry.label ?? entry.id}**`);
+      }
+      if (typeof entry.description === "string") {
+        parts.push(entry.description);
+      }
+      // Show key fields
+      for (const key of ["keywords", "parents", "children", "references"]) {
+        const val = entry[key];
+        if (Array.isArray(val) && val.length > 0) {
+          parts.push(`**${key}:** ${val.join(", ")}`);
+        }
+      }
+      // Remaining data
+      const rest = { ...r };
+      delete rest.__REQUIRED_NEXT_STEPS__;
+      parts.push(`\n---\n${JSON.stringify(rest, null, 2)}`);
+      break;
+    }
+
+    case "brief_suggest_type_guides": {
+      // Format candidates as a readable list
+      const candidates = r.candidates as
+        | Array<Record<string, unknown>>
+        | undefined;
+      if (candidates && candidates.length > 0) {
+        parts.push("**Type Guide Candidates:**\n");
+        for (const c of candidates) {
+          const name = c.displayName ?? c.slug ?? c.type ?? "unknown";
+          const score = c.score ? ` (score: ${c.score})` : "";
+          parts.push(`- **${name}**${score}`);
+          if (typeof c.description === "string") {
+            parts.push(`  ${c.description}`);
+          }
+        }
+      } else {
+        parts.push(
+          "No matching type guide candidates found. Consider creating a custom guide.",
+        );
+      }
+      if (r.signal) parts.push(`\n_Signal: ${r.signal}_`);
+      break;
+    }
+
+    default: {
+      // Generic auto-formatter for all other tools
+      const rest = { ...r };
+      delete rest.__REQUIRED_NEXT_STEPS__;
+      parts.push(formatGenericResult(rest));
+      break;
+    }
+  }
+
+  return parts.join("\n\n");
+}
+
+// ---------------------------------------------------------------------------
+// Generic result formatter — auto-detects common patterns
+// ---------------------------------------------------------------------------
+
+const STATUS_KEYS = new Set([
+  "success",
+  "created",
+  "tagged",
+  "installed",
+  "removed",
+  "converted",
+  "resolved",
+  "updated",
+  "applied",
+  "dismissed",
+  "linked",
+  "drafted",
+]);
+
+const BODY_KEYS = ["body", "guide", "template"];
+
+function humanize(key: string): string {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim();
+}
+
+function formatGenericResult(obj: Record<string, unknown>): string {
+  const lines: string[] = [];
+  const shown = new Set<string>();
+
+  // 1. Status line from boolean flags
+  for (const key of STATUS_KEYS) {
+    if (obj[key] === true) {
+      lines.push(`${humanize(key)}`);
+      shown.add(key);
+    }
+  }
+
+  // 2. Text body fields — render as markdown blocks
+  for (const key of BODY_KEYS) {
+    const val = obj[key];
+    if (typeof val === "string" && val.length > 0) {
+      lines.push(val);
+      shown.add(key);
+    }
+  }
+
+  // 3. Remaining fields as readable key-value pairs
+  for (const [key, value] of Object.entries(obj)) {
+    if (shown.has(key)) continue;
+    if (value === null || value === undefined) continue;
+    if (typeof value === "boolean" && STATUS_KEYS.has(key)) continue;
+
+    const label = humanize(key);
+
+    if (typeof value === "string") {
+      if (value.length > 200) {
+        // Long text — render as block
+        lines.push(`**${label}:**\n${value}`);
+      } else {
+        lines.push(`**${label}:** ${value}`);
+      }
+    } else if (typeof value === "number") {
+      lines.push(`**${label}:** ${value}`);
+    } else if (typeof value === "boolean") {
+      lines.push(`**${label}:** ${value}`);
+    } else if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+      const allStrings = value.every((v) => typeof v === "string");
+      if (allStrings && value.length <= 3) {
+        lines.push(`**${label}:** ${value.join(", ")}`);
+      } else if (allStrings) {
+        lines.push(
+          `**${label}:**\n${(value as string[]).map((v) => `- ${v}`).join("\n")}`,
+        );
+      } else {
+        // Array of objects — render each compactly
+        lines.push(
+          `**${label}:**\n${value.map((v) => `- ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join("\n")}`,
+        );
+      }
+    } else if (typeof value === "object") {
+      // One-level deep: render sub-fields inline
+      const sub = value as Record<string, unknown>;
+      const subParts: string[] = [];
+      for (const [sk, sv] of Object.entries(sub)) {
+        if (sv === null || sv === undefined) continue;
+        if (
+          typeof sv === "string" ||
+          typeof sv === "number" ||
+          typeof sv === "boolean"
+        ) {
+          subParts.push(`${humanize(sk)}: ${sv}`);
+        } else if (
+          Array.isArray(sv) &&
+          sv.length > 0 &&
+          sv.every((v) => typeof v === "string")
+        ) {
+          subParts.push(`${humanize(sk)}: ${sv.join(", ")}`);
+        }
+      }
+      if (subParts.length > 0) {
+        lines.push(`**${label}:** ${subParts.join(" | ")}`);
+      } else {
+        lines.push(`**${label}:** ${JSON.stringify(sub)}`);
+      }
+    }
+  }
+
+  return lines.length > 0 ? lines.join("\n") : "{}";
 }
 
 // ---------------------------------------------------------------------------
@@ -1514,7 +1968,10 @@ export async function handleToolCall(
     _parseError,
     timeoutMs = 30_000,
   } = params;
-  const args = (rawArgs ?? {}) as Record<string, unknown>;
+  const args = normalizeAliases(
+    name,
+    (rawArgs ?? {}) as Record<string, unknown>,
+  );
 
   // JSON parse errors take priority — return isError:true with parse error message
   if (_parseError !== undefined) {
@@ -1610,8 +2067,9 @@ export async function handleToolCall(
       const handler = TOOL_HANDLERS[name];
       if (handler) {
         const result = await handler(args);
+        const formatted = formatToolResult(name, result);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: "text", text: formatted }],
         };
       }
 
