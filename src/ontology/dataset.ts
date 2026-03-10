@@ -42,6 +42,62 @@ const HF_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_ENTRIES = 50_000;
 
+function getHfHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const token = process.env.HF_TOKEN ?? process.env.HUGGING_FACE_HUB_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/**
+ * Parse a JSON response that may be either HuggingFace format
+ * ({rows: [{row: {...}}]}) or a flat JSON array ([{...}, {...}]).
+ */
+function parseRowsFromJson(
+  data: unknown,
+  maxRows: number,
+): {
+  rows: Array<Record<string, unknown>>;
+  format: string;
+  totalRows?: number;
+} {
+  // HuggingFace format: {rows: [{row: {...}}, ...], num_rows_total: N}
+  if (
+    data !== null &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    "rows" in (data as Record<string, unknown>)
+  ) {
+    const hf = data as {
+      rows?: Array<{ row?: Record<string, unknown> }>;
+      num_rows_total?: number;
+    };
+    const rows = Array.isArray(hf.rows)
+      ? hf.rows
+          .slice(0, maxRows)
+          .map((r) => r.row ?? {})
+          .filter((r) => Object.keys(r).length > 0)
+      : [];
+    return { rows, format: "huggingface", totalRows: hf.num_rows_total };
+  }
+
+  // Flat JSON array: [{...}, {...}, ...]
+  if (Array.isArray(data)) {
+    const rows = data
+      .slice(0, maxRows)
+      .filter(
+        (item): item is Record<string, unknown> =>
+          item !== null && typeof item === "object" && !Array.isArray(item),
+      )
+      .filter((r) => Object.keys(r).length > 0);
+    return { rows, format: "json-array", totalRows: data.length };
+  }
+
+  return { rows: [], format: "unknown" };
+}
+
 // ---------------------------------------------------------------------------
 // previewDataset
 // ---------------------------------------------------------------------------
@@ -84,16 +140,20 @@ export async function previewDataset(params: {
   try {
     const response = await httpGet(url, {
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: getHfHeaders(),
     });
     clearTimeout(timer);
 
     if (!response.ok) {
+      const hint =
+        response.status === 401
+          ? " HuggingFace requires authentication. To set up: 1) Create a free account at huggingface.co, 2) Go to Settings → Access Tokens → New Token, 3) Set HF_TOKEN environment variable (e.g., export HF_TOKEN=hf_xxx or add to your MCP server config)."
+          : "";
       return {
         columns: [],
         sampleRows: [],
         format: "unknown",
-        signal: `Dataset API returned status ${response.status}. Check the dataset ID and try again.`,
+        signal: `Dataset API returned status ${response.status}.${hint} Check the dataset ID and try again.`,
       };
     }
 
@@ -107,23 +167,14 @@ export async function previewDataset(params: {
       };
     }
 
-    const data = JSON.parse(text) as {
-      rows?: Array<{ row?: Record<string, unknown> }>;
-      num_rows_total?: number;
-      features?: Array<{ name: string }>;
-    };
+    const rawData = JSON.parse(text) as unknown;
+    const { rows, format, totalRows } = parseRowsFromJson(rawData, maxRows);
 
-    const rows = Array.isArray(data.rows)
-      ? data.rows
-          .slice(0, maxRows)
-          .map((r) => r.row ?? {})
-          .filter((r) => Object.keys(r).length > 0)
-      : [];
-
-    // Extract columns from first row or features
+    // Extract columns from HF features if available, else from first row
+    const hfData = rawData as { features?: Array<{ name: string }> };
     const columns =
-      Array.isArray(data.features) && data.features.length > 0
-        ? data.features.map((f) => f.name)
+      Array.isArray(hfData.features) && hfData.features.length > 0
+        ? hfData.features.map((f) => f.name)
         : rows.length > 0
           ? Object.keys(rows[0])
           : [];
@@ -131,8 +182,8 @@ export async function previewDataset(params: {
     return {
       columns,
       sampleRows: rows,
-      totalRows: data.num_rows_total,
-      format: "huggingface",
+      totalRows,
+      format,
       signal:
         rows.length > 0
           ? `Preview: ${rows.length} rows, ${columns.length} columns. Use brief_fetch_dataset to convert to an ontology pack.`
@@ -309,6 +360,30 @@ async function fetchAllRows(
     throw new Error("SSRF: URL resolves to private/internal address.");
   }
 
+  // For non-HF URLs, fetch once and parse with format detection
+  const isHfDatasetId = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/.test(source.trim());
+  if (!isHfDatasetId) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HF_TIMEOUT_MS);
+    try {
+      const response = await httpGet(url, {
+        signal: controller.signal,
+        headers: getHfHeaders(),
+      });
+      clearTimeout(timer);
+      if (!response.ok) return [];
+      const text = await response.text();
+      if (text.length > MAX_RESPONSE_SIZE) return [];
+      const rawData = JSON.parse(text) as unknown;
+      const { rows } = parseRowsFromJson(rawData, maxRows);
+      return rows;
+    } catch {
+      clearTimeout(timer);
+      return [];
+    }
+  }
+
+  // HuggingFace paginated fetch
   const allRows: Array<Record<string, unknown>> = [];
   let offset = 0;
   const pageSize = 100;
@@ -325,7 +400,7 @@ async function fetchAllRows(
     try {
       const response = await httpGet(pageUrl, {
         signal: controller.signal,
-        headers: { Accept: "application/json" },
+        headers: getHfHeaders(),
       });
       clearTimeout(timer);
 

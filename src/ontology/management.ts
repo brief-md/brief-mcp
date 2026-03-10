@@ -5,6 +5,7 @@ import { buildIndex, searchIndex } from "./indexer.js";
 import {
   ensureBundledPacks,
   loadAllPacks,
+  loadPackFromDisk,
   removePackFromDisk,
   savePackToDisk,
 } from "./pack-loader.js";
@@ -94,6 +95,28 @@ export function getPackIndex(
   packName: string,
 ): ReturnType<typeof buildIndex> | undefined {
   return packIndexes.get(packName);
+}
+
+/**
+ * Reload a pack from disk into the in-memory cache.
+ * Useful when pack.json has been overwritten externally (e.g. after
+ * brief_create_ontology template is replaced with real data).
+ */
+export async function reloadPackFromDisk(
+  packName: string,
+): Promise<ReturnType<typeof buildIndex> | undefined> {
+  try {
+    const pack = await loadPackFromDisk(packName);
+    if (!pack) return undefined;
+    const index = buildIndex({
+      name: pack.name,
+      entries: pack.entries as Array<Record<string, unknown>>,
+    });
+    packIndexes.set(pack.name, index);
+    return index;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

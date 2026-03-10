@@ -2,7 +2,7 @@
 
 import { NotFoundError } from "../errors/error-types.js";
 import defaultLogger from "../observability/logger.js";
-import { getPackIndex, installPack } from "./management.js";
+import { getPackIndex, installPack, reloadPackFromDisk } from "./management.js";
 
 // Lazy import to avoid fixture contamination at module load time
 let _isTaggedFn: ((ontology: string, entryId: string) => boolean) | undefined;
@@ -420,12 +420,20 @@ export async function getOntologyEntry(params: {
 }): Promise<{ entry: EntryResult }> {
   const { ontology, entryId, fields, detailLevel = "standard" } = params;
 
-  const index = getPackIndex(ontology);
+  let index = getPackIndex(ontology);
   if (!index) {
     throw makeNotFoundError(`Pack '${ontology}' not found`);
   }
 
-  const rawEntry = index.entries.get(entryId);
+  let rawEntry = index.entries.get(entryId);
+  // If entry not found, try reloading from disk (pack may have been overwritten)
+  if (!rawEntry) {
+    const reloaded = await reloadPackFromDisk(ontology);
+    if (reloaded) {
+      index = reloaded;
+      rawEntry = index.entries.get(entryId);
+    }
+  }
   if (!rawEntry) {
     throw makeNotFoundError(
       `Entry '${ontology}:${entryId}' not found`,
@@ -461,12 +469,20 @@ export async function browseOntology(params: {
   // Eagerly initialize isTagged for alreadyTagged enrichment
   await getIsTagged();
 
-  const index = getPackIndex(ontology);
+  let index = getPackIndex(ontology);
   if (!index) {
     throw makeNotFoundError(`Pack '${ontology}' not found`);
   }
 
-  const rawEntry = index.entries.get(entryId);
+  let rawEntry = index.entries.get(entryId);
+  // If entry not found, try reloading from disk (pack may have been overwritten)
+  if (!rawEntry) {
+    const reloaded = await reloadPackFromDisk(ontology);
+    if (reloaded) {
+      index = reloaded;
+      rawEntry = index.entries.get(entryId);
+    }
+  }
   if (!rawEntry) {
     throw makeNotFoundError(
       `Entry '${entryId}' not found in pack '${ontology}'`,
@@ -629,4 +645,49 @@ export async function browseOntology(params: {
   }
 
   return response;
+}
+
+// ─── Column Listing ──────────────────────────────────────────────────────────
+
+/**
+ * List available columns for an ontology pack by sampling entries.
+ * Helps users choose which columns to display in structured sections.
+ */
+export function listOntologyColumns(params: { ontology: string }): {
+  columns: Array<{ name: string; sampleValues: string[] }>;
+  entryCount: number;
+} {
+  const packIndex = getPackIndex(params.ontology);
+  if (!packIndex) {
+    throw new Error(`Pack '${params.ontology}' not found`);
+  }
+
+  // Collect all unique keys from entries, sample values
+  const columnMap = new Map<string, string[]>();
+  let sampled = 0;
+
+  for (const [, entry] of packIndex.entries) {
+    const data = entry as Record<string, unknown>;
+    for (const [key, value] of Object.entries(data)) {
+      if (!columnMap.has(key)) {
+        columnMap.set(key, []);
+      }
+      const samples = columnMap.get(key) ?? [];
+      if (samples.length < 3 && value !== undefined && value !== null) {
+        const formatted = Array.isArray(value)
+          ? value.slice(0, 2).join("; ")
+          : String(value).slice(0, 80);
+        if (formatted) samples.push(formatted);
+      }
+    }
+    sampled++;
+    if (sampled >= 10) break;
+  }
+
+  const columns = [...columnMap.entries()].map(([name, sampleValues]) => ({
+    name,
+    sampleValues,
+  }));
+
+  return { columns, entryCount: packIndex.entries.size };
 }
