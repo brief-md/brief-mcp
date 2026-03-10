@@ -78,6 +78,7 @@ import {
   setTutorialDismissed,
   startTutorial,
 } from "../workspace/reentry.js"; // check-rules-ignore
+import { buildGuideContent } from "./guide.js"; // check-rules-ignore
 
 // ---------------------------------------------------------------------------
 // Server reference for sampling access
@@ -166,6 +167,8 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       (result as Record<string, unknown>).__REQUIRED_NEXT_STEPS__ =
         `STOP and follow these steps IN ORDER before doing anything else:\n${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
     }
+    // Embed the interaction guide so the AI sees all patterns and rules
+    (result as Record<string, unknown>).__GUIDE__ = buildGuideContent();
     return result;
   },
   brief_create_sub_project: (args) =>
@@ -188,6 +191,8 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       (result as Record<string, unknown>).__REQUIRED_NEXT_STEPS__ =
         `STOP and follow these steps IN ORDER before doing anything else:\n${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
     }
+    // Embed the interaction guide so the AI sees all patterns and rules
+    (result as Record<string, unknown>).__GUIDE__ = buildGuideContent();
     return result;
   },
   brief_start_tutorial: () => startTutorial(),

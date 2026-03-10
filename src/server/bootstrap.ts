@@ -1738,10 +1738,15 @@ function formatToolResult(toolName: string, result: unknown): string {
           ...(r.nextSteps as string[]).map((s, i) => `${i + 1}. ${s}`),
         );
       }
+      // Include the interaction guide so the AI knows all patterns and rules
+      if (typeof r.__GUIDE__ === "string") {
+        parts.push(`\n---\n${r.__GUIDE__}`);
+      }
       // Compact remaining metadata
       const rest = { ...r };
       for (const k of [
         "__REQUIRED_NEXT_STEPS__",
+        "__GUIDE__",
         "identity",
         "setupPhase",
         "status",
