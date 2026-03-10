@@ -59,9 +59,9 @@ describe("TASK-08: MCP Server Bootstrap", () => {
   });
 
   describe("tool registration [MCP-02, MCP-06]", () => {
-    it("listing tools returns exactly 52 definitions [MCP-02]", async () => {
+    it("listing tools returns exactly 55 definitions [MCP-02]", async () => {
       const tools = await getRegisteredTools();
-      expect(tools).toHaveLength(52);
+      expect(tools).toHaveLength(55);
     });
 
     it("every tool name starts with brief_ [MCP-06]", async () => {
@@ -71,7 +71,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
       }
     });
 
-    it("registered tool names match exact spec list of 52 tools [MCP-02]", async () => {
+    it("registered tool names match exact spec list of 55 tools [MCP-02]", async () => {
       const tools = await getRegisteredTools();
       const toolNames = tools.map((t: any) => t.name).sort();
       const expectedTools = [
@@ -140,6 +140,10 @@ describe("TASK-08: MCP Server Bootstrap", () => {
         "brief_preview_dataset",
         "brief_fetch_dataset",
         "brief_ontology_draft",
+        // WP7: Structured section tools
+        "brief_list_ontology_columns",
+        "brief_link_section_dataset",
+        "brief_convert_to_structured",
       ].sort();
       expect(toolNames).toEqual(expectedTools);
     });
@@ -614,5 +618,58 @@ describe("TASK-08: Property Tests", () => {
       }),
       { numRuns: 5 },
     );
+  });
+
+  describe("parameter alias normalization", () => {
+    it("brief_update_section accepts 'section' as alias for 'heading'", async () => {
+      const result = await handleToolCall({
+        name: "brief_update_section",
+        arguments: { section: "What This Is", content: "Test content" },
+      });
+      // Should NOT be a validation error about missing 'heading'
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).not.toContain("Missing required parameter");
+    });
+
+    it("brief_update_section still works with canonical 'heading'", async () => {
+      const result = await handleToolCall({
+        name: "brief_update_section",
+        arguments: { heading: "What This Is", content: "Test content" },
+      });
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).not.toContain("Missing required parameter");
+    });
+
+    it("brief_add_extension accepts 'extension' as alias for 'extension_name'", async () => {
+      const result = await handleToolCall({
+        name: "brief_add_extension",
+        arguments: { extension: "sensory_palette" },
+      });
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).not.toContain("Missing required parameter");
+    });
+
+    it("brief_set_active_project 'path' is NOT remapped to 'project_path'", async () => {
+      const result = await handleToolCall({
+        name: "brief_set_active_project",
+        arguments: { path: "/some/project" },
+      });
+      const text = (result.content[0] as { text: string }).text;
+      // Should not fail with "Missing required parameter: path"
+      expect(text).not.toContain("Missing required parameter");
+    });
+
+    it("canonical param wins when both alias and canonical are provided", async () => {
+      const result = await handleToolCall({
+        name: "brief_update_section",
+        arguments: {
+          section: "Wrong Heading",
+          heading: "What This Is",
+          content: "Test",
+        },
+      });
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).not.toContain("Missing required parameter");
+    });
   });
 });

@@ -26,8 +26,7 @@ describe("TASK-43: Extension — Creation & Listing", () => {
       const expectedSubsections = [
         "Direction",
         "References",
-        "Constraints",
-        "Open Questions",
+        "Key Elements",
         "Direction/Intent",
       ];
       const hasExpected = result.subsections.some((s: string) =>
@@ -171,16 +170,17 @@ describe("metadata key format [WRITE-08]", () => {
 });
 
 describe("subsection convention [COMPAT-12, T43-03]", () => {
-  it("custom extension subsections follow Direction/Constraints/References/Questions convention [COMPAT-12, T43-03]", async () => {
+  it("custom extension subsections follow Direction/Key Elements/References convention [COMPAT-12, T43-03]", async () => {
     const result = await addExtension({ extensionName: "MY CUSTOM EXT" });
     const subsections = result.subsections || [];
-    // T43-03: all four standard subsections must be present (not just Direction/Intent and References)
+    // T43-03: all standard subsections must be present — no core-level sections (Constraints, Open Questions)
     expect(subsections).toContain("Direction/Intent");
+    expect(subsections).toContain("Key Elements");
     expect(subsections).toContain("References");
-    expect(subsections).toContain("Constraints");
-    expect(
-      subsections.some((s: string) => /open questions|questions/i.test(s)),
-    ).toBe(true);
+    expect(subsections).not.toContain("Constraints");
+    expect(subsections.some((s: string) => /open questions/i.test(s))).toBe(
+      false,
+    );
   });
 });
 

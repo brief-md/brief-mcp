@@ -29,13 +29,13 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
       expect(guide.frontmatter.version).toBeDefined();
     });
 
-    it("generic guide markdown body: includes 10 Universal Project Dimensions [COMPAT-08]", () => {
+    it("generic guide markdown body: includes core guide sections [COMPAT-08]", () => {
       const guide = loadGenericGuide();
       expect(guide.body).toBeDefined();
       expect(guide.body.length).toBeGreaterThan(100);
-      // Verify dimensional content is present (at least some dimension-like headings)
+      // Verify v2.0 guide sections are present
       expect(guide.body).toMatch(
-        /purpose|audience|tone|structure|scope|identity|vision|direction|constraints|timeline/i,
+        /Domain Discovery|Domain Project Hierarchy|Known Tensions|Quality Signals|Bootstrapping Workflow/i,
       );
     });
   });
@@ -148,10 +148,11 @@ describe("TASK-53: Cross-Cutting — Bundled Content", () => {
   });
 
   describe("bedrock fallback [COMPAT-08]", () => {
-    it("10 Universal Project Dimensions bundled as constant", () => {
+    it("core guide sections bundled as constant", () => {
       expect(Array.isArray(UNIVERSAL_DIMENSIONS)).toBe(true);
-      expect(UNIVERSAL_DIMENSIONS.length).toBe(10);
+      expect(UNIVERSAL_DIMENSIONS.length).toBe(6);
       expect(UNIVERSAL_DIMENSIONS[0]).toHaveProperty("name");
+      expect(UNIVERSAL_DIMENSIONS[0]).toHaveProperty("description");
     });
   });
 

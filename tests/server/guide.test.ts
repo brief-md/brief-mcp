@@ -19,20 +19,26 @@ describe("TASK-25: Server — MCP Resource brief://guide", () => {
       expect(result.content.length).toBeGreaterThan(0);
     });
 
-    it("guide content contains all 8 interaction pattern descriptions [QUEST-01]", async () => {
+    it("guide content contains all 10 interaction pattern descriptions [QUEST-01]", async () => {
       const result = await getGuideResource();
       // G-175: tighten at least 2 regexes to be more specific
       // Pattern 1: Session Start — must mention "session" and "start" together
       expect(result.content).toMatch(/session[\s_-]?start/i);
       // Pattern 2: Re-entry — must mention "re-entry" or "reentry" or "re-enter"
       expect(result.content).toMatch(/re-?entr(?:y|ance)|reenter/i);
-      // Remaining 6 patterns with standard checks
+      // Remaining patterns with standard checks
       expect(result.content).toMatch(/decision/i);
       expect(result.content).toMatch(/question/i);
       expect(result.content).toMatch(/conflict/i);
       expect(result.content).toMatch(/extension/i);
       expect(result.content).toMatch(/ontology/i);
       expect(result.content).toMatch(/external/i);
+      // Pattern 9: Collaborative Section Authoring
+      expect(result.content).toMatch(
+        /collaborative.*authoring|section.*authoring/i,
+      );
+      // Pattern 10: Type Guide Review
+      expect(result.content).toMatch(/type\s+guide\s+review/i);
       // Content should have substantial length indicating multiple patterns
       expect(result.content.length).toBeGreaterThan(500);
     });
