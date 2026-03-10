@@ -21,14 +21,14 @@ export const GUIDE_RESOURCE: GuideResource = {
 
 // ---------------------------------------------------------------------------
 // Guide content — built once at module load, cached in memory (static per
-// server version). Covers all 10 interaction patterns, DR-01..08,
+// server version). Covers all 9 interaction patterns, DR-01..08,
 // QUEST-01..11, tool recommendations, multi-MCP guidance, signal format.
 // ---------------------------------------------------------------------------
 
 const GUIDE_CONTENT = `# BRIEF.md Interaction Guide
 
 This guide describes how an AI assistant should interact with the brief-mcp server.
-It covers the 10 interaction patterns, decision recognition rules (DR-01 through DR-08),
+It covers the 9 interaction patterns, decision recognition rules (DR-01 through DR-08),
 question surfacing rules (QUEST-01 through QUEST-11), tool usage recommendations,
 and signal block format documentation.
 
@@ -38,12 +38,18 @@ and signal block format documentation.
 
 ### Pattern 1: Session Start
 
-At the start of every session, call \`brief_get_context\` with the active project path.
-This returns the full BRIEF.md context including metadata, decisions, constraints,
-open questions, and extension content. Always do this before any other work.
+At the start of every session, determine if this is an **existing project** or a **new project**:
 
-Use \`brief_get_context\` scope parameter to walk the project hierarchy and include
-parent context when working on a sub-project.
+- **Existing project**: call \`brief_reenter_project\` with the project path. This sets the
+  active project and returns a structured summary: identity, decisions, open questions,
+  section fill state, detected conflicts, intentional tensions, lifecycle phase, and
+  required next steps. Follow the \`__REQUIRED_NEXT_STEPS__\` in the response before doing
+  anything else. Ask about any external tool sessions since last visit (DR-06).
+- **New project**: call \`brief_create_project\` to initialise a new BRIEF.md.
+
+Use \`brief_get_context\` **mid-session** for targeted lookups (e.g. reading specific
+sections, walking the project hierarchy via the scope parameter). It returns the raw
+BRIEF.md content — useful for deep reads but not as a session-start tool.
 
 ### Pattern 2: Decision Capture
 
@@ -59,14 +65,7 @@ placeholders (no action needed) and genuine open questions that block progress o
 shape other decisions (QUEST-01). Capture questions with \`brief_add_question\`,
 providing options and impact where possible (QUEST-08).
 
-### Pattern 4: Re-Entry
-
-When returning to a project after time away, call \`brief_reenter_project\` to load
-the full context and see what has changed. The re-entry flow presents "To Resolve"
-questions as action items and "To Keep Open" questions as intentional ambiguities
-(QUEST-06). Ask about any external tool sessions since last visit (DR-06).
-
-### Pattern 5: External Session
+### Pattern 4: External Session
 
 When the user returns from working in external tools (e.g. Suno AI, Figma, Ableton),
 capture what happened via \`brief_capture_external_session\`. Extract decisions from
@@ -74,7 +73,7 @@ the user's narrative using DR-01 signal detection, apply DR-02 elicitation to ea
 and record the session summary with breadcrumb links. Never claim to know what happened
 in an external session — only capture what the user narrates.
 
-### Pattern 6: Conflict Resolution
+### Pattern 5: Conflict Resolution
 
 Use \`brief_check_conflicts\` to detect contradictions between decisions in the
 BRIEF.md hierarchy. When conflicts are found, help the user resolve them by
@@ -82,7 +81,7 @@ presenting the conflicting decisions and their rationale. Resolution may involve
 superseding a decision (\`brief_add_decision\` with \`replaces\`), adding an exception
 (\`exception_to\`), or adding a new decision that clarifies the relationship.
 
-### Pattern 7: Extension Setup
+### Pattern 6: Extension Setup
 
 Extensions hold **source material, creative inputs, and structured data** that inform the
 project. They are NOT deliverables or outputs. If a user suggests subsections like "Logline",
@@ -92,7 +91,7 @@ profiles, visual references, etc.). Decisions and questions are also NOT part of
 they are tracked separately via \`brief_add_decision\` and \`brief_add_question\`.
 
 An extension has a **title** and **subsections**. Each subsection is either:
-- **Freeform**: user writes text (use Pattern 9 — collaborative authoring)
+- **Freeform**: user writes text (use Pattern 8 — collaborative authoring)
 - **Structured**: linked to exactly **one** ontology, holds **multiple entries** from
   that ontology as table rows (e.g. a "Themes" subsection linked to theme-pack contains
   Nostalgia, Teamwork, etc. as rows — do NOT create one subsection per entry)
@@ -112,14 +111,14 @@ ontologies, use two separate subsections.
 4. For each **structured** subsection:
    a. \`brief_link_section_dataset\` — link the ontology to the subsection with columns
    b. \`brief_tag_entry\` — add entries from the ontology (repeat for each entry)
-5. For each **freeform** subsection: use Pattern 9 (collaborative authoring).
+5. For each **freeform** subsection: use Pattern 8 (collaborative authoring).
 6. Only activate extensions the user approves.
 
 During extension setup, proactively surface known decision points as questions
 (QUEST-02) and offer the deferral escape hatch (QUEST-11) for questions the user
 may not be ready to answer.
 
-### Pattern 8: Ontology Exploration
+### Pattern 7: Ontology Exploration
 
 Ontology packs provide shared vocabulary for project domains. Use
 \`brief_search_ontology\` to find relevant terms, \`brief_browse_ontology\` to explore
@@ -129,7 +128,7 @@ Data in ontology packs is user-contributed — always verify before relying on i
 In planning sessions, combine \`brief_get_context\` + \`brief_get_questions\` +
 \`brief_check_conflicts\` for a structured state summary (QUEST-07).
 
-### Pattern 9: Collaborative Section Authoring
+### Pattern 8: Collaborative Section Authoring
 
 When populating BRIEF.md sections (What This Is, What This Is NOT, Why This Exists, or any
 extension section), do NOT generate content autonomously. Instead, follow this sequence:
@@ -148,7 +147,7 @@ This applies to all identity sections during project setup (setupPhase: "needs_i
 and to extension sections during extension setup. The user's voice should be preserved —
 the AI's role is editor, not author.
 
-### Pattern 10: Type Guide Review
+### Pattern 9: Type Guide Review
 
 After project creation, if the response includes a \`typeGuide\`, present it to the user
 for review before proceeding. Follow this sequence:

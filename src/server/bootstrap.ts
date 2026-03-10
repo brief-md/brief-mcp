@@ -120,11 +120,17 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_reenter_project",
     description:
-      "Resume work on a brief-mcp project by loading its full context and re-evaluating setup lifecycle. Returns decisions, open questions, recent activity, AND a setupPhase + nextSteps directive. Always call this after completing a setup phase (identity, type guide) to get the next required step. Follow the __REQUIRED_NEXT_STEPS__ in the response.",
+      "Start every brief-mcp session with this for existing projects. Returns a structured summary: identity, decisions, open questions, section fill state, conflicts, intentional tensions, lifecycle phase, and required next steps. Sets the active project. Follow the __REQUIRED_NEXT_STEPS__ in the response before doing anything else. Also call after completing a setup phase to get the next required step.",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string", description: "Project path to re-enter." },
+        detail: {
+          type: "string",
+          enum: ["summary", "detailed"],
+          description:
+            "Level of detail for section overview. 'summary' (default): section names + filled/empty flags. 'detailed': includes word counts and extension fill state.",
+        },
       },
     },
   },
@@ -172,7 +178,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_get_context",
     description:
-      "Call this at the start of every session. Returns full project context from BRIEF.md. brief-mcp scope: session initialisation. Use scope to walk the project hierarchy.",
+      "Read full project context from BRIEF.md mid-session. Use for targeted section lookups or walking the project hierarchy via scope. For session start, prefer brief_reenter_project instead.",
     inputSchema: {
       type: "object",
       properties: {
