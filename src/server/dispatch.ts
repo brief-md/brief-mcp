@@ -105,6 +105,7 @@ function withProjectPath(args: Args): Args {
     if (active?.path) {
       return { ...args, project_path: active.path };
     }
+    return { ...args, _noActiveProject: true };
   }
   return args;
 }
@@ -418,6 +419,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       typed<Parameters<typeof addExtension>[0]>(
         remap(withProjectPath(args), {
           extension_name: "extensionName", // check-rules-ignore
+          section_modes: "sectionModes",
           project_path: "projectPath",
         }),
       ),

@@ -283,8 +283,13 @@ export async function handleUpdateSection(
       await writeSectionToDisk(projectPath, canonical, content);
       result.confirmation = `Section '${canonical}' updated in ${filePath}.`;
     }
+    result.persisted = true;
   } else {
     // Fallback: update in-memory store for test compat
+    result.persisted = false;
+    warnings.push(
+      "BRIEF.md not found on disk — changes saved in-memory only and will be lost on restart. Ensure an active project is set.",
+    );
     const existing = sectionStore.find((s) => s.name === canonical);
     if (existing) {
       if (append) {
@@ -371,6 +376,7 @@ export async function handleCaptureExternalSession(
   const breadcrumb = `- ${dateStr} ${tool}: ${count} decisions captured \u2014 ${titles.join(", ")}`;
 
   // Write to disk if a project exists
+  let persisted = false;
   if (await projectExists(projectPath)) {
     for (const d of decisions) {
       const decisionLine = d.why
@@ -379,12 +385,18 @@ export async function handleCaptureExternalSession(
       await appendToSection(projectPath, "Key Decisions", decisionLine);
     }
     await appendToSection(projectPath, "External Tool Sessions", breadcrumb);
+    persisted = true;
   }
 
   return {
     success: true,
     decisionsWritten: count,
     breadcrumbWritten: true,
+    persisted,
+    ...(!persisted && {
+      persistWarning:
+        "BRIEF.md not found on disk — changes not persisted. Ensure an active project is set.",
+    }),
     filePath,
     breadcrumbFormat: breadcrumb,
     breadcrumb,

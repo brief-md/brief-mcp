@@ -19,8 +19,19 @@ export async function removeExtension(params: {
   warnings: string[];
 }> {
   const { extensionName, removeContent = false } = params;
-  const projectPath =
-    params.projectPath ?? getActiveProject()?.path ?? "/default-workspace";
+  const projectPath = params.projectPath ?? getActiveProject()?.path;
+
+  if (!projectPath) {
+    return {
+      removed: false,
+      sectionsRemoved: [],
+      metadataUpdated: false,
+      filePath: "",
+      warnings: [
+        "No active project set and no project_path provided. Use brief_set_active_project first.",
+      ],
+    };
+  }
 
   const warnings: string[] = [];
 

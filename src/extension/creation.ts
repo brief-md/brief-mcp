@@ -1,6 +1,9 @@
 import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
+import defaultLogger from "../observability/logger.js"; // check-rules-ignore
 import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
 import { syncExtensionMetadata } from "../writer/metadata-sync.js"; // check-rules-ignore
+
+const logger = defaultLogger;
 
 /* ------------------------------------------------------------------ */
 /*  Bundled Extension Registry — six spec-defined extensions (COMPAT-05) */
@@ -340,6 +343,7 @@ export async function addExtension(params: {
   /* Persist to BRIEF.md if there's an active project (Gap 4) */
   let persisted = false;
   let resultFilePath: string | undefined;
+  let persistWarning: string | undefined;
   const targetPath = params.projectPath ?? getActiveProject()?.path;
   if (targetPath) {
     try {
@@ -352,9 +356,18 @@ export async function addExtension(params: {
       await writeBrief(targetPath, briefContent);
       persisted = true;
       resultFilePath = `${targetPath}/BRIEF.md`;
-    } catch {
-      /* best-effort: in-memory creation succeeds even if disk write fails */
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn("Failed to persist extension to BRIEF.md", {
+        extensionName: metadataFormat,
+        targetPath,
+        error: message,
+      });
+      persistWarning = `Write to disk failed: ${message}. Extension created in-memory only.`;
     }
+  } else {
+    persistWarning =
+      "No active project set and no project_path provided. Extension created in-memory only.";
   }
 
   /* Chain associated ontologies (Gap 9) */
@@ -387,8 +400,9 @@ export async function addExtension(params: {
     referencePrompt,
     ...(sectionModes && { sectionModes }),
     ...(nextSteps && { nextSteps }),
-    ...(persisted && { persisted: true }),
+    persisted,
     ...(resultFilePath && { filePath: resultFilePath }),
+    ...(persistWarning && { persistWarning }),
     ...(associatedOntologies &&
       associatedOntologies.length > 0 && { associatedOntologies }),
     ...(ontologyHint && { ontologyHint }),
