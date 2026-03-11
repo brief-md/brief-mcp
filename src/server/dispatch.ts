@@ -237,7 +237,10 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   brief_add_constraint: (args) =>
     handleAddConstraint(
       typed<Parameters<typeof handleAddConstraint>[0]>(
-        remap(withProjectPath(args), { project_path: "projectPath" }),
+        remap(withProjectPath(args), {
+          project_path: "projectPath",
+          constraint: "text",
+        }), // check-rules-ignore
       ),
     ),
   brief_add_question: (args) =>
