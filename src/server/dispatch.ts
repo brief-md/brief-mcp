@@ -424,7 +424,17 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
   // Type intelligence
   brief_get_type_guide: (args) => getTypeGuide(args),
-  brief_create_type_guide: (args) => createTypeGuide(args),
+  brief_create_type_guide: (args) =>
+    createTypeGuide(
+      remap(args, {
+        type_aliases: "typeAliases", // check-rules-ignore
+        suggested_extensions: "suggestedExtensions",
+        suggested_ontologies: "suggestedOntologies",
+        common_parent_types: "commonParentTypes",
+        common_child_types: "commonChildTypes",
+        reference_sources: "referenceSources",
+      }),
+    ),
 
   // Extension
   brief_suggest_extensions: (args) =>
