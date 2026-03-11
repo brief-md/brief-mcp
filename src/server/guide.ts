@@ -32,6 +32,13 @@ It covers the 9 interaction patterns, decision recognition rules (DR-01 through 
 question surfacing rules (QUEST-01 through QUEST-11), tool usage recommendations,
 and signal block format documentation.
 
+> **IMPORTANT — Do not edit BRIEF.md directly.**
+> All modifications to BRIEF.md must go through \`brief_*\` tools. Never use file-editing
+> tools (write_file, edit_file, insert_text, etc.) to modify BRIEF.md content. The tools
+> enforce formatting rules, structural validation, and metadata tracking that manual edits
+> bypass. If no \`brief_*\` tool exists for a specific change, ask the user how to proceed
+> rather than editing the file directly.
+
 ---
 
 ## Interaction Patterns
