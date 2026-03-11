@@ -420,6 +420,12 @@ export async function getOntologyEntry(params: {
 }): Promise<{ entry: EntryResult }> {
   const { ontology, entryId, fields, detailLevel = "standard" } = params;
 
+  if (!entryId || String(entryId).trim() === "") {
+    throw makeNotFoundError(
+      `entry_id is required. Use brief_search_ontology to find entry IDs first.`,
+    );
+  }
+
   let index = getPackIndex(ontology);
   if (!index) {
     throw makeNotFoundError(`Pack '${ontology}' not found`);
@@ -465,6 +471,12 @@ export async function browseOntology(params: {
   detailLevel?: string;
 }): Promise<BrowseResponse> {
   const { ontology, entryId, direction, detailLevel = "standard" } = params;
+
+  if (!entryId || String(entryId).trim() === "") {
+    throw makeNotFoundError(
+      `entry_id is required for browsing. Use brief_search_ontology to find entry IDs first.`,
+    );
+  }
 
   // Eagerly initialize isTagged for alreadyTagged enrichment
   await getIsTagged();

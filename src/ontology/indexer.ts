@@ -165,7 +165,11 @@ export function buildIndex(pack: {
 
   for (const rawEntry of pack.entries) {
     const entry = rawEntry as Record<string, unknown>;
-    const entryId = entry.id as string;
+    const rawId = entry.id;
+    if (rawId === undefined || rawId === null || String(rawId).trim() === "") {
+      continue; // Skip entries with no valid ID
+    }
+    const entryId = String(rawId);
     const label = (entry.label as string) ?? "";
 
     entries.set(entryId, {
