@@ -59,9 +59,9 @@ describe("TASK-08: MCP Server Bootstrap", () => {
   });
 
   describe("tool registration [MCP-02, MCP-06]", () => {
-    it("listing tools returns exactly 56 definitions [MCP-02]", async () => {
+    it("listing tools returns exactly 57 definitions [MCP-02]", async () => {
       const tools = await getRegisteredTools();
-      expect(tools).toHaveLength(56);
+      expect(tools).toHaveLength(57);
     });
 
     it("every tool name starts with brief_ [MCP-06]", async () => {
@@ -71,7 +71,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
       }
     });
 
-    it("registered tool names match exact spec list of 56 tools [MCP-02]", async () => {
+    it("registered tool names match exact spec list of 57 tools [MCP-02]", async () => {
       const tools = await getRegisteredTools();
       const toolNames = tools.map((t: any) => t.name).sort();
       const expectedTools = [
@@ -114,6 +114,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
         "brief_suggest_references",
         "brief_lookup_reference",
         "brief_add_reference",
+        "brief_discover_references",
         // Type guide tools (TASK-40, TASK-41, TASK-42, TASK-43)
         "brief_get_type_guide",
         "brief_create_type_guide",
@@ -716,6 +717,67 @@ describe("TASK-08: Property Tests", () => {
       const text = (result.content[0] as { text: string }).text;
       // Default subsections include Direction/Intent
       expect(text).toContain("Direction/Intent");
+    });
+  });
+
+  describe("brief_discover_references tool", () => {
+    it("schema has required extension_name", async () => {
+      const tools = await getRegisteredTools();
+      const tool = tools.find(
+        (t: any) => t.name === "brief_discover_references",
+      );
+      expect(tool).toBeDefined();
+      expect(tool!.inputSchema.required).toContain("extension_name");
+    });
+
+    it("returns discovery result with tier signals", async () => {
+      const result = await handleToolCall({
+        name: "brief_discover_references",
+        arguments: {
+          extension_name: "world_building",
+          entry_labels: ["isolation", "family bonds"],
+          project_type: "film",
+        },
+      });
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain("Reference Discovery");
+      expect(text).toContain("world_building");
+    });
+
+    it("builds search query when local results are sparse", async () => {
+      const result = await handleToolCall({
+        name: "brief_discover_references",
+        arguments: {
+          extension_name: "obscure_domain",
+          entry_labels: ["quantum entanglement", "brane cosmology"],
+          project_type: "documentary",
+        },
+      });
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { text: string }).text;
+      // With obscure labels, local results should be sparse → search query generated
+      expect(text).toContain("search query");
+    });
+
+    it("signals manual tier always true", async () => {
+      const result = await handleToolCall({
+        name: "brief_discover_references",
+        arguments: { extension_name: "minimal" },
+      });
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain("brief_add_reference");
+    });
+  });
+
+  describe("brief_add_reference url support", () => {
+    it("schema includes url property", async () => {
+      const tools = await getRegisteredTools();
+      const tool = tools.find((t: any) => t.name === "brief_add_reference");
+      expect(tool).toBeDefined();
+      expect(tool!.inputSchema.properties.url).toBeDefined();
+      expect(tool!.inputSchema.properties.url.type).toBe("string");
     });
   });
 

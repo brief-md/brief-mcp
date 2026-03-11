@@ -44,6 +44,7 @@ import { ontologyDraft } from "../ontology/draft.js"; // check-rules-ignore
 import { installOntology, listOntologies } from "../ontology/management.js"; // check-rules-ignore
 import { searchOntology } from "../ontology/search.js"; // check-rules-ignore
 import { listTags, removeTag, tagEntry } from "../ontology/tagging.js"; // check-rules-ignore
+import { discoverReferences } from "../reference/discovery.js"; // check-rules-ignore
 import { lookupReference } from "../reference/lookup.js"; // check-rules-ignore
 import {
   getEntryReferences,
@@ -405,6 +406,21 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
     lookupReference(typed<Parameters<typeof lookupReference>[0]>(args)),
   brief_add_reference: (args) =>
     addReference(typed<Parameters<typeof addReference>[0]>(args)),
+  brief_discover_references: (args) =>
+    discoverReferences(
+      typed<Parameters<typeof discoverReferences>[0]>(
+        remap(args, {
+          extension_name: "extensionName", // check-rules-ignore
+          extension_description: "extensionDescription",
+          entry_labels: "entryLabels",
+          entry_descriptions: "entryDescriptions",
+          entry_tags: "entryTags",
+          project_type: "projectType",
+          existing_references: "existingReferences",
+          max_results: "maxResults",
+        }),
+      ),
+    ),
 
   // Type intelligence
   brief_get_type_guide: (args) => getTypeGuide(args),

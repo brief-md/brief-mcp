@@ -36,7 +36,7 @@ const logOutput = {
 const logger = createLogger({ module: "server", output: logOutput });
 
 // ---------------------------------------------------------------------------
-// Tool definitions (45 tools — MCP-02, MCP-05, MCP-06)
+// Tool definitions (46 tools — MCP-02, MCP-05, MCP-06)
 // All parameter names use snake_case (A2-04).
 // ---------------------------------------------------------------------------
 
@@ -689,6 +689,10 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         title: { type: "string", description: "Reference title." },
         notes: { type: "string", description: "Optional notes." },
+        url: {
+          type: "string",
+          description: "URL or link to the referenced work.",
+        },
         ontology_links: {
           type: "array",
           items: { type: "object" },
@@ -696,6 +700,54 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["section", "title"],
+    },
+  },
+  {
+    name: "brief_discover_references",
+    description:
+      "Build a context-aware search query from extension data to discover references. Returns local suggestions and a structured web search query. The AI uses the query to search the web, then presents results for multi-selection. brief-mcp scope: reference discovery.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        extension_name: {
+          type: "string",
+          description: "Extension to find references for.",
+        },
+        extension_description: {
+          type: "string",
+          description: "What the extension captures.",
+        },
+        entry_labels: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Labels of entries in the extension (e.g., theme names, character names).",
+        },
+        entry_descriptions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Descriptions of entries.",
+        },
+        entry_tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Tags or categories from entries.",
+        },
+        project_type: {
+          type: "string",
+          description: "Project type for type guide reference hints.",
+        },
+        existing_references: {
+          type: "array",
+          items: { type: "object" },
+          description: "Already-added references to exclude.",
+        },
+        max_results: {
+          type: "number",
+          description: "Max local suggestions (default 10).",
+        },
+      },
+      required: ["extension_name"],
     },
   },
 
@@ -1400,6 +1452,7 @@ const REQUIRED_STRING_PARAMS: Record<string, readonly string[]> = {
   brief_get_entry_references: ["ontology", "entry_id"],
   brief_suggest_references: ["context"],
   brief_add_reference: ["section", "title"],
+  brief_discover_references: ["extension_name"], // check-rules-ignore
   brief_get_type_guide: ["type"],
   brief_create_type_guide: ["type"],
   brief_suggest_extensions: ["project_type"],
@@ -1931,6 +1984,45 @@ function formatToolResult(toolName: string, result: unknown): string {
       parts.push(
         "\nWalk through each subsection with the user. See Pattern 6 workflow for next steps.",
       );
+      break;
+    }
+
+    case "brief_discover_references": {
+      const dExtName = r.extensionName ?? "Extension";
+      parts.push(`**Reference Discovery: ${dExtName}**\n`);
+      const locals = r.localSuggestions as
+        | Array<Record<string, unknown>>
+        | undefined;
+      if (locals && locals.length > 0) {
+        parts.push("**Local suggestions:**");
+        for (let i = 0; i < locals.length; i++) {
+          const s = locals[i];
+          parts.push(`${i + 1}. ${s.creator}: ${s.title} — ${s.matchReason}`);
+        }
+      }
+      const ctx = r.searchContext as Record<string, unknown> | null;
+      if (ctx) {
+        parts.push(`\n**Web search query:** "${ctx.query}"`);
+        if (
+          Array.isArray(ctx.referenceTypes) &&
+          (ctx.referenceTypes as string[]).length > 0
+        ) {
+          parts.push(
+            `**Reference types to search for:** ${(ctx.referenceTypes as string[]).join(", ")}`,
+          );
+        }
+        if (
+          Array.isArray(ctx.searchHints) &&
+          (ctx.searchHints as string[]).length > 0
+        ) {
+          parts.push(
+            `**Search hints:** ${(ctx.searchHints as string[]).join(", ")}`,
+          );
+        }
+      }
+      if (typeof r.instructions === "string") {
+        parts.push(`\n${r.instructions}`);
+      }
       break;
     }
 

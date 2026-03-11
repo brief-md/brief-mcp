@@ -157,20 +157,33 @@ c. \`brief_tag_entry\` for each entry the user selects
 **Step 6 — Set up freeform subsections:**
 Use Pattern 8 (collaborative authoring) for each freeform subsection.
 
-**Step 7 — References:**
-After subsections are set up (or at any point the user seems uncertain about content),
-ask: "Do you have any reference material in mind for this extension? Films, albums, books,
-articles, or other works that inspire or inform this area?"
-- Use \`brief_suggest_references\` with the extension context to surface relevant references
-  from installed packs. Show suggestions and let the user pick.
-- Use \`brief_lookup_reference\` if the user names a specific work — find it in the index.
-- Call \`brief_add_reference\` to add each reference to the relevant subsection.
-- References can inform later steps: if a user is stuck populating a structured subsection,
-  their references provide context for which ontology entries are relevant.
+**Step 7 — References (three-tier discovery):**
+After subsections are set up (or when the user needs help with content), find reference
+material. Call \`brief_discover_references\` with the extension's populated data: entry labels,
+descriptions, tags, and the project type. The tool builds a context-aware search query and
+returns local suggestions plus a structured web search query.
 
-This step can also happen **during** Step 3 or Step 5 — if the user is unsure about
-subsection content or ontology entries, asking about references helps ground the
-conversation in concrete examples they already know.
+a. **Local suggestions:** Present any matches from installed reference packs. Let the user
+   pick multiple from a numbered list.
+
+b. **Web search (when signalled):** If the tool signals \`webSearch: true\`, use the returned
+   search query to search the web for real-world works (films, books, albums, etc.) whose
+   attributes overlap with the extension's entries. Present results with titles, creators,
+   descriptions, and links. Let the user pick multiple.
+
+c. **AI knowledge (when signalled):** If the tool signals \`aiKnowledge: true\`, suggest
+   references from your own knowledge that match the extension context. Describe each briefly
+   with why it matches. Let the user pick.
+
+d. **Manual entry:** The user names a reference directly. Use \`brief_lookup_reference\` to
+   check the index, then \`brief_add_reference\` to record it.
+
+For all selected references, call \`brief_add_reference\` with section, creator, title, notes,
+and url (when available). Present results as a numbered list for multi-selection
+("Pick any combination: 1, 3, 5" or "all").
+
+This step can happen **during** Step 3 or Step 5 — if the user is uncertain about content
+or ontology entries, references help ground the conversation in concrete examples.
 
 **Step 8 — Only activate extensions the user approves.**
 
@@ -403,7 +416,8 @@ When a request involves both context and action, call \`brief_*\` tools first.
 - **\`brief_get_ontology_entry\`**: Look up a specific ontology entry.
 - **\`brief_tag_entry\`**: Tag a BRIEF.md section with an ontology concept.
 - **\`brief_suggest_references\`**: Get reference suggestions for current context.
-- **\`brief_add_reference\`**: Add a bibliographic reference to a section.
+- **\`brief_discover_references\`**: Build a context-aware search query from extension data for reference discovery.
+- **\`brief_add_reference\`**: Add a bibliographic reference to a section (supports url field for links).
 
 ### Extension and Type Tools
 
