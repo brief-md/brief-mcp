@@ -781,6 +781,16 @@ describe("TASK-08: Property Tests", () => {
     });
   });
 
+  describe("brief_create_type_guide schema", () => {
+    it("schema includes reference_sources property", async () => {
+      const tools = await getRegisteredTools();
+      const tool = tools.find((t: any) => t.name === "brief_create_type_guide");
+      expect(tool).toBeDefined();
+      expect(tool!.inputSchema.properties.reference_sources).toBeDefined();
+      expect(tool!.inputSchema.properties.reference_sources.type).toBe("array");
+    });
+  });
+
   describe("guide embedding in session-start responses", () => {
     it("brief_reenter_project response includes the interaction guide", async () => {
       const result = await handleToolCall({

@@ -133,6 +133,7 @@ function buildFrontmatter(opts: {
   suggestedOntologies?: string[];
   commonParentTypes?: string[];
   commonChildTypes?: string[];
+  referenceSources?: string[];
   createdByProject?: string;
 }): string {
   const lines: string[] = ["---"];
@@ -166,6 +167,11 @@ function buildFrontmatter(opts: {
   if (opts.commonChildTypes && opts.commonChildTypes.length > 0) {
     lines.push("common_child_types:");
     for (const t of opts.commonChildTypes) lines.push(`  - ${t}`);
+  }
+
+  if (opts.referenceSources && opts.referenceSources.length > 0) {
+    lines.push("reference_sources:");
+    for (const src of opts.referenceSources) lines.push(`  - ${src}`);
   }
 
   if (opts.createdByProject) {
@@ -216,7 +222,7 @@ function checkAliases(
 /**
  * Generate a structured template for a type guide body when no body is provided.
  * Sections follow the pattern: Overview, Key Dimensions, Suggested Workflow,
- * Known Tensions (feeds conflict detection), Quality Signals.
+ * Known Tensions (feeds conflict detection), Quality Signals, Reference Sources.
  */
 export function generateTypeGuideTemplate(params: {
   type: string;
@@ -231,25 +237,33 @@ export function generateTypeGuideTemplate(params: {
     "",
     "## Overview",
     "",
-    `Brief description of what a ${params.type} project involves and its core goals.`,
+    `What is a ${params.type} project? Define the medium, typical scope, and primary goals.`,
     "",
     "## Key Dimensions",
     "",
-    "What dimensions are most critical for this project type? Consider: medium,",
-    "audience, workflow stages, quality benchmarks, and domain-specific concerns.",
+    "List 4-6 dimensions most critical for this project type. For each, give a one-line",
+    "description. Consider: medium/format, audience, creative constraints, production",
+    "stages, quality benchmarks, and domain-specific concerns.",
     "",
     "## Suggested Workflow",
     "",
-    "Recommended order of operations for this project type.",
+    "Recommended order of operations for this project type, as a numbered list.",
+    "Include key decision points and common milestones.",
     "",
     "## Known Tensions",
     "",
-    "Common trade-offs and tensions specific to this project type.",
+    "List 3-5 common trade-offs specific to this project type. Format each as:",
+    "**X vs Y** — one sentence explaining the tension.",
     "These feed into conflict detection when available.",
     "",
     "## Quality Signals",
     "",
-    "How to know when a project of this type is well-defined.",
+    "List 3-5 concrete indicators that a project of this type is well-defined.",
+    "",
+    "## Reference Sources",
+    "",
+    "Where to find real-world references for this project type (databases, catalogues,",
+    "communities). Examples: IMDB for films, Discogs for albums, Goodreads for books.",
   ];
 
   if (params.suggestedExtensions && params.suggestedExtensions.length > 0) {
@@ -355,6 +369,9 @@ export async function createTypeGuide(
   const commonChildTypes = Array.isArray(params.commonChildTypes)
     ? params.commonChildTypes.filter((a) => typeof a === "string").map(String)
     : [];
+  const referenceSources = Array.isArray(params.referenceSources)
+    ? params.referenceSources.filter((a) => typeof a === "string").map(String)
+    : [];
   const force = params.force === true;
   const activeProject =
     typeof params.activeProject === "string" ? params.activeProject : undefined;
@@ -457,6 +474,8 @@ export async function createTypeGuide(
       commonParentTypes.length > 0 ? commonParentTypes : undefined,
     commonChildTypes:
       commonChildTypes.length > 0 ? commonChildTypes : undefined,
+    referenceSources:
+      referenceSources.length > 0 ? referenceSources : undefined,
     createdByProject,
   });
 

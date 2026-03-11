@@ -767,7 +767,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_create_type_guide",
     description:
-      "Create or update a type guide file. brief-mcp scope: type guide authoring. IMPORTANT — Pattern 10: Do NOT pre-write the full body. First call with body omitted or empty to get the template, then present each section (Overview, Key Dimensions, Suggested Workflow, Known Tensions, Quality Signals) to the user for collaborative input. Only write the final body after the user has reviewed and approved the content. Include a '## Known Tensions' section to enable domain-aware conflict detection.",
+      "Create or update a type guide file. brief-mcp scope: type guide authoring. Pattern 10: Do NOT pre-write the body. Call with body empty to get the template, then present each section (Overview, Key Dimensions, Workflow, Known Tensions, Quality Signals, Reference Sources) for collaborative input. Write the final body only after user approval. Known Tensions enables conflict detection; Reference Sources guides brief_discover_references.",
     inputSchema: {
       type: "object",
       properties: {
@@ -796,6 +796,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "array",
           items: { type: "string" },
           description: "Common child types.",
+        },
+        reference_sources: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Where to find references for this project type (e.g., 'IMDB for films', 'Discogs for albums'). Used by brief_discover_references.",
         },
         body: {
           type: "string",

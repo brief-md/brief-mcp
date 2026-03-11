@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   _resetState,
   createTypeGuide,
+  generateTypeGuideTemplate,
 } from "../../src/type-intelligence/creation";
 import { _resetState as _resetLoadingState } from "../../src/type-intelligence/loading";
 
@@ -178,6 +179,54 @@ describe("TASK-41: Type Intelligence — Type Guide Creation", () => {
       expect(result.created).toBe(true);
       expect(result.createdByProject).toBeUndefined();
     });
+  });
+});
+
+describe("referenceSources in frontmatter", () => {
+  afterEach(() => {
+    _resetState();
+    _resetLoadingState();
+    vi.clearAllMocks();
+  });
+
+  it("referenceSources appears as reference_sources in generated frontmatter", async () => {
+    const result = await createTypeGuide({
+      type: "ref-test-type",
+      referenceSources: ["IMDB for films", "Letterboxd"],
+      body: "# Guide\n\nSome content here.",
+    });
+    expect(result.created).toBe(true);
+    expect(result.frontmatter).toMatch(/reference_sources:/);
+    expect(result.frontmatter).toMatch(/IMDB for films/);
+    expect(result.frontmatter).toMatch(/Letterboxd/);
+  });
+
+  it("empty referenceSources omitted from frontmatter", async () => {
+    const result = await createTypeGuide({
+      type: "no-ref-type",
+      referenceSources: [],
+      body: "# Guide\n\nSome content here.",
+    });
+    expect(result.created).toBe(true);
+    expect(result.frontmatter).not.toMatch(/reference_sources:/);
+  });
+});
+
+describe("enriched template", () => {
+  it("template includes Reference Sources section", () => {
+    const template = generateTypeGuideTemplate({ type: "film" });
+    expect(template).toContain("## Reference Sources");
+    expect(template).toContain("databases, catalogues");
+  });
+
+  it("template includes structured prompts for Key Dimensions", () => {
+    const template = generateTypeGuideTemplate({ type: "album" });
+    expect(template).toContain("List 4-6 dimensions");
+  });
+
+  it("template includes structured prompts for Known Tensions", () => {
+    const template = generateTypeGuideTemplate({ type: "album" });
+    expect(template).toContain("**X vs Y**");
   });
 });
 
