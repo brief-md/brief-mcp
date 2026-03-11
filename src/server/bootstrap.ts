@@ -36,7 +36,7 @@ const logOutput = {
 const logger = createLogger({ module: "server", output: logOutput });
 
 // ---------------------------------------------------------------------------
-// Tool definitions (44 tools — MCP-02, MCP-05, MCP-06)
+// Tool definitions (45 tools — MCP-02, MCP-05, MCP-06)
 // All parameter names use snake_case (A2-04).
 // ---------------------------------------------------------------------------
 
@@ -779,6 +779,38 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: "brief_design_extension",
+    description:
+      "Design a custom extension before creating it. Searches installed ontologies for matches against proposed subsections and returns a structured proposal with mode recommendations and sample entries. The AI then walks the user through each subsection interactively. brief-mcp scope: extension design.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        extension_name: {
+          type: "string",
+          description:
+            "Name for the custom extension (e.g. 'world_building', 'character_development').",
+        },
+        description: {
+          type: "string",
+          description:
+            "What this extension should capture — the user's vision for it.",
+        },
+        subsections: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Proposed subsection names. If omitted, defaults are suggested.",
+        },
+        project_type: {
+          type: "string",
+          description:
+            "Project type (e.g. 'film', 'album') for contextual suggestions.",
+        },
+      },
+      required: ["extension_name", "description"],
+    },
+  },
+  {
     name: "brief_add_extension",
     description:
       "Add an extension to BRIEF.md. An extension has a title and subsections. Each subsection is either freeform (user writes text, use Pattern 9) or structured (linked to an ontology — entries appear as table rows). Workflow: create extension with section_modes → for structured subsections, call brief_link_section_dataset to link an ontology, then brief_tag_entry to add entries. brief-mcp scope: extension management.",
@@ -1371,6 +1403,7 @@ const REQUIRED_STRING_PARAMS: Record<string, readonly string[]> = {
   brief_get_type_guide: ["type"],
   brief_create_type_guide: ["type"],
   brief_suggest_extensions: ["project_type"],
+  brief_design_extension: ["extension_name", "description"],
   brief_add_extension: ["extension_name"],
   brief_remove_extension: ["extension_name"],
   brief_remove_ontology: ["ontology"],
@@ -1824,6 +1857,80 @@ function formatToolResult(toolName: string, result: unknown): string {
         );
       }
       if (r.signal) parts.push(`\n_Signal: ${r.signal}_`);
+      break;
+    }
+
+    case "brief_design_extension": {
+      const extName = r.extensionName ?? "Custom Extension";
+      parts.push(`**Extension Proposal: ${extName}**\n`);
+      const subs = r.subsections as Array<Record<string, unknown>> | undefined;
+      if (subs && subs.length > 0) {
+        parts.push(
+          "| Subsection | Mode | Ontology Match | Next Step |",
+          "|---|---|---|---|",
+        );
+        for (const s of subs) {
+          const mode = s.recommendedMode ?? "freeform";
+          const ontology = s.matchedOntology
+            ? `${s.matchedOntology} (${s.matchedOntologyEntryCount ?? "?"} entries)`
+            : "—";
+          let next = "";
+          if (s.matchedOntology) next = "Review sample entries below";
+          else if (s.ontologyAction === "discover")
+            next = "Search for external packs?";
+          else if (s.ontologyAction === "create")
+            next = "Create custom ontology?";
+          else next = "Freeform — user writes content";
+          parts.push(`| ${s.name} | ${mode} | ${ontology} | ${next} |`);
+        }
+        // Show sample entries for matched ontologies
+        const matched = subs.filter(
+          (s) =>
+            s.sampleEntries &&
+            Array.isArray(s.sampleEntries) &&
+            (s.sampleEntries as unknown[]).length > 0,
+        );
+        for (const s of matched) {
+          parts.push(
+            `\n**Sample entries from ${s.matchedOntology} (for ${s.name}):**`,
+          );
+          for (const e of s.sampleEntries as Array<Record<string, unknown>>) {
+            const desc =
+              typeof e.description === "string" ? `: "${e.description}"` : "";
+            parts.push(`- ${e.label}${desc}`);
+          }
+          if (s.suggestedColumns && Array.isArray(s.suggestedColumns)) {
+            parts.push(
+              `**Suggested columns:** ${(s.suggestedColumns as string[]).join(", ")}`,
+            );
+          }
+        }
+        // Show ontology options for unmatched subsections
+        const unmatched = subs.filter(
+          (s) => s.ontologyAction && s.ontologyAction !== "none",
+        );
+        if (unmatched.length > 0) {
+          parts.push("\n**Ontology options for unmatched subsections:**");
+          for (const s of unmatched) {
+            parts.push(
+              `- ${s.name} → ${s.ontologyActionHint ?? "Search or create an ontology"}`,
+            );
+          }
+        }
+      }
+      // Show installed ontologies
+      const installed = r.installedOntologies as
+        | Array<Record<string, unknown>>
+        | undefined;
+      if (installed && installed.length > 0) {
+        const list = installed
+          .map((o) => `${o.name} (${o.entryCount})`)
+          .join(", ");
+        parts.push(`\n**Installed ontologies:** ${list}`);
+      }
+      parts.push(
+        "\nWalk through each subsection with the user. See Pattern 6 workflow for next steps.",
+      );
       break;
     }
 

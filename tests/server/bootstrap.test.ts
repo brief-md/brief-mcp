@@ -59,9 +59,9 @@ describe("TASK-08: MCP Server Bootstrap", () => {
   });
 
   describe("tool registration [MCP-02, MCP-06]", () => {
-    it("listing tools returns exactly 55 definitions [MCP-02]", async () => {
+    it("listing tools returns exactly 56 definitions [MCP-02]", async () => {
       const tools = await getRegisteredTools();
-      expect(tools).toHaveLength(55);
+      expect(tools).toHaveLength(56);
     });
 
     it("every tool name starts with brief_ [MCP-06]", async () => {
@@ -71,7 +71,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
       }
     });
 
-    it("registered tool names match exact spec list of 55 tools [MCP-02]", async () => {
+    it("registered tool names match exact spec list of 56 tools [MCP-02]", async () => {
       const tools = await getRegisteredTools();
       const toolNames = tools.map((t: any) => t.name).sort();
       const expectedTools = [
@@ -118,6 +118,7 @@ describe("TASK-08: MCP Server Bootstrap", () => {
         "brief_get_type_guide",
         "brief_create_type_guide",
         "brief_suggest_extensions",
+        "brief_design_extension",
         "brief_add_extension",
         "brief_list_extensions",
         // Framework visibility (TASK-44)
@@ -677,6 +678,44 @@ describe("TASK-08: Property Tests", () => {
       });
       const text = (result.content[0] as { text: string }).text;
       expect(text).not.toContain("Missing required parameter");
+    });
+  });
+
+  describe("brief_design_extension tool", () => {
+    it("schema has required extension_name and description", async () => {
+      const tools = await getRegisteredTools();
+      const tool = tools.find((t: any) => t.name === "brief_design_extension");
+      expect(tool).toBeDefined();
+      expect(tool!.inputSchema.required).toContain("extension_name");
+      expect(tool!.inputSchema.required).toContain("description");
+    });
+
+    it("returns a proposal with subsections and installed ontologies", async () => {
+      const result = await handleToolCall({
+        name: "brief_design_extension",
+        arguments: {
+          extension_name: "world_building",
+          description: "World building for a sci-fi film project",
+        },
+      });
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain("Extension Proposal");
+      expect(text).toContain("world_building");
+    });
+
+    it("uses default subsections when none provided", async () => {
+      const result = await handleToolCall({
+        name: "brief_design_extension",
+        arguments: {
+          extension_name: "test_ext",
+          description: "A test extension",
+        },
+      });
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { text: string }).text;
+      // Default subsections include Direction/Intent
+      expect(text).toContain("Direction/Intent");
     });
   });
 

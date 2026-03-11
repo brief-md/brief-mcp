@@ -21,6 +21,7 @@ import {
   handleUpdateSection,
 } from "../context/write-sections.js"; // check-rules-ignore
 import { addExtension, listExtensions } from "../extension/creation.js"; // check-rules-ignore
+import { designExtension } from "../extension/design.js"; // check-rules-ignore
 import { removeExtension } from "../extension/removal.js"; // check-rules-ignore
 import { suggestExtensions } from "../extension/suggestion.js"; // check-rules-ignore
 import { getHierarchyPosition } from "../hierarchy/position.js"; // check-rules-ignore
@@ -416,6 +417,15 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
         remap(args, {
           project_type: "projectType",
           active_extensions: "activeExtensions",
+        }),
+      ),
+    ),
+  brief_design_extension: (args) =>
+    designExtension(
+      typed<Parameters<typeof designExtension>[0]>(
+        remap(args, {
+          extension_name: "extensionName", // check-rules-ignore
+          project_type: "projectType",
         }),
       ),
     ),
