@@ -355,11 +355,18 @@ async function handleFillColumns(
   const draft = await getDraft(params.draftId);
   if (!draft) throw new Error(`Draft not found: ${params.draftId}`);
 
+  const customCols = draft.columns
+    .filter((c) => c.type === "custom")
+    .map((c) => c.name);
+  let filled = false;
+  let aiError = false;
+
   if (samplingFn) {
     try {
       await fillColumnsWithAI(samplingFn, draft);
+      filled = true;
     } catch {
-      /* best-effort */
+      aiError = true;
     }
   }
 
@@ -367,11 +374,17 @@ async function handleFillColumns(
   draft.updatedAt = new Date().toISOString();
   await saveDraft(draft);
 
-  return {
-    draftId: draft.id,
-    draft,
-    signal: `Columns filled. Status: finalizing. Call finalize to install the pack.`,
-  };
+  // Build informative signal
+  let signal: string;
+  if (filled) {
+    signal = `Columns filled. Status: finalizing. Call finalize to install the pack.`;
+  } else if (aiError) {
+    signal = `AI column-fill failed. ${customCols.length > 0 ? `Use edit_entry to manually fill: ${customCols.join(", ")}. ` : ""}Status: finalizing. Call finalize when entries are complete.`;
+  } else {
+    signal = `No AI sampling available — columns were NOT auto-filled. ${customCols.length > 0 ? `Use edit_entry to manually fill: ${customCols.join(", ")} for each entry. ` : ""}Status: finalizing.`;
+  }
+
+  return { draftId: draft.id, draft, signal };
 }
 
 async function handleAddColumn(params: {
@@ -511,7 +524,11 @@ async function handleFinalize(params: { draftId?: string }): Promise<{
     );
   }
 
-  // Build pack
+  // Build pack — include all standard + custom column data
+  const customColNames = draft.columns
+    .filter((c) => c.type === "custom")
+    .map((c) => c.name);
+
   const pack = {
     name: draft.name,
     version: "1.0.0",
@@ -519,6 +536,12 @@ async function handleFinalize(params: { draftId?: string }): Promise<{
       const entry: Record<string, unknown> = { id: e.id, label: e.label };
       if (e.description) entry.description = e.description;
       if (e.keywords) entry.keywords = e.keywords;
+      // Include custom column data
+      for (const col of customColNames) {
+        if (e[col] !== undefined && e[col] !== "") {
+          entry[col] = e[col];
+        }
+      }
       return entry;
     }),
   };
@@ -577,32 +600,78 @@ async function fillColumnsWithAI(
   samplingFn: SamplingFn,
   draft: OntologyDraft,
 ): Promise<void> {
-  const sampleIds = draft.entries.slice(0, 10).map((e) => e.label);
+  const customCols = draft.columns
+    .filter((c) => c.type === "custom")
+    .map((c) => c.name);
 
-  const result = await samplingFn({
-    messages: [
-      {
-        role: "user",
-        content: {
-          type: "text",
-          text: `For the ontology "${draft.name}" with entries: ${sampleIds.join(", ")}. Suggest 3-5 keywords for each entry. Respond with a JSON object mapping entry labels to keyword arrays.`,
+  // If there are custom columns, ask AI to fill them
+  if (customCols.length > 0) {
+    const entryLabels = draft.entries.map((e) => e.label);
+    const colList = customCols.join(", ");
+
+    const result = await samplingFn({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `For the ontology "${draft.name}" (${draft.description}), fill these columns for each entry: ${colList}.\n\nEntries: ${entryLabels.join(", ")}\n\nRespond with a JSON object where keys are entry labels and values are objects with the column values. Example: {"mp3": {"media_type": "audio", "mime_type": "audio/mpeg"}}`,
+          },
         },
-      },
-    ],
-    maxTokens: 1000,
-  });
+      ],
+      maxTokens: 2000,
+    });
 
-  const content = result?.content as
-    | Array<{ type: string; text?: string }>
-    | undefined;
-  const text = content?.[0]?.text ?? "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    const mapping = JSON.parse(jsonMatch[0]) as Record<string, string[]>;
-    for (const entry of draft.entries) {
-      const kws = mapping[entry.label];
-      if (Array.isArray(kws)) {
-        entry.keywords = kws;
+    const content = result?.content as
+      | Array<{ type: string; text?: string }>
+      | undefined;
+    const text = content?.[0]?.text ?? "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const mapping = JSON.parse(jsonMatch[0]) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      for (const entry of draft.entries) {
+        const data = mapping[entry.label] ?? mapping[entry.id];
+        if (data && typeof data === "object") {
+          for (const col of customCols) {
+            if (data[col] !== undefined) {
+              entry[col] = data[col];
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // No custom columns — fall back to keyword suggestion
+    const sampleIds = draft.entries.slice(0, 10).map((e) => e.label);
+
+    const result = await samplingFn({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `For the ontology "${draft.name}" with entries: ${sampleIds.join(", ")}. Suggest 3-5 keywords for each entry. Respond with a JSON object mapping entry labels to keyword arrays.`,
+          },
+        },
+      ],
+      maxTokens: 1000,
+    });
+
+    const content = result?.content as
+      | Array<{ type: string; text?: string }>
+      | undefined;
+    const text = content?.[0]?.text ?? "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const mapping = JSON.parse(jsonMatch[0]) as Record<string, string[]>;
+      for (const entry of draft.entries) {
+        const kws = mapping[entry.label];
+        if (Array.isArray(kws)) {
+          entry.keywords = kws;
+        }
       }
     }
   }
