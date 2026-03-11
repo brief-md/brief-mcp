@@ -90,12 +90,13 @@ superseding a decision (\`brief_add_decision\` with \`replaces\`), adding an exc
 
 ### Pattern 6: Extension Setup
 
-Extensions hold **source material, creative inputs, and structured data** that inform the
-project. They are NOT deliverables or outputs. If a user suggests subsections like "Logline",
-"Synopsis", "Treatment", or "Screenplay", clarify: those are outputs generated from the brief
-data, not extensions. Extensions hold the raw inputs (themes, narrative arcs, character
-profiles, visual references, etc.). Decisions and questions are also NOT part of extensions —
-they are tracked separately via \`brief_add_decision\` and \`brief_add_question\`.
+Extensions hold **structured domain inputs** that inform the project — technical specs,
+thematic frameworks, pipeline stages, design constraints, or any domain-specific metadata.
+They are NOT deliverables or outputs. If a user suggests subsections that describe final
+artefacts (e.g. "Logline", "Synopsis", "API Documentation"), clarify: those are outputs
+generated from the brief data, not extensions. Extensions hold the raw inputs that shape
+decisions. Decisions and questions are also NOT part of extensions — they are tracked
+separately via \`brief_add_decision\` and \`brief_add_question\`.
 
 An extension has a **title** and **subsections**. Each subsection is either:
 - **Freeform**: user writes text (use Pattern 8 — collaborative authoring)
