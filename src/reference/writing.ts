@@ -81,6 +81,10 @@ function buildRefLinkComment(pack: string, entryId: string): string {
   return `<!-- brief:ref-link ${pack} ${entryId} -->`;
 }
 
+function buildUrlComment(refUrl: string): string {
+  return `<!-- brief:url ${refUrl} -->`;
+}
+
 function hasSameSectionDuplicate(
   section: string,
   creator: string,
@@ -98,6 +102,7 @@ export async function addReference(params: {
   creator: string;
   title: string;
   notes?: string;
+  url?: string;
   ontologyLinks?: Array<{ pack: string; entryId: string }>;
   projectPath?: string;
   noActiveProject?: boolean;
@@ -118,6 +123,7 @@ export async function addReference(params: {
     creator,
     title,
     notes,
+    url,
     ontologyLinks,
     projectPath = "/root/project",
     noActiveProject,
@@ -156,8 +162,11 @@ export async function addReference(params: {
     duplicateWarning = `Duplicate reference: "${creator}: ${title}" already exists in "${section}"`;
   }
 
-  // Lines to insert: reference entry + optional ref-link comments
+  // Lines to insert: reference entry + optional url comment + optional ref-link comments
   const insertLines: string[] = [`- ${referenceText}`];
+  if (url) {
+    insertLines.push(buildUrlComment(url));
+  }
   if (refLinkComments) {
     for (const c of refLinkComments) {
       insertLines.push(c.text);
@@ -177,9 +186,15 @@ export async function addReference(params: {
   // Write to disk if a project exists
   if (diskExists) {
     const refLine = `- ${referenceText}`;
-    const fullContent = refLinkComments
-      ? `${refLine}\n${refLinkComments.map((c) => c.text).join("\n")}`
-      : refLine;
+    const commentLines: string[] = [];
+    if (url) commentLines.push(buildUrlComment(url));
+    if (refLinkComments) {
+      for (const c of refLinkComments) commentLines.push(c.text);
+    }
+    const fullContent =
+      commentLines.length > 0
+        ? `${refLine}\n${commentLines.join("\n")}`
+        : refLine;
     await appendToSection(projectPath, section, fullContent);
   }
 

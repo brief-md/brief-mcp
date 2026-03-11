@@ -26,6 +26,7 @@ export interface ReferenceEntry {
   readonly creator?: string;
   readonly title: string;
   readonly notes?: string;
+  readonly url?: string;
   readonly section: string;
   readonly ontologyLinks?: Array<{ pack: string; entryId: string }>;
 }
