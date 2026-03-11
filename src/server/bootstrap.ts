@@ -1794,10 +1794,18 @@ function formatToolResult(toolName: string, result: unknown): string {
         if (r.aliases && Array.isArray(r.aliases) && r.aliases.length > 0) {
           parts.push(`Aliases: ${(r.aliases as string[]).join(", ")}`);
         }
-        // If body/template was generated, show it
-        const body = r.body ?? r.template;
-        if (typeof body === "string" && body.length > 0) {
-          parts.push(`\n${body}`);
+        if (r.templateUsed && typeof r.template === "string") {
+          // Template was written to disk — AI must now collaborate on each section
+          parts.push(
+            "\n**Template written — do NOT pre-write the body.** Present each section below to the user one at a time. Discuss, draft collaboratively, then call brief_create_type_guide again with force=true and the completed body.\n",
+            r.template as string,
+          );
+        } else {
+          // Body was provided directly
+          const body = r.body ?? r.template;
+          if (typeof body === "string" && body.length > 0) {
+            parts.push(`\n${body}`);
+          }
         }
       }
       // Include remaining metadata

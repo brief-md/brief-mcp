@@ -536,6 +536,6 @@ export async function createTypeGuide(
     scriptExecuted: false,
     ...(hasScript && { sanitized: true }),
     ...(warnings.length > 0 && { warnings }),
-    ...(templateUsed && { templateUsed: true }),
+    ...(templateUsed && { templateUsed: true, template: body }),
   };
 }
