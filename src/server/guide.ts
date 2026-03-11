@@ -21,14 +21,14 @@ export const GUIDE_RESOURCE: GuideResource = {
 
 // ---------------------------------------------------------------------------
 // Guide content — built once at module load, cached in memory (static per
-// server version). Covers all 9 interaction patterns, DR-01..08,
+// server version). Covers all 10 interaction patterns, DR-01..08,
 // QUEST-01..11, tool recommendations, multi-MCP guidance, signal format.
 // ---------------------------------------------------------------------------
 
 const GUIDE_CONTENT = `# BRIEF.md Interaction Guide
 
 This guide describes how an AI assistant should interact with the brief-mcp server.
-It covers the 9 interaction patterns, decision recognition rules (DR-01 through DR-08),
+It covers the 10 interaction patterns, decision recognition rules (DR-01 through DR-08),
 question surfacing rules (QUEST-01 through QUEST-11), tool usage recommendations,
 and signal block format documentation.
 
@@ -247,6 +247,31 @@ If \`setupPhase\` is "choose_type_guide" or "explore_type", type guide review ta
 priority over extension setup. If the guide is generic (\`isGeneric: true\`), use the
 10 Universal Dimensions to explore the project type collaboratively before creating
 a domain-specific guide with \`brief_create_type_guide\`.
+
+### Pattern 10: Type Guide Creation
+
+When creating a new type guide with \`brief_create_type_guide\`, follow this collaborative
+workflow — do NOT pre-write the body in a single call:
+
+1. **Get the template**: Call \`brief_create_type_guide\` with the type name and metadata
+   (aliases, suggested_extensions, reference_sources) but **no body**. The tool returns
+   a structured template with section prompts.
+2. **Walk through each section**: Present each template section to the user one at a time:
+   - **Overview**: What defines this project type? Scope, medium, goals.
+   - **Key Dimensions**: 4-6 critical dimensions with one-line descriptions.
+   - **Suggested Workflow**: Numbered steps with decision points and milestones.
+   - **Known Tensions**: 3-5 trade-offs as **X vs Y** — these feed conflict detection.
+   - **Quality Signals**: 3-5 concrete indicators of a well-defined project.
+   - **Reference Sources**: Real databases/catalogues for this domain (used by \`brief_discover_references\`).
+3. **Draft each section collaboratively**: For each section, propose content based on
+   what you know, then ask the user to confirm, adjust, or expand. The user's voice
+   and domain knowledge should drive the content.
+4. **Write the final body**: Once all sections are approved, call \`brief_create_type_guide\`
+   again with \`force: true\` and the complete body.
+
+The goal is a type guide that reflects the user's actual understanding of the domain,
+not generic AI-generated filler. A thin guide with real insights beats a long one with
+surface-level content.
 
 ---
 
