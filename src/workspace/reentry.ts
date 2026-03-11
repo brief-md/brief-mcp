@@ -10,7 +10,7 @@ import {
 } from "../io/project-state.js"; // check-rules-ignore
 import type { SubProjectInfo } from "../types/workspace.js";
 import { checkConflicts } from "../validation/conflicts.js"; // check-rules-ignore
-import { setActiveProject } from "./active.js";
+import { markSessionStarted, setActiveProject } from "./active.js";
 import { getTutorialContent, setDismissedFlag } from "./tutorial.js";
 
 // ---------------------------------------------------------------------------
@@ -397,9 +397,11 @@ export async function generateReentrySummary(params: {
       workspaceRoots: [],
     });
     activeProjectSet = true;
+    markSessionStarted();
   } catch {
     // Best-effort: if setting fails, still produce summary
     activeProjectSet = true;
+    markSessionStarted();
   }
 
   if (simulateEmpty) {

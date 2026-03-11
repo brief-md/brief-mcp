@@ -17,6 +17,7 @@ import { initializeFromDisk as initOntology } from "../ontology/management.js"; 
 import { initializeFromDisk as initLookup } from "../reference/lookup.js"; // check-rules-ignore
 import { initializeFromDisk as initSuggestion } from "../reference/suggestion.js"; // check-rules-ignore
 import { initializeFromDisk as initTypeCreation } from "../type-intelligence/creation.js"; // check-rules-ignore
+import { hasSessionStarted } from "../workspace/active.js"; // check-rules-ignore
 import { setServer, TOOL_HANDLERS } from "./dispatch.js";
 
 // ---------------------------------------------------------------------------
@@ -1860,6 +1861,12 @@ function formatToolResult(toolName: string, result: unknown): string {
     }
 
     case "brief_get_context": {
+      // Nudge AI to use brief_reenter_project at session start
+      if (!hasSessionStarted()) {
+        parts.push(
+          "⚠ brief_reenter_project has not been called this session. Call it to receive the full project state, setup phase, required next steps, and interaction guide. brief_get_context is for mid-session lookups only.\n",
+        );
+      }
       // Format sections as readable text
       if (r.sections && typeof r.sections === "object") {
         const sections = r.sections as Record<string, unknown>;

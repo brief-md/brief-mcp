@@ -17,6 +17,7 @@ import type { ActiveProjectInfo } from "../types/workspace.js";
 let _activeProject: { name: string; path: string } | undefined;
 let _activeScope: string | undefined;
 const _workspaces: string[] = [];
+let _sessionStartCalled = false;
 
 // ---------------------------------------------------------------------------
 // Deprecated shims — kept for backward compatibility
@@ -52,6 +53,15 @@ export function getWorkspaces(): string[] {
 export function clearActiveProject(): void {
   _activeProject = undefined;
   _activeScope = undefined;
+  _sessionStartCalled = false;
+}
+
+export function markSessionStarted(): void {
+  _sessionStartCalled = true;
+}
+
+export function hasSessionStarted(): boolean {
+  return _sessionStartCalled;
 }
 
 // ---------------------------------------------------------------------------

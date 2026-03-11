@@ -69,6 +69,7 @@ import {
 import {
   addWorkspace,
   getActiveProject,
+  markSessionStarted,
   setActiveProject,
 } from "../workspace/active.js"; // check-rules-ignore
 import { createProject, createSubProject } from "../workspace/creation.js"; // check-rules-ignore
@@ -160,6 +161,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
         identifier: projectPath,
         workspaceRoots: [],
       });
+      markSessionStarted();
     }
     // Surface nextSteps as a prominent directive block so the LLM doesn't skip them
     const steps = (result as Record<string, unknown>).nextSteps as
