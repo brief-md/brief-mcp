@@ -872,7 +872,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_add_extension",
     description:
-      "Add an extension to BRIEF.md. An extension has a title and subsections. Each subsection is either freeform (user writes text, use Pattern 9) or structured (linked to an ontology — entries appear as table rows). Workflow: create extension with section_modes → for structured subsections, call brief_link_section_dataset to link an ontology, then brief_tag_entry to add entries. brief-mcp scope: extension management.",
+      "Add an extension to BRIEF.md. Creates the skeleton (headings + guidance prompts). After creation, you MUST fill each subsection: for freeform subsections, walk through each with the user and call brief_update_section to write content; for structured subsections, call brief_link_section_dataset then brief_tag_entry. Do NOT leave subsections empty. Do NOT edit BRIEF.md directly. brief-mcp scope: extension management.",
     inputSchema: {
       type: "object",
       properties: {
@@ -895,6 +895,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
             type: "string",
             enum: ["freeform", "structured"],
           },
+        },
+        subsection_descriptions: {
+          type: "object",
+          description:
+            "Map of subsection name → description/guidance prompt. These appear as italic hints in each subsection, telling the AI what content to write. Pass the rationale from brief_design_extension here.",
+          additionalProperties: { type: "string" },
         },
         project_path: {
           type: "string",
@@ -2044,6 +2050,62 @@ function formatToolResult(toolName: string, result: unknown): string {
       if (typeof r.instructions === "string") {
         parts.push(`\n${r.instructions}`);
       }
+      break;
+    }
+
+    case "brief_ontology_draft": {
+      const d = r.draft as Record<string, unknown> | undefined;
+      if (r.draftId) parts.push(`**Draft Id:** ${r.draftId}`);
+      if (d) {
+        const status = d.status ?? "unknown";
+        const name = d.name ?? "untitled";
+        const entries = d.entries as Array<Record<string, unknown>> | undefined;
+        const columns = d.columns as Array<Record<string, unknown>> | undefined;
+        const entryCount = entries?.length ?? 0;
+
+        parts.push(
+          `**Draft:** ${name} | Status: ${status} | ${entryCount} entries`,
+        );
+
+        // Show columns
+        if (columns && columns.length > 0) {
+          const colNames = columns.map(
+            (c) =>
+              `${c.name}${(c as Record<string, unknown>).type === "custom" ? "*" : ""}`,
+          );
+          parts.push(`**Columns:** ${colNames.join(", ")}`);
+        }
+
+        // Show entries with column data (max 25)
+        if (entries && entries.length > 0) {
+          const customCols = (columns ?? [])
+            .filter((c) => (c as Record<string, unknown>).type === "custom")
+            .map((c) => c.name as string);
+
+          if (customCols.length > 0) {
+            // Table format for structured data
+            const header = `| id | label | ${customCols.join(" | ")} |`;
+            const sep = `|---|---|${customCols.map(() => "---").join("|")}|`;
+            parts.push(header, sep);
+            for (const e of entries.slice(0, 25)) {
+              const vals = customCols.map((c) => String(e[c] ?? ""));
+              parts.push(`| ${e.id} | ${e.label} | ${vals.join(" | ")} |`);
+            }
+          } else {
+            // Simple list
+            for (const e of entries.slice(0, 25)) {
+              const desc =
+                typeof e.description === "string" ? ` — ${e.description}` : "";
+              parts.push(`- **${e.label}** (${e.id})${desc}`);
+            }
+          }
+          if (entries.length > 25) {
+            parts.push(`_...and ${entries.length - 25} more entries_`);
+          }
+        }
+      }
+      if (r.signal) parts.push(`\n_${r.signal}_`);
+      if (r.installed) parts.push(`\n**Installed as pack:** ${r.packName}`);
       break;
     }
 
