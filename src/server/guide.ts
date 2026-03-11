@@ -47,11 +47,14 @@ and signal block format documentation.
 
 At the start of every session, determine if this is an **existing project** or a **new project**:
 
-- **Existing project**: call \`brief_reenter_project\` with the project path. This sets the
-  active project and returns a structured summary: identity, decisions, open questions,
-  section fill state, detected conflicts, intentional tensions, lifecycle phase, and
-  required next steps. Follow the \`__REQUIRED_NEXT_STEPS__\` in the response before doing
-  anything else. Ask about any external tool sessions since last visit (DR-06).
+- **Existing project**: call \`brief_reenter_project\` with the project path. **This is the
+  only correct way to resume a project.** Do NOT use \`brief_list_projects\` +
+  \`brief_set_active_project\` + \`brief_get_context\` as a substitute — that sequence misses
+  the setup phase, required next steps, and the interaction guide that \`brief_reenter_project\`
+  delivers. It sets the active project and returns a structured summary: identity, decisions,
+  open questions, section fill state, detected conflicts, intentional tensions, lifecycle
+  phase, and required next steps. Follow the \`__REQUIRED_NEXT_STEPS__\` in the response
+  before doing anything else. Ask about any external tool sessions since last visit (DR-06).
 - **New project**: call \`brief_create_project\` to initialise a new BRIEF.md.
 
 Use \`brief_get_context\` **mid-session** for targeted lookups (e.g. reading specific
