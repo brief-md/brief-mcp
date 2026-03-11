@@ -55,7 +55,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_list_projects",
     description:
-      "List all BRIEF.md projects in known workspaces. brief-mcp scope: project discovery and filtering.",
+      "List all BRIEF.md projects in known workspaces. brief-mcp scope: project discovery and filtering. NOTE: To resume work on a project at session start, use brief_reenter_project — not list + set_active.",
     inputSchema: {
       type: "object",
       properties: {
@@ -69,7 +69,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_set_active_project",
     description:
-      "Set the active project for the current session. brief-mcp scope: session state. Provide the path to a BRIEF.md file or project directory.",
+      "Set the active project for the current session. brief-mcp scope: session state. Use for mid-session context switches (e.g. sub-projects). For session start, use brief_reenter_project instead — it returns the full project state, setup phase, and interaction guide.",
     inputSchema: {
       type: "object",
       properties: {
