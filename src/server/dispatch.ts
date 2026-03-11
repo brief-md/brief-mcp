@@ -466,6 +466,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
         remap(withProjectPath(args), {
           extension_name: "extensionName", // check-rules-ignore
           section_modes: "sectionModes",
+          subsection_descriptions: "subsectionDescriptions",
           project_path: "projectPath",
         }),
       ),

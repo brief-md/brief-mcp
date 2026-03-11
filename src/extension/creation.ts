@@ -220,6 +220,7 @@ export async function addExtension(params: {
   targetSubsection?: string;
   simulateAmbiguous?: boolean;
   subsections?: string[];
+  subsectionDescriptions?: Record<string, string>;
   simulateOrphanHeading?: boolean;
   projectPath?: string;
   sectionModes?: Record<string, "freeform" | "structured">;
@@ -317,6 +318,7 @@ export async function addExtension(params: {
 
   /* Generate content with guidance prompts */
   const sectionModes = params.sectionModes;
+  const subsectionDescriptions = params.subsectionDescriptions;
   const contentLines = [`# ${headingFormat}`, ""];
   for (const sub of resolvedSubsections) {
     contentLines.push(`## ${sub}`, "");
@@ -325,7 +327,10 @@ export async function addExtension(params: {
       contentLines.push(`<!-- brief:section-dataset -->`, "");
     }
     const specPrompts = SUBSECTION_PROMPTS[metadataFormat];
-    const prompt = specPrompts?.[sub] ?? DEFAULT_SUBSECTION_PROMPTS[sub];
+    const prompt =
+      specPrompts?.[sub] ??
+      subsectionDescriptions?.[sub] ??
+      DEFAULT_SUBSECTION_PROMPTS[sub];
     if (prompt) {
       contentLines.push(`*${prompt}*`, "");
     }
@@ -387,6 +392,29 @@ export async function addExtension(params: {
     ? "For structured sections: use brief_ontology_draft, brief_search_ontology, or brief_discover_ontologies to link a dataset."
     : undefined;
 
+  /* Build required next steps — tell AI to fill each subsection */
+  const freeformSubs = resolvedSubsections.filter(
+    (s) => !sectionModes || sectionModes[s] !== "structured",
+  );
+  const structuredSubs = resolvedSubsections.filter(
+    (s) => sectionModes?.[s] === "structured",
+  );
+  const requiredNextStepParts: string[] = [];
+  if (freeformSubs.length > 0) {
+    requiredNextStepParts.push(
+      `Walk through each freeform subsection with the user and call brief_update_section to fill content. Freeform subsections: ${freeformSubs.join(", ")}.`,
+    );
+  }
+  if (structuredSubs.length > 0) {
+    requiredNextStepParts.push(
+      `For structured subsections (${structuredSubs.join(", ")}): call brief_link_section_dataset to link an ontology, then brief_tag_entry to add entries.`,
+    );
+  }
+  requiredNextStepParts.push(
+    "Do NOT edit BRIEF.md directly — use brief_update_section for all content.",
+  );
+  const __REQUIRED_NEXT_STEPS__ = requiredNextStepParts.join(" ");
+
   return {
     created: true,
     alreadyExists: false,
@@ -398,6 +426,7 @@ export async function addExtension(params: {
     success: true,
     content,
     referencePrompt,
+    __REQUIRED_NEXT_STEPS__,
     ...(sectionModes && { sectionModes }),
     ...(nextSteps && { nextSteps }),
     persisted,
