@@ -100,19 +100,79 @@ A subsection can only use one ontology. If a project needs entries from two diff
 ontologies, use two separate subsections.
 
 **Workflow:**
-1. Call \`brief_suggest_extensions\` to recommend extensions for the project type.
-   Present them to the user — explain what each adds. Invite the user to describe
-   additional extensions not listed. \`brief_add_extension\` accepts any name and
-   subsections — it is not limited to the predefined registry.
-2. For each extension the user approves, determine which subsections it needs and
-   whether each is freeform or structured. Ask the user.
-3. Call \`brief_add_extension\` with \`subsections\` and \`section_modes\` (map of
-   subsection name → "freeform" or "structured").
-4. For each **structured** subsection:
-   a. \`brief_link_section_dataset\` — link the ontology to the subsection with columns
-   b. \`brief_tag_entry\` — add entries from the ontology (repeat for each entry)
-5. For each **freeform** subsection: use Pattern 8 (collaborative authoring).
-6. Only activate extensions the user approves.
+
+**Step 1 — Choose extension type:**
+Ask the user: do they want a **predefined extension** (from the registry) or a **custom extension**?
+- For predefined: call \`brief_suggest_extensions\` to show available options. Present each
+  with what it adds. The user picks one or more.
+- For custom: proceed to Step 2.
+
+**Step 2 — Design the custom extension:**
+Call \`brief_design_extension\` with the extension name and description. This searches
+installed ontologies and returns a proposal: subsections with recommended modes,
+matched ontologies with sample entries, and action hints for unmatched subsections.
+Present this proposal to the user.
+
+**Step 3 — Walk through each subsection interactively:**
+For each subsection in the proposal, work through it with the user:
+
+a. **If an installed ontology matched** (recommendedMode = "structured"):
+   Show the sample entries. Ask: "Does this ontology fit? Here are some entries it contains..."
+   - If yes → subsection is structured, linked to this ontology
+   - If no → treat as unmatched (see below)
+
+b. **If no ontology matched** (ontologyAction = "discover"):
+   Ask: "No installed ontology matches this. Want to search for one?"
+   - If yes → call \`brief_discover_ontologies\` with the subsection domain as query.
+     Show results. If user picks one → call \`brief_install_ontology\` to install it.
+     Then call \`brief_search_ontology\` to show sample entries. Subsection becomes structured.
+   - If no → subsection stays freeform
+
+c. **If no ontology matched** (ontologyAction = "create"):
+   Ask: "This seems project-specific. Want to create a custom ontology for it?"
+   - If yes → call \`brief_create_ontology\` or \`brief_ontology_draft\` to build one.
+     Walk through entry creation with the user. Subsection becomes structured.
+   - If no → subsection stays freeform
+
+d. **If inherently freeform** (ontologyAction = "none"):
+   Confirm with user: "This subsection will be freeform — you'll write the content."
+
+Do NOT default everything to freeform. If ontologies are available that match a
+subsection's domain, recommend structured mode and explain why (entries as rows
+provide structure, searchability, and cross-project reuse).
+
+**Step 4 — Confirm and create:**
+Summarise the final plan: each subsection with its agreed mode and ontology (if any).
+**STOP and get explicit confirmation** before creating.
+Call \`brief_add_extension\` with \`subsections\` and \`section_modes\`.
+Create **one extension at a time** — do NOT batch-create multiple extensions.
+
+**Step 5 — Set up structured subsections:**
+For each structured subsection:
+a. \`brief_link_section_dataset\` — link the ontology with chosen columns
+b. Ask the user which entries to add. Use \`brief_search_ontology\` or
+   \`brief_browse_ontology\` to help them explore entries.
+c. \`brief_tag_entry\` for each entry the user selects
+
+**Step 6 — Set up freeform subsections:**
+Use Pattern 8 (collaborative authoring) for each freeform subsection.
+
+**Step 7 — References:**
+After subsections are set up (or at any point the user seems uncertain about content),
+ask: "Do you have any reference material in mind for this extension? Films, albums, books,
+articles, or other works that inspire or inform this area?"
+- Use \`brief_suggest_references\` with the extension context to surface relevant references
+  from installed packs. Show suggestions and let the user pick.
+- Use \`brief_lookup_reference\` if the user names a specific work — find it in the index.
+- Call \`brief_add_reference\` to add each reference to the relevant subsection.
+- References can inform later steps: if a user is stuck populating a structured subsection,
+  their references provide context for which ontology entries are relevant.
+
+This step can also happen **during** Step 3 or Step 5 — if the user is unsure about
+subsection content or ontology entries, asking about references helps ground the
+conversation in concrete examples they already know.
+
+**Step 8 — Only activate extensions the user approves.**
 
 During extension setup, proactively surface known decision points as questions
 (QUEST-02) and offer the deferral escape hatch (QUEST-11) for questions the user
@@ -348,6 +408,7 @@ When a request involves both context and action, call \`brief_*\` tools first.
 ### Extension and Type Tools
 
 - **\`brief_suggest_extensions\`**: Get extension suggestions for a project type.
+- **\`brief_design_extension\`**: Design a custom extension — searches ontologies and returns a structured proposal.
 - **\`brief_add_extension\`**: Activate an extension in BRIEF.md.
 - **\`brief_get_type_guide\`**: Retrieve guidance for a project type.
 
