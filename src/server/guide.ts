@@ -258,12 +258,15 @@ workflow — do NOT pre-write the body in a single call:
    (aliases, suggested_extensions, reference_sources) but **no body**. The tool returns
    a structured template with section prompts.
 2. **Walk through each section**: Present each template section to the user one at a time:
-   - **Overview**: What defines this project type? Scope, medium, goals.
+   - **Overview**: What defines this project type? Scope, medium, goals. What distinguishes it?
+   - **Project Structure**: Layers/hierarchy (e.g. tool → features → components). Informs parent/child types.
    - **Key Dimensions**: 4-6 critical dimensions with one-line descriptions.
-   - **Suggested Workflow**: Numbered steps with decision points and milestones.
+   - **Suggested Workflow**: Numbered steps with decision points, milestones, iteration loops.
    - **Known Tensions**: 3-5 trade-offs as **X vs Y** — these feed conflict detection.
+   - **Anti-patterns**: 3-5 common mistakes the AI should flag.
+   - **Extension Guidance**: What domain metadata this type needs and why — informs extension design.
    - **Quality Signals**: 3-5 concrete indicators of a well-defined project.
-   - **Reference Sources**: Real databases/catalogues for this domain (used by \`brief_discover_references\`).
+   - **Reference Sources**: Real databases/catalogues/docs for this domain (used by \`brief_discover_references\`).
 3. **Draft each section collaboratively**: For each section, propose content based on
    what you know, then ask the user to confirm, adjust, or expand. The user's voice
    and domain knowledge should drive the content.
