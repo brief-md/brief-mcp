@@ -6,13 +6,34 @@ export type TypeGuideSource =
   | "community"
   | "user_edited";
 
+export interface SuggestedExtensionSubsection {
+  readonly name: string;
+  readonly mode: "ontology" | "freeform";
+  readonly ontology?: string; // pack name, required when mode === "ontology"
+}
+
+export interface SuggestedExtension {
+  readonly slug: string;
+  readonly description: string;
+  readonly subsections: SuggestedExtensionSubsection[];
+}
+
+export interface SuggestedOntology {
+  readonly name: string;
+  readonly description: string;
+  readonly origin: "bundled" | "url" | "custom";
+  readonly version: string;
+  readonly url?: string; // required when origin === "url"
+  readonly generated_from?: string; // extension slug, set when origin === "custom"
+}
+
 export interface TypeGuideMetadata {
   readonly type: string;
   readonly typeAliases?: string[];
   readonly source: TypeGuideSource;
   readonly version: string;
-  readonly suggestedExtensions?: string[];
-  readonly suggestedOntologies?: string[];
+  readonly suggestedExtensions?: SuggestedExtension[];
+  readonly suggestedOntologies?: SuggestedOntology[];
   readonly commonParentTypes?: string[];
   readonly commonChildTypes?: string[];
   readonly bootstrapping?: boolean;

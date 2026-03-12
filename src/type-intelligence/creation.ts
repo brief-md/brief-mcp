@@ -6,10 +6,17 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { getConfigDir } from "../config/config.js";
-import { VALID_EXTENSION_SLUGS } from "../extension/creation.js"; // check-rules-ignore
+import {
+  getKnownExtensions,
+  VALID_EXTENSION_SLUGS,
+} from "../extension/creation.js"; // check-rules-ignore
 import { atomicWriteFile } from "../io/file-io.js";
 import { sanitizeObject } from "../security/input-sanitisation.js";
-import type { TypeGuideSource } from "../types/type-intelligence.js";
+import type {
+  SuggestedExtension,
+  SuggestedOntology,
+  TypeGuideSource,
+} from "../types/type-intelligence.js";
 import { buildGuide, registerGuide } from "./loading.js"; // check-rules-ignore
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -125,12 +132,86 @@ function buildFilePath(type: string): string {
 
 // ─── YAML frontmatter builder ────────────────────────────────────────────────
 
+/** Serialize a SuggestedExtension to YAML block lines (indented under suggested_extensions:). */
+function serializeExtensionEntry(ext: SuggestedExtension): string[] {
+  const lines: string[] = [];
+  lines.push(`  - slug: ${ext.slug}`);
+  if (ext.description) {
+    lines.push(`    description: "${ext.description}"`);
+  }
+  if (ext.subsections && ext.subsections.length > 0) {
+    lines.push("    subsections:");
+    for (const sub of ext.subsections) {
+      lines.push(`      - name: ${sub.name}`);
+      lines.push(`        mode: ${sub.mode}`);
+      if (sub.mode === "ontology" && sub.ontology) {
+        lines.push(`        ontology: ${sub.ontology}`);
+      }
+    }
+  }
+  return lines;
+}
+
+/** Serialize a SuggestedOntology to YAML block lines (indented under suggested_ontologies:). */
+function serializeOntologyEntry(ont: SuggestedOntology): string[] {
+  const lines: string[] = [];
+  lines.push(`  - name: ${ont.name}`);
+  if (ont.description) {
+    lines.push(`    description: "${ont.description}"`);
+  }
+  lines.push(`    origin: ${ont.origin}`);
+  lines.push(`    version: "${ont.version}"`);
+  if (ont.origin === "url" && ont.url) {
+    lines.push(`    url: "${ont.url}"`);
+  }
+  if (ont.origin === "custom" && ont.generated_from) {
+    lines.push(`    generated_from: ${ont.generated_from}`);
+  }
+  return lines;
+}
+
+/**
+ * Build a SuggestedExtension from an extension slug using the known extension registry.
+ * Subsections default to freeform mode; associatedOntologies set ontology mode.
+ */
+export function buildSuggestedExtension(slug: string): SuggestedExtension {
+  const known = getKnownExtensions();
+  const ext = known.get(slug);
+  const name = ext?.name ?? slug.toUpperCase().replace(/_/g, " ");
+  const subsections = ext?.subsections ?? [];
+
+  // Use per-subsection ontology mapping if available
+  if (ext?.subsectionDetails && ext.subsectionDetails.length > 0) {
+    return {
+      slug,
+      description: name,
+      subsections: ext.subsectionDetails.map((d) => ({
+        name: d.name,
+        mode: d.mode,
+        ...(d.mode === "ontology" && d.ontology
+          ? { ontology: d.ontology }
+          : {}),
+      })),
+    };
+  }
+
+  // Fallback: all freeform (custom extensions without subsectionDetails)
+  return {
+    slug,
+    description: name,
+    subsections: subsections.map((subName) => ({
+      name: subName,
+      mode: "freeform" as const,
+    })),
+  };
+}
+
 function buildFrontmatter(opts: {
   type: string;
   source: string;
   typeAliases?: string[];
-  suggestedExtensions?: string[];
-  suggestedOntologies?: string[];
+  suggestedExtensions?: SuggestedExtension[];
+  suggestedOntologies?: SuggestedOntology[];
   commonParentTypes?: string[];
   commonChildTypes?: string[];
   referenceSources?: string[];
@@ -151,12 +232,16 @@ function buildFrontmatter(opts: {
 
   if (opts.suggestedExtensions && opts.suggestedExtensions.length > 0) {
     lines.push("suggested_extensions:");
-    for (const ext of opts.suggestedExtensions) lines.push(`  - ${ext}`);
+    for (const ext of opts.suggestedExtensions) {
+      lines.push(...serializeExtensionEntry(ext));
+    }
   }
 
   if (opts.suggestedOntologies && opts.suggestedOntologies.length > 0) {
     lines.push("suggested_ontologies:");
-    for (const ont of opts.suggestedOntologies) lines.push(`  - ${ont}`);
+    for (const ont of opts.suggestedOntologies) {
+      lines.push(...serializeOntologyEntry(ont));
+    }
   }
 
   if (opts.commonParentTypes && opts.commonParentTypes.length > 0) {
@@ -226,8 +311,8 @@ function checkAliases(
  */
 export function generateTypeGuideTemplate(params: {
   type: string;
-  suggestedExtensions?: string[];
-  suggestedOntologies?: string[];
+  suggestedExtensions?: SuggestedExtension[];
+  suggestedOntologies?: SuggestedOntology[];
 }): string {
   const title =
     params.type.charAt(0).toUpperCase() +
@@ -273,8 +358,22 @@ export function generateTypeGuideTemplate(params: {
     "",
     "What domain-specific metadata does this project type need? Describe the kinds of",
     "extensions that make sense — not just names, but what structured inputs they capture",
-    "and why. Examples: a film needs character profiles, visual tone, narrative structure;",
-    "a CLI tool needs technical stack, pipeline stages, supported formats.",
+    "and why. Each extension has subsections, and each subsection has a mode:",
+    "",
+    "- **ontology** — content draws from a linked ontology pack (structured vocabulary).",
+    "  Specify which ontology pack provides the vocabulary.",
+    "- **freeform** — user describes in their own words (free text, no ontology link).",
+    "",
+    "Examples: a film's Visual Language subsection might use `mode: ontology` linked to",
+    "a cinematography pack, while Production Approach uses `mode: freeform`.",
+    "",
+    "## Ontology Guidance",
+    "",
+    "What knowledge packs does this project type benefit from? Each ontology has an origin:",
+    "",
+    "- **bundled** — shipped with the tool (e.g., `theme-ontology`, `musicbrainz`)",
+    "- **url** — downloadable from an external source (include the URL)",
+    "- **custom** — AI-generated for this project type (note which extension prompted it)",
     "",
     "## Quality Signals",
     "",
@@ -290,14 +389,29 @@ export function generateTypeGuideTemplate(params: {
   if (params.suggestedExtensions && params.suggestedExtensions.length > 0) {
     lines.push("", "## Recommended Extensions", "");
     for (const ext of params.suggestedExtensions) {
-      lines.push(`- ${ext}`);
+      lines.push(`### ${ext.slug}`);
+      if (ext.description) lines.push(`${ext.description}`);
+      lines.push("");
+      if (ext.subsections && ext.subsections.length > 0) {
+        lines.push("| Subsection | Mode | Ontology |");
+        lines.push("|---|---|---|");
+        for (const sub of ext.subsections) {
+          const ontCol =
+            sub.mode === "ontology" && sub.ontology ? sub.ontology : "—";
+          lines.push(`| ${sub.name} | ${sub.mode} | ${ontCol} |`);
+        }
+        lines.push("");
+      }
     }
   }
 
   if (params.suggestedOntologies && params.suggestedOntologies.length > 0) {
     lines.push("", "## Recommended Ontologies", "");
+    lines.push("| Name | Origin | Version | Description |");
+    lines.push("|---|---|---|---|");
     for (const ont of params.suggestedOntologies) {
-      lines.push(`- ${ont}`);
+      const desc = ont.description || "—";
+      lines.push(`| ${ont.name} | ${ont.origin} | ${ont.version} | ${desc} |`);
     }
   }
 
@@ -401,14 +515,28 @@ export async function createTypeGuide(
   const createdByProject =
     !noActiveProject && activeProject ? activeProject : undefined;
 
+  // Build rich objects early — needed for both template and frontmatter
+  const richExtensions: SuggestedExtension[] | undefined =
+    suggestedExtensions.length > 0
+      ? suggestedExtensions.map((slug) => buildSuggestedExtension(slug))
+      : undefined;
+
+  const richOntologies: SuggestedOntology[] | undefined =
+    suggestedOntologies.length > 0
+      ? suggestedOntologies.map((name) => ({
+          name,
+          description: "",
+          origin: "bundled" as const,
+          version: "1.0.0",
+        }))
+      : undefined;
+
   // Generate template body if none provided or too minimal
   if (!body || body.trim().length < 20) {
     body = generateTypeGuideTemplate({
       type,
-      suggestedExtensions:
-        suggestedExtensions.length > 0 ? suggestedExtensions : undefined,
-      suggestedOntologies:
-        suggestedOntologies.length > 0 ? suggestedOntologies : undefined,
+      suggestedExtensions: richExtensions,
+      suggestedOntologies: richOntologies,
     });
     templateUsed = true;
   }
@@ -482,15 +610,12 @@ export async function createTypeGuide(
   // SEC-13: Detect embedded script content (MUST NOT execute — flag it)
   const hasScript = SCRIPT_RE.test(body);
 
-  // Build file content
   const frontmatterStr = buildFrontmatter({
     type,
     source,
     typeAliases: typeAliases.length > 0 ? typeAliases : undefined,
-    suggestedExtensions:
-      suggestedExtensions.length > 0 ? suggestedExtensions : undefined,
-    suggestedOntologies:
-      suggestedOntologies.length > 0 ? suggestedOntologies : undefined,
+    suggestedExtensions: richExtensions,
+    suggestedOntologies: richOntologies,
     commonParentTypes:
       commonParentTypes.length > 0 ? commonParentTypes : undefined,
     commonChildTypes:

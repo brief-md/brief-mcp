@@ -1,5 +1,6 @@
 import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
 import defaultLogger from "../observability/logger.js"; // check-rules-ignore
+import { updateTypeGuideSuggestions } from "../type-intelligence/updater.js"; // check-rules-ignore
 import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
 import { syncExtensionMetadata } from "../writer/metadata-sync.js"; // check-rules-ignore
 
@@ -9,11 +10,18 @@ const logger = defaultLogger;
 /*  Bundled Extension Registry — six spec-defined extensions (COMPAT-05) */
 /* ------------------------------------------------------------------ */
 
+export interface SubsectionInfo {
+  name: string;
+  mode: "ontology" | "freeform";
+  ontology?: string;
+}
+
 interface ExtensionInfo {
   name: string;
   slug: string;
   description: string;
   subsections: string[];
+  subsectionDetails: SubsectionInfo[];
   associatedOntologies: string[];
 }
 
@@ -23,6 +31,15 @@ const SPEC_EXTENSIONS: Record<string, ExtensionInfo> = {
     slug: "sonic_arts",
     description: "Audio, music, sound design, acoustic experiences",
     subsections: ["Sound Palette", "Production Approach", "Sonic References"],
+    subsectionDetails: [
+      { name: "Sound Palette", mode: "ontology", ontology: "music-theory" },
+      { name: "Production Approach", mode: "freeform" },
+      {
+        name: "Sonic References",
+        mode: "ontology",
+        ontology: "audio-production",
+      },
+    ],
     associatedOntologies: ["music-theory", "audio-production", "theme-pack"],
   },
   narrative_creative: {
@@ -30,6 +47,19 @@ const SPEC_EXTENSIONS: Record<string, ExtensionInfo> = {
     slug: "narrative_creative",
     description: "Storytelling, fiction, creative writing, narrative design",
     subsections: ["Narrative Arc", "Character Development", "Voice & Tone"],
+    subsectionDetails: [
+      {
+        name: "Narrative Arc",
+        mode: "ontology",
+        ontology: "narrative-structure",
+      },
+      {
+        name: "Character Development",
+        mode: "ontology",
+        ontology: "character-archetypes",
+      },
+      { name: "Voice & Tone", mode: "freeform" },
+    ],
     associatedOntologies: ["narrative-structure", "character-archetypes"],
   },
   lyrical_craft: {
@@ -37,6 +67,11 @@ const SPEC_EXTENSIONS: Record<string, ExtensionInfo> = {
     slug: "lyrical_craft",
     description: "Song lyrics, poetry, versification, lyrical expression",
     subsections: ["Lyrical Themes", "Rhyme Scheme", "Verse Structure"],
+    subsectionDetails: [
+      { name: "Lyrical Themes", mode: "ontology", ontology: "theme-pack" },
+      { name: "Rhyme Scheme", mode: "ontology", ontology: "poetic-forms" },
+      { name: "Verse Structure", mode: "freeform" },
+    ],
     associatedOntologies: ["poetic-forms", "lyrical-devices", "theme-pack"],
   },
   visual_storytelling: {
@@ -44,6 +79,11 @@ const SPEC_EXTENSIONS: Record<string, ExtensionInfo> = {
     slug: "visual_storytelling",
     description: "Film, video, visual narrative, photography, visual media",
     subsections: ["Visual Language", "Shot Composition", "Color Palette"],
+    subsectionDetails: [
+      { name: "Visual Language", mode: "ontology", ontology: "cinematography" },
+      { name: "Shot Composition", mode: "freeform" },
+      { name: "Color Palette", mode: "ontology", ontology: "visual-design" },
+    ],
     associatedOntologies: ["visual-design", "cinematography"],
   },
   strategic_planning: {
@@ -51,6 +91,15 @@ const SPEC_EXTENSIONS: Record<string, ExtensionInfo> = {
     slug: "strategic_planning",
     description: "Business strategy, product planning, market analysis",
     subsections: ["Strategic Objectives", "Market Analysis", "Success Metrics"],
+    subsectionDetails: [
+      { name: "Strategic Objectives", mode: "freeform" },
+      {
+        name: "Market Analysis",
+        mode: "ontology",
+        ontology: "market-analysis",
+      },
+      { name: "Success Metrics", mode: "freeform" },
+    ],
     associatedOntologies: ["business-strategy", "market-analysis"],
   },
   system_design: {
@@ -61,6 +110,19 @@ const SPEC_EXTENSIONS: Record<string, ExtensionInfo> = {
       "Architecture Overview",
       "Component Design",
       "Integration Points",
+    ],
+    subsectionDetails: [
+      {
+        name: "Architecture Overview",
+        mode: "ontology",
+        ontology: "software-architecture",
+      },
+      {
+        name: "Component Design",
+        mode: "ontology",
+        ontology: "system-patterns",
+      },
+      { name: "Integration Points", mode: "freeform" },
     ],
     associatedOntologies: ["software-architecture", "system-patterns"],
   },
@@ -361,6 +423,17 @@ export async function addExtension(params: {
       await writeBrief(targetPath, briefContent);
       persisted = true;
       resultFilePath = `${targetPath}/BRIEF.md`;
+
+      // Living type guide: update suggested_extensions (best-effort)
+      try {
+        await updateTypeGuideSuggestions({
+          projectPath: targetPath,
+          action: "add_extension",
+          value: metadataFormat,
+        });
+      } catch {
+        /* best-effort */
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn("Failed to persist extension to BRIEF.md", {
@@ -448,11 +521,22 @@ export const createExtension = addExtension;
  */
 export function getKnownExtensions(): Map<
   string,
-  { name: string; subsections: string[] }
+  { name: string; subsections: string[]; subsectionDetails?: SubsectionInfo[] }
 > {
-  const result = new Map<string, { name: string; subsections: string[] }>();
+  const result = new Map<
+    string,
+    {
+      name: string;
+      subsections: string[];
+      subsectionDetails?: SubsectionInfo[];
+    }
+  >();
   for (const [slug, ext] of Object.entries(SPEC_EXTENSIONS)) {
-    result.set(slug, { name: ext.name, subsections: ext.subsections });
+    result.set(slug, {
+      name: ext.name,
+      subsections: ext.subsections,
+      subsectionDetails: ext.subsectionDetails,
+    });
   }
   for (const [slug, ext] of createdExtensions) {
     if (!result.has(slug)) {
