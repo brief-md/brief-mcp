@@ -73,33 +73,96 @@ function parseDecisionEntries(body: string): {
     [];
   let supersededCount = 0;
 
-  for (const line of body.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("-")) continue;
+  const lines = body.split("\n");
 
-    let text = trimmed.replace(/^-\s*/, "").trim();
-    let status = "active";
-    let date: string | undefined;
+  // Detect format: H3 headings (### ID: Title) vs list items (- text)
+  const hasH3Headings = lines.some((l) => /^###\s+/.test(l.trim()));
 
-    const dateMatch = text.match(/\[(\d{4}-\d{2}-\d{2})\]/);
-    if (dateMatch) {
-      date = dateMatch[1];
-      text = text.replace(dateMatch[0], "").trim();
+  if (hasH3Headings) {
+    // H3 heading format: ### ID: Title with **WHAT:**/**WHY:**/**WHEN:** sub-fields
+    let currentTitle: string | undefined;
+    let currentStatus = "active";
+    let currentDate: string | undefined;
+    let isSuperseded = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const h3Match = trimmed.match(/^###\s+(.+)/);
+      if (h3Match) {
+        // Save previous decision if any
+        if (currentTitle) {
+          decisions.push({
+            date: currentDate,
+            title: currentTitle,
+            status: currentStatus,
+          });
+          if (currentStatus === "superseded") supersededCount++;
+        }
+        // Start new decision
+        let heading = h3Match[1];
+        isSuperseded = /^~~/.test(heading) && /~~$/.test(heading);
+        if (isSuperseded) {
+          heading = heading.replace(/^~~\s*/, "").replace(/\s*~~$/, "");
+          currentStatus = "superseded";
+        } else {
+          currentStatus = "active";
+        }
+        currentTitle = heading;
+        currentDate = undefined;
+        continue;
+      }
+
+      // Parse sub-fields for current decision
+      if (currentTitle) {
+        const whenMatch = trimmed.match(/^\*\*(?:WHEN):\*\*\s*(.+)/i);
+        if (whenMatch) {
+          currentDate = whenMatch[1].replace(/^\*\*\s*/, "").trim();
+        }
+        const exceptionMatch = trimmed.match(/^\*\*(?:EXCEPTION TO):\*\*\s*/i);
+        if (exceptionMatch) currentStatus = "exception";
+        const supersededByMatch = trimmed.match(
+          /^\*\*(?:SUPERSEDED BY):\*\*\s*/i,
+        );
+        if (supersededByMatch) currentStatus = "superseded";
+      }
     }
-
-    if (/\[superseded\]/i.test(text)) {
-      status = "superseded";
-      supersededCount++;
-      text = text.replace(/\[superseded\]/i, "").trim();
-    } else if (/\[exception/i.test(text)) {
-      status = "exception";
-      text = text.replace(/\[exception[^\]]*\]/i, "").trim();
+    // Save last decision
+    if (currentTitle) {
+      decisions.push({
+        date: currentDate,
+        title: currentTitle,
+        status: currentStatus,
+      });
+      if (currentStatus === "superseded") supersededCount++;
     }
+  } else {
+    // List-item format: - Decision text [date] [superseded]
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("-")) continue;
 
-    // Extract title (before "why:" parenthetical)
-    const title = text.replace(/\s*\(why:.*?\)/, "").trim();
+      let text = trimmed.replace(/^-\s*/, "").trim();
+      let status = "active";
+      let date: string | undefined;
 
-    decisions.push({ date, title, status });
+      const dateMatch = text.match(/\[(\d{4}-\d{2}-\d{2})\]/);
+      if (dateMatch) {
+        date = dateMatch[1];
+        text = text.replace(dateMatch[0], "").trim();
+      }
+
+      if (/\[superseded\]/i.test(text)) {
+        status = "superseded";
+        supersededCount++;
+        text = text.replace(/\[superseded\]/i, "").trim();
+      } else if (/\[exception/i.test(text)) {
+        status = "exception";
+        text = text.replace(/\[exception[^\]]*\]/i, "").trim();
+      }
+
+      const title = text.replace(/\s*\(why:.*?\)/, "").trim();
+      decisions.push({ date, title, status });
+    }
   }
 
   return { decisions, supersededCount };
@@ -251,7 +314,12 @@ function getSectionOverview(
 
 async function computeSetupPhase(
   projectPath: string,
-  metadata: { type?: string; typeGuide?: string; project?: string },
+  metadata: {
+    type?: string;
+    typeGuide?: string;
+    project?: string;
+    extensions?: string[];
+  },
 ): Promise<{ setupPhase: string | undefined; nextSteps: string[] }> {
   const nextSteps: string[] = [];
 
@@ -326,6 +394,11 @@ async function computeSetupPhase(
     );
   } catch {
     /* type guide resolution failed — skip to extensions */
+  }
+
+  // If extensions are already accepted in metadata, project is fully active
+  if (metadata.extensions && metadata.extensions.length > 0) {
+    return { setupPhase: undefined, nextSteps };
   }
 
   // Identity complete + type guide reviewed → ready for extensions
