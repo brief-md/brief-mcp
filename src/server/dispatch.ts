@@ -271,7 +271,14 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
     ),
 
   // Validation
-  brief_lint: (args) => lintBrief(String(args.content ?? "")),
+  brief_lint: async (args) => {
+    const resolved = withProjectPath(args);
+    const projectPath = String(resolved.path ?? resolved.project_path ?? "");
+    if (!projectPath)
+      return { error: "No project path provided and no active project set." };
+    const content = await readBrief(projectPath);
+    return lintBrief(content);
+  },
   brief_check_conflicts: async (args) => {
     const server = _server;
     const samplingFn: SamplingFn | undefined = server

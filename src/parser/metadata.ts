@@ -281,8 +281,10 @@ export function parseMetadata(input: string): ParsedMetadata {
   for (let i = bodyStartLine; i < lines.length; i++) {
     const line = lines[i];
 
-    // Stop scanning at first section heading
-    if (/^#{1,6}\s/.test(line)) break;
+    // Stop scanning at first section heading (H2+), but skip the H1 title
+    // which precedes the metadata block in standard BRIEF.md files.
+    if (/^#{2,6}\s/.test(line)) break;
+    if (/^#\s/.test(line)) continue;
 
     let rawName: string | null = null;
     let rawValue: string | null = null;
