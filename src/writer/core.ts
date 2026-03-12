@@ -273,7 +273,18 @@ export async function readBriefSection(
   const sections = findSections(normalized);
   const target = findMatchingSection(sections, sectionName);
   if (!target) return { content: "" };
-  const body = normalized.slice(target.bodyStart, target.bodyEnd);
+
+  // Level-aware body end: an H2 section's body extends to the next H1 or H2,
+  // not to H3 sub-headings which are part of the section's content.
+  let levelAwareEnd = target.bodyEnd;
+  for (const s of sections) {
+    if (s.headingStart > target.headingStart && s.level <= target.level) {
+      levelAwareEnd = s.headingStart;
+      break;
+    }
+  }
+
+  const body = normalized.slice(target.bodyStart, levelAwareEnd);
   // Strip only structural leading/trailing newlines, not content whitespace
   return { content: body.replace(/^\n+/, "").replace(/\n+$/, "") };
 }
