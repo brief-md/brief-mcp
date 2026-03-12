@@ -17,10 +17,13 @@ const CANONICAL_FIELD_MAP: Record<string, string> = {
 
 const REQUIRED_FIELDS = ["Project", "Type", "Created"] as const;
 
-// Regex: bold markdown  **Field:** value  or  **Field :** value
+// Regex: bold markdown metadata in two common formats:
+//   **Field:** value   (colon inside bold — most common in real BRIEF.md files)
+//   **Field**: value   (colon outside bold — alternate format)
 // Uses " ?" (optional single space) after closing ** so a value that IS a space
 // is captured correctly and not consumed by greedy whitespace matching.
-const BOLD_META_RE = /^\*\*([^*:]+?)\s*:\*\* ?(.*)$/;
+const BOLD_META_COLON_INSIDE_RE = /^\*\*([^*:]+?):\*\*\s?(.*)$/;
+const BOLD_META_COLON_OUTSIDE_RE = /^\*\*([^*:]+?)\s*\*\*:\s?(.*)$/;
 // Regex: plain text  Field: value  (non-empty value required)
 const PLAIN_META_RE = /^([A-Za-z][A-Za-z0-9_ ]*):\s+(.+)$/;
 
@@ -284,8 +287,9 @@ export function parseMetadata(input: string): ParsedMetadata {
     let rawName: string | null = null;
     let rawValue: string | null = null;
 
-    // Bold format: **Field:** value or **Field :** value
-    let m = BOLD_META_RE.exec(line);
+    // Bold format: **Field:** value (colon inside bold) or **Field**: value (colon outside)
+    let m = BOLD_META_COLON_INSIDE_RE.exec(line);
+    if (!m) m = BOLD_META_COLON_OUTSIDE_RE.exec(line);
     if (m) {
       rawName = m[1];
       rawValue = m[2];

@@ -29,10 +29,13 @@ export interface MaturitySignals {
 // ── Field detection ─────────────────────────────────────────────────────────
 
 const FULL_FORMAT_FIELDS = [
-  { key: "what", pattern: /^WHAT:/m },
-  { key: "why", pattern: /^WHY:/m },
-  { key: "when", pattern: /^WHEN:/m },
-  { key: "alternativesConsidered", pattern: /^ALTERNATIVES CONSIDERED:/m },
+  { key: "what", pattern: /^(?:\*\*)?WHAT:(?:\*\*)?\s/m },
+  { key: "why", pattern: /^(?:\*\*)?WHY:(?:\*\*)?\s/m },
+  { key: "when", pattern: /^(?:\*\*)?WHEN:(?:\*\*)?\s/m },
+  {
+    key: "alternativesConsidered",
+    pattern: /^(?:\*\*)?ALTERNATIVES CONSIDERED:(?:\*\*)?\s/m,
+  },
 ] as const;
 
 /** A decision is "full format" if it has at least WHAT and WHY fields. */
