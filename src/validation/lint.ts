@@ -569,7 +569,7 @@ function checkNonCanonicalMetadata(
     if (trimmed === "") continue;
 
     const match = trimmed.match(
-      /^(Project|Type|Created|Updated|Extensions|Ontologies|Status|Version):\s/,
+      /^(Project|Type|Created|Updated|Extensions|Status|Version):\s/,
     );
     if (match && !trimmed.startsWith("**")) {
       findings.push(

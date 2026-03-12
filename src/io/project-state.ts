@@ -30,7 +30,7 @@ export interface BriefMetadata {
   created: string;
   updated: string;
   extensions: string[];
-  ontologies: string[];
+  ontologies: string[]; // backward compat — empty for new files
   version: number;
   [key: string]: unknown;
 }

@@ -251,7 +251,7 @@ function getSectionOverview(
 
 async function computeSetupPhase(
   projectPath: string,
-  metadata: { type?: string; project?: string },
+  metadata: { type?: string; typeGuide?: string; project?: string },
 ): Promise<{ setupPhase: string | undefined; nextSteps: string[] }> {
   const nextSteps: string[] = [];
 
@@ -284,10 +284,11 @@ async function computeSetupPhase(
     return { setupPhase: "needs_type", nextSteps };
   }
 
-  // Check type guide status
+  // Check type guide status — prefer explicit typeGuide name over type slug
   try {
     const { getTypeGuide } = await import("../type-intelligence/loading.js");
-    const typeGuide = await getTypeGuide({ type });
+    const guideSlug = metadata.typeGuide ?? type;
+    const typeGuide = await getTypeGuide({ type: guideSlug });
     const isGeneric = (typeGuide as { isGeneric?: boolean })?.isGeneric;
 
     if (isGeneric) {

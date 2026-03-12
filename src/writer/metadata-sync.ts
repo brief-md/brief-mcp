@@ -20,16 +20,16 @@ function buildNewFileContent(extensionMetaName: string): string {
     "**Project:** ",
     "**Type:** ",
     `**Extensions:** ${extensionMetaName}`,
-    "**Status:** active",
+    "**Status:** concept",
     `**Created:** ${today}`,
     `**Updated:** ${today}`,
-    "**Ontologies:** ",
     "**Version:** 1.0",
     "",
   ].join("\n");
 }
 
 // Canonical metadata field order for new files (WRITE-11)
+// Ontologies removed — ontology config belongs in type guides, not BRIEF.md metadata.
 export const CANONICAL_FIELD_ORDER = [
   "Project",
   "Type",
@@ -37,7 +37,6 @@ export const CANONICAL_FIELD_ORDER = [
   "Status",
   "Created",
   "Updated",
-  "Ontologies",
   "Version",
 ];
 
@@ -78,30 +77,18 @@ export function syncUpdatedTimestamp(content: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// syncTypeGuideMetadata
+// syncTypeGuideMetadata (DEPRECATED)
 // ---------------------------------------------------------------------------
 
 /**
- * Add or update **Type Guide:** metadata field in BRIEF.md content.
+ * @deprecated Type guides are now resolved via the **Type:** field directly.
+ * The **Type:** value IS the type guide lookup key — no separate metadata field needed.
  */
 export function syncTypeGuideMetadata(
   content: string,
-  params: { slug: string; source: string },
+  _params: { slug: string; source: string },
 ): string {
-  const value = `${params.slug} (${params.source})`;
-  const typeGuideRe = /^\*\*Type Guide:\*\*\s*.*$/m;
-
-  if (typeGuideRe.test(content)) {
-    return content.replace(typeGuideRe, `**Type Guide:** ${value}`);
-  }
-
-  // Insert after **Type:** line if present
-  const typeRe = /^(\*\*Type:\*\*\s*.*)$/m;
-  if (typeRe.test(content)) {
-    return content.replace(typeRe, `$1\n**Type Guide:** ${value}`);
-  }
-
-  return `**Type Guide:** ${value}\n${content}`;
+  return content;
 }
 
 // ---------------------------------------------------------------------------
@@ -206,48 +193,19 @@ export async function syncExtensionMetadata(
 }
 
 // ---------------------------------------------------------------------------
-// syncOntologyMetadata
+// syncOntologyMetadata (DEPRECATED)
 // ---------------------------------------------------------------------------
 
 /**
- * Sync ontology metadata (add a pack name to the Ontologies field).
- * Returns the updated content string. (WRITE-05, ONT-08)
+ * @deprecated Ontology configuration now belongs in type guides, not BRIEF.md metadata.
+ * The **Ontologies:** field is no longer written to BRIEF.md files.
+ * Ontology packs are tracked in type guide YAML frontmatter (suggested_ontologies).
  */
 export async function syncOntologyMetadata(
   inputContent: string,
-  params: { pack: string; version?: string },
+  _params: { pack: string; version?: string },
 ): Promise<string> {
-  const entry = params.version
-    ? `${params.pack} (${params.version})`
-    : params.pack;
-
-  if (/\*\*Ontologies:\*\*/.test(inputContent)) {
-    return inputContent.replace(
-      /(\*\*Ontologies:\*\*\s*)(.*)/,
-      (_match, prefix: string, existing: string) => {
-        const trimmed = existing.trim();
-        if (!trimmed) return `${prefix}${entry}`;
-        const items = trimmed
-          .split(",")
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-        // Don't add if pack already present
-        if (
-          items.some(
-            (i: string) =>
-              i === params.pack || i.startsWith(`${params.pack} (`),
-          )
-        ) {
-          return `${prefix}${existing}`;
-        }
-        items.push(entry);
-        return `${prefix}${items.join(", ")}`;
-      },
-    );
-  }
-
-  // No Ontologies field — append
-  return `${inputContent}\n**Ontologies:** ${entry}\n`;
+  return inputContent;
 }
 
 // ---------------------------------------------------------------------------
@@ -471,12 +429,12 @@ export function metadataToHeadingFormat(metadataName: string): string {
   return translateExtensionName(metadataName, "toHeading");
 }
 
-/** @deprecated Use syncExtensionMetadata or syncOntologyMetadata instead */
+/** @deprecated Use syncExtensionMetadata instead */
 export async function writeMetadataField(
   _filePath: string,
   _params: MetadataSyncParams,
 ): Promise<WriterResult> {
   throw new Error(
-    "writeMetadataField is deprecated. Use syncExtensionMetadata or syncOntologyMetadata.",
+    "writeMetadataField is deprecated. Use syncExtensionMetadata.",
   );
 }

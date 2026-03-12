@@ -225,7 +225,7 @@ export async function writeSection(
 
 /**
  * Create a new BRIEF.md file content string from project metadata.
- * Metadata in canonical order: Project, Type, Extensions, Status, Created, Updated, Ontologies, Version.
+ * Metadata in canonical order: Project, Type, Extensions, Status, Created, Updated, Version.
  * Returns the full file content as a string (always LF line endings).
  */
 export async function createNewFile(params: {
@@ -239,12 +239,10 @@ export async function createNewFile(params: {
   const metaLines = [
     `**Project:** ${params.project}`,
     `**Type:** ${params.type}`,
-    `**Extensions:**`,
-    `**Status:** active`,
+    `**Status:** concept`,
     `**Created:** ${today}`,
     `**Updated:** ${today}`,
-    `**Ontologies:**`,
-    `**Version:** 1`,
+    `**Version:** 1.0`,
     "",
   ];
 
