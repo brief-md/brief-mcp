@@ -44,6 +44,7 @@ export interface ExternalDecision {
 
 export interface CaptureExternalSessionOptions {
   tool: string;
+  summary?: string;
   decisions: ExternalDecision[];
   session_date?: string;
   projectPath?: string;

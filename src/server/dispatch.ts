@@ -260,7 +260,11 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   brief_capture_external_session: (args) =>
     handleCaptureExternalSession(
       typed<Parameters<typeof handleCaptureExternalSession>[0]>(
-        remap(withProjectPath(args), { project_path: "projectPath" }),
+        remap(withProjectPath(args), {
+          project_path: "projectPath",
+          tool_name: "tool", // check-rules-ignore
+          date: "session_date",
+        }),
       ),
     ),
   brief_update_section: (args) =>
