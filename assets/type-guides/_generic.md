@@ -89,6 +89,54 @@ Help identify where domain knowledge can be found. This information helps popula
 - Ask the user about influential works, tools, or standards in their domain
 - Note any domain-specific vocabulary — this helps with ontology tagging later
 
+## Extension & Ontology Schema
+
+When the type guide is created, its YAML frontmatter tracks extensions and ontologies as rich objects. Understanding this schema helps capture the right data during domain discovery.
+
+### Extension Subsection Modes
+
+Each extension has subsections, and each subsection declares how its content is captured:
+
+- **`mode: freeform`** — user describes in their own words. No ontology link needed.
+- **`mode: ontology`** — content draws from a linked ontology pack. The `ontology` field names which pack provides the vocabulary.
+
+During domain discovery, identify for each subsection: does this domain have structured vocabulary (ontology mode), or is it best described freely (freeform mode)?
+
+### Ontology Origins
+
+Each ontology in the type guide declares where it comes from:
+
+- **`origin: bundled`** — shipped with the tool (e.g., `theme-ontology`, `musicbrainz`)
+- **`origin: url`** — downloadable from an external source. Requires a `url` field.
+- **`origin: custom`** — AI-generated for this project type. Includes `generated_from` to track which extension prompted its creation.
+
+### Example Frontmatter Schema
+
+```yaml
+suggested_extensions:
+  - slug: sonic_arts
+    description: "Audio, music, sound design"
+    subsections:
+      - name: Sound Palette
+        mode: ontology
+        ontology: music-theory
+      - name: Production Approach
+        mode: freeform
+
+suggested_ontologies:
+  - name: music-theory
+    description: "Scales, modes, harmonic concepts"
+    origin: bundled
+    version: "1.0.0"
+  - name: custom-production-terms
+    description: "Domain vocabulary for production techniques"
+    origin: custom
+    version: "1.0.0"
+    generated_from: sonic_arts
+```
+
+During the setup conversation, gather enough context to populate these fields accurately when calling `brief_create_type_guide`.
+
 ## Known Tensions
 
 Universal trade-offs that apply to any project. During the domain discovery conversation, surface **domain-specific tensions** as well — these become the `## Known Tensions` section and `conflict_patterns` metadata in the created type guide.
