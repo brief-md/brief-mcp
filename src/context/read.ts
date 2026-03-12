@@ -3,7 +3,12 @@
 // and fallback stubs for backwards compatibility.
 
 import { projectExists, readBrief, readSection } from "../io/project-state.js"; // check-rules-ignore
-import type { Decision, Question } from "../types/decisions.js";
+import type {
+  Decision,
+  DecisionFormat,
+  DecisionStatus,
+  Question,
+} from "../types/decisions.js";
 
 /* ------------------------------------------------------------------ */
 /*  Parameter / Result interfaces                                      */
@@ -118,7 +123,22 @@ function makeQuestion(
   } as unknown as Question;
 }
 
-/** Parse decision lines from a section body. */
+/** Parse a structured field value from decision body lines (e.g., "**WHAT:** value" or "WHAT: value"). */
+function parseField(lines: string[], fieldName: string): string | undefined {
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match "**FIELD:** value", "**FIELD**: value", and "FIELD: value" (case-insensitive)
+    const pattern = new RegExp(
+      `^(?:\\*\\*)?${fieldName}:?(?:\\*\\*)?:?\\s*(.+)`,
+      "i",
+    );
+    const m = trimmed.match(pattern);
+    if (m) return m[1].replace(/^\*\*\s*/, "").trim();
+  }
+  return undefined;
+}
+
+/** Parse decision lines from a section body. Handles both list-item format and H3 heading format. */
 function parseDecisions(
   body: string,
   filter?: { statusFilter?: string },
@@ -126,34 +146,146 @@ function parseDecisions(
   const decisions: Decision[] = [];
   const lines = body.split("\n");
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("-")) continue;
-    const text = trimmed.replace(/^-\s*/, "").trim();
-    if (!text) continue;
+  // Check if this body uses H3 heading format (### Decision Title)
+  const hasH3Headings = lines.some((l) => /^###\s+/.test(l.trim()));
 
-    // Parse optional metadata: "Decision text (why: reason) [2025-01-01]"
-    let status = "active";
-    let date = new Date().toISOString().slice(0, 10);
-    let decisionText = text;
+  if (hasH3Headings) {
+    // Parse H3 heading format with optional WHAT/WHY/WHEN sub-fields
+    const blocks: {
+      heading: string;
+      bodyLines: string[];
+      lineIndex: number;
+    }[] = [];
 
-    const dateMatch = text.match(/\[(\d{4}-\d{2}-\d{2})\]/);
-    if (dateMatch) {
-      date = dateMatch[1];
-      decisionText = decisionText.replace(dateMatch[0], "").trim();
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      const h3Match = trimmed.match(/^###\s+(.+)/);
+      if (h3Match) {
+        blocks.push({
+          heading: h3Match[1].trim(),
+          bodyLines: [],
+          lineIndex: i,
+        });
+      } else if (blocks.length > 0 && trimmed) {
+        blocks[blocks.length - 1].bodyLines.push(trimmed);
+      }
     }
 
-    if (/\[superseded\]/i.test(text)) {
-      status = "superseded";
-      decisionText = decisionText.replace(/\[superseded\]/i, "").trim();
-    } else if (/\[exception\]/i.test(text)) {
-      status = "exception";
-      decisionText = decisionText.replace(/\[exception\]/i, "").trim();
+    for (const block of blocks) {
+      let heading = block.heading;
+      let status: DecisionStatus = "active";
+      let format: DecisionFormat = "minimal";
+
+      // Detect superseded: ~~strikethrough~~ or (superseded) in heading
+      if (/^~~.+~~$/.test(heading)) {
+        status = "superseded";
+        heading = heading.replace(/^~~|~~$/g, "").trim();
+      } else if (/\(superseded\)/i.test(heading)) {
+        status = "superseded";
+        heading = heading.replace(/\(superseded\)/i, "").trim();
+      }
+
+      // Extract structured fields from body
+      const what = parseField(block.bodyLines, "WHAT");
+      const why = parseField(block.bodyLines, "WHY");
+      const when = parseField(block.bodyLines, "WHEN");
+      const replaces = parseField(block.bodyLines, "REPLACES");
+      const exceptionTo = parseField(block.bodyLines, "EXCEPTION TO");
+      const supersededBy = parseField(block.bodyLines, "SUPERSEDED BY");
+      const resolvedFrom = parseField(block.bodyLines, "RESOLVED FROM");
+      const altText = parseField(block.bodyLines, "ALTERNATIVES CONSIDERED");
+
+      // Determine format
+      if (what || why || when) {
+        format = "full";
+      }
+
+      // Exception status from field
+      if (exceptionTo) {
+        status = "exception";
+      }
+      // Superseded status from field (overrides exception)
+      if (supersededBy) {
+        status = "superseded";
+      }
+
+      // Rationale for minimal format: non-field body text
+      let rationale: string | undefined;
+      if (format === "minimal" && block.bodyLines.length > 0) {
+        rationale =
+          block.bodyLines
+            .filter(
+              (l) =>
+                !/^(?:\*\*)?(?:WHAT|WHY|WHEN|REPLACES|EXCEPTION TO|SUPERSEDED BY|RESOLVED FROM|ALTERNATIVES CONSIDERED)(?:\*\*)?:/i.test(
+                  l,
+                ),
+            )
+            .join(" ")
+            .trim() || undefined;
+      }
+
+      if (filter?.statusFilter && status !== filter.statusFilter) continue;
+
+      const decision: Record<string, unknown> = {
+        text: heading,
+        status,
+        format,
+        date: when ?? new Date().toISOString().slice(0, 10),
+      };
+      if (what) decision.what = what;
+      if (why) decision.why = why;
+      if (when) decision.when = when;
+      if (replaces) decision.replaces = replaces;
+      if (exceptionTo) decision.exceptionTo = exceptionTo;
+      if (supersededBy) decision.supersededBy = supersededBy;
+      if (resolvedFrom) decision.resolvedFrom = resolvedFrom;
+      if (rationale) decision.rationale = rationale;
+      if (altText) {
+        decision.alternativesConsidered = altText
+          .split(/[,/]/)
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+      }
+
+      decisions.push(
+        makeDecision(
+          decision as Record<string, unknown> & {
+            text: string;
+            status: string;
+          },
+        ),
+      );
     }
+  } else {
+    // Parse list-item format: "- Decision text [date] [superseded]"
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("-")) continue;
+      const text = trimmed.replace(/^-\s*/, "").trim();
+      if (!text) continue;
 
-    if (filter?.statusFilter && status !== filter.statusFilter) continue;
+      let status = "active";
+      let date = new Date().toISOString().slice(0, 10);
+      let decisionText = text;
 
-    decisions.push(makeDecision({ text: decisionText, status, date }));
+      const dateMatch = text.match(/\[(\d{4}-\d{2}-\d{2})\]/);
+      if (dateMatch) {
+        date = dateMatch[1];
+        decisionText = decisionText.replace(dateMatch[0], "").trim();
+      }
+
+      if (/\[superseded\]/i.test(text)) {
+        status = "superseded";
+        decisionText = decisionText.replace(/\[superseded\]/i, "").trim();
+      } else if (/\[exception\]/i.test(text)) {
+        status = "exception";
+        decisionText = decisionText.replace(/\[exception\]/i, "").trim();
+      }
+
+      if (filter?.statusFilter && status !== filter.statusFilter) continue;
+
+      decisions.push(makeDecision({ text: decisionText, status, date }));
+    }
   }
 
   // Sort newest first
