@@ -7,6 +7,10 @@ import {
   writeBrief,
 } from "../io/project-state.js"; // check-rules-ignore
 import { getTypeGuide } from "../type-intelligence/loading.js"; // check-rules-ignore
+import type {
+  SuggestedExtension,
+  SuggestedOntology,
+} from "../types/type-intelligence.js";
 
 // ---------------------------------------------------------------------------
 // Reserved Windows names
@@ -171,8 +175,8 @@ export async function createProject(params: {
     slug: string;
     body?: string;
     source: string;
-    suggestedExtensions?: string[];
-    suggestedOntologies?: string[];
+    suggestedExtensions?: SuggestedExtension[];
+    suggestedOntologies?: SuggestedOntology[];
     isGeneric?: boolean;
     signal?: string;
   };

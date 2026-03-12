@@ -1,6 +1,8 @@
 // src/ontology/management.ts — Ontology pack management (TASK-35)
 // Provides pack index management with disk persistence via pack-loader.
 
+import { updateTypeGuideSuggestions } from "../type-intelligence/updater.js"; // check-rules-ignore
+import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
 import { buildIndex, searchIndex } from "./indexer.js";
 import {
   ensureBundledPacks,
@@ -476,6 +478,25 @@ export async function installOntology(params: {
     description: pack.description ?? "",
     version: incomingVersion,
   });
+
+  // Living type guide: update suggested_ontologies (best-effort)
+  try {
+    const active = getActiveProject();
+    if (active) {
+      await updateTypeGuideSuggestions({
+        projectPath: active.path,
+        action: "add_ontology",
+        value: pack.name,
+        ontologyMeta: {
+          description: pack.description ?? "",
+          origin: trustLevel === "url" ? "url" : "bundled",
+          version: incomingVersion,
+        },
+      });
+    }
+  } catch {
+    /* best-effort */
+  }
 
   return {
     installed: true,

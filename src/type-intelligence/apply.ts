@@ -1,8 +1,6 @@
 // src/type-intelligence/apply.ts — WP4: Apply type guide (auto-install extensions & ontologies)
 
 import { addExtension } from "../extension/creation.js"; // check-rules-ignore
-import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
-import { syncTypeGuideMetadata } from "../writer/metadata-sync.js"; // check-rules-ignore
 import { getTypeGuide } from "./loading.js"; // check-rules-ignore
 
 export async function applyTypeGuide(params: {
@@ -55,18 +53,18 @@ export async function applyTypeGuide(params: {
     const suggestedExtensions = guide.metadata.suggestedExtensions ?? [];
     if (suggestedExtensions.length > 0) {
       const results = await Promise.allSettled(
-        suggestedExtensions.map((extensionName) =>
-          addExtension({ extensionName, projectPath }),
+        suggestedExtensions.map((ext) =>
+          addExtension({ extensionName: ext.slug, projectPath }),
         ),
       );
 
       for (let i = 0; i < results.length; i++) {
         const settledResult = results[i];
-        const extName = suggestedExtensions[i];
+        const extSlug = suggestedExtensions[i].slug;
         if (settledResult.status === "fulfilled") {
-          extensionsInstalled.push(extName);
+          extensionsInstalled.push(extSlug);
         } else {
-          extensionsFailed.push(extName);
+          extensionsFailed.push(extSlug);
         }
       }
     }
@@ -77,8 +75,8 @@ export async function applyTypeGuide(params: {
 
   if (autoInstallOntologies) {
     const suggestedOntologies = guide.metadata.suggestedOntologies ?? [];
-    for (const name of suggestedOntologies) {
-      ontologiesSuggested.push({ name, status: "suggested" });
+    for (const ont of suggestedOntologies) {
+      ontologiesSuggested.push({ name: ont.name, status: "suggested" });
     }
   }
 
@@ -99,19 +97,8 @@ export async function applyTypeGuide(params: {
     );
   }
 
-  // 6. Write **Type Guide:** metadata to BRIEF.md (best-effort)
-  try {
-    const briefContent = await readBrief(projectPath);
-    if (briefContent) {
-      const updated = syncTypeGuideMetadata(briefContent, {
-        slug: guide.slug,
-        source: guide.metadata.source,
-      });
-      await writeBrief(projectPath, updated);
-    }
-  } catch {
-    /* best-effort — don't fail the whole apply for metadata write */
-  }
+  // Type guide is resolved via **Type:** field — no separate metadata field needed.
+  // The **Type:** value IS the type guide lookup key (exact → alias → generic).
 
   return {
     applied: true,

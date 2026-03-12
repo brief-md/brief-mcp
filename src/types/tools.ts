@@ -997,8 +997,8 @@ export interface SuggestTypeGuidesOutput {
     matchType: string;
     relevanceScore: number;
     summary: string;
-    suggestedExtensions?: string[];
-    suggestedOntologies?: string[];
+    suggestedExtensions?: Array<{ slug: string; description: string }>;
+    suggestedOntologies?: Array<{ name: string; description: string }>;
   }>;
   readonly hasExactMatch: boolean;
   readonly signal: string;

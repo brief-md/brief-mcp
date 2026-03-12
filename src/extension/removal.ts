@@ -1,6 +1,7 @@
 // src/extension/removal.ts — GAP-I: Extension removal
 
 import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
+import { updateTypeGuideSuggestions } from "../type-intelligence/updater.js"; // check-rules-ignore
 import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
 import {
   syncExtensionMetadata,
@@ -126,6 +127,17 @@ export async function removeExtension(params: {
 
   // Write back
   await writeBrief(projectPath, updated);
+
+  // Living type guide: update suggested_extensions (best-effort)
+  try {
+    await updateTypeGuideSuggestions({
+      projectPath,
+      action: "remove_extension",
+      value: metaName,
+    });
+  } catch {
+    /* best-effort */
+  }
 
   return {
     removed: true,

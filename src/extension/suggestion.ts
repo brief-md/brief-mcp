@@ -307,9 +307,13 @@ export async function suggestExtensions(params: {
     const res = await getTypeGuide({ type: projectType });
     if (!res.isGeneric && res.guide?.metadata?.suggestedExtensions) {
       tier1 = res.guide.metadata.suggestedExtensions
-        .filter((e) => !activeExtensions.includes(e) && e in EXTENSION_REGISTRY)
-        .map((e) => {
-          const def = EXTENSION_REGISTRY[e];
+        .filter(
+          (ext) =>
+            !activeExtensions.includes(ext.slug) &&
+            ext.slug in EXTENSION_REGISTRY,
+        )
+        .map((ext) => {
+          const def = EXTENSION_REGISTRY[ext.slug];
           const onts = buildOntologyEntries(
             def.associatedOntologies,
             installedOntologies,
@@ -322,11 +326,11 @@ export async function suggestExtensions(params: {
             checks,
           );
           return {
-            name: e,
+            name: ext.slug,
             reason: `Recommended by type guide for ${projectType}`,
             confidence: "high" as ExtensionConfidence,
             sourceTier: 1 as const,
-            extension: e,
+            extension: ext.slug,
             suggestedOntologies: onts,
           } as ExtensionSuggestion;
         });

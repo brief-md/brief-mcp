@@ -1,5 +1,9 @@
 // src/type-intelligence/search.ts — WP2: Type guide search & suggestion (OQ-4/OQ-7)
 
+import type {
+  SuggestedExtension,
+  SuggestedOntology,
+} from "../types/type-intelligence.js";
 import { getAliasIndex, getLoadedGuides } from "./loading.js";
 
 interface SuggestCandidate {
@@ -9,8 +13,8 @@ interface SuggestCandidate {
   matchType: "exact" | "alias" | "keyword" | "related";
   relevanceScore: number;
   summary: string;
-  suggestedExtensions?: string[];
-  suggestedOntologies?: string[];
+  suggestedExtensions?: SuggestedExtension[];
+  suggestedOntologies?: SuggestedOntology[];
 }
 
 interface SuggestResult {
