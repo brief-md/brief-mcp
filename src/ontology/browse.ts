@@ -470,7 +470,12 @@ export async function browseOntology(params: {
   direction: "up" | "down" | "around" | "all";
   detailLevel?: string;
 }): Promise<BrowseResponse> {
-  const { ontology, entryId, direction, detailLevel = "standard" } = params;
+  const {
+    ontology,
+    entryId,
+    direction = "all",
+    detailLevel = "standard",
+  } = params;
 
   if (!entryId || String(entryId).trim() === "") {
     throw makeNotFoundError(

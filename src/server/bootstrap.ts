@@ -518,18 +518,24 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "brief_browse_ontology",
     description:
-      "Browse entries in an ontology pack, optionally by category. brief-mcp scope: ontology browsing. Data is user-contributed — verify before relying on it.",
+      "Browse an entry's neighborhood in an ontology pack: parents, children, siblings. brief-mcp scope: ontology browsing. Data is user-contributed — verify before relying on it.",
     inputSchema: {
       type: "object",
       properties: {
         ontology: { type: "string", description: "Pack ID to browse." },
-        category: { type: "string", description: "Filter by category." },
-        max_results: {
-          type: "number",
-          description: "Maximum results to return.",
+        entry_id: {
+          type: "string",
+          description:
+            "Entry ID to browse from. Use brief_search_ontology to find IDs.",
+        },
+        direction: {
+          type: "string",
+          enum: ["up", "down", "around", "all"],
+          description:
+            "Browse direction: up (parents/ancestors), down (children/descendants), around (siblings), all.",
         },
       },
-      required: ["ontology"],
+      required: ["ontology", "entry_id"],
     },
   },
   {
@@ -1458,7 +1464,7 @@ const REQUIRED_STRING_PARAMS: Record<string, readonly string[]> = {
   brief_update_section: ["heading"],
   brief_search_ontology: ["query"],
   brief_get_ontology_entry: ["ontology", "entry_id"],
-  brief_browse_ontology: ["ontology"],
+  brief_browse_ontology: ["ontology", "entry_id"],
   brief_install_ontology: ["source"],
   brief_tag_entry: ["ontology", "entry_id", "section"],
   brief_remove_tag: ["ontology", "entry_id", "section"],
