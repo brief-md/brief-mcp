@@ -1,6 +1,7 @@
 // src/visibility/frameworks.ts — TASK-44: Framework Visibility & Ontology Management
 
 import { projectExists, readBriefMetadata } from "../io/project-state.js"; // check-rules-ignore
+import { getPackIndex, uninstallPack } from "../ontology/management.js"; // check-rules-ignore
 import type {
   OntologyRemovalResult,
   ProjectFrameworks,
@@ -247,9 +248,15 @@ export async function removeOntology(params: {
     throw new Error("No active project. Set a project context first.");
   }
 
-  // Check if pack is known
+  // Check if pack is known (fixture data or runtime registry)
   const packType = knownPacks.get(ontology);
   if (!packType) {
+    // Fallback: check runtime pack index (packs created via brief_create_ontology)
+    const runtimeIndex = getPackIndex(ontology);
+    if (runtimeIndex) {
+      await uninstallPack(ontology);
+      return { removed: true, parentModified: false };
+    }
     throw new Error(`Ontology pack "${ontology}" not found in any project.`);
   }
 

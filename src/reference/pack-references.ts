@@ -116,9 +116,35 @@ export const FALLBACK_REFERENCE_PACKS: RefPack[] = [
 // ── Disk loader ─────────────────────────────────────────────────────────
 
 /**
- * Load reference packs, returning FALLBACK_REFERENCE_PACKS.
- * Future: load from disk via ontology pack-loader interface.
+ * Load reference packs from disk via ontology pack-loader, falling back
+ * to FALLBACK_REFERENCE_PACKS if disk load fails or returns nothing.
  */
 export async function loadReferencePacks(): Promise<RefPack[]> {
+  try {
+    const { loadAllPacks } = await import("../ontology/pack-loader.js");
+    const diskPacks = await loadAllPacks();
+    if (diskPacks && diskPacks.length > 0) {
+      return diskPacks.map((p) => ({
+        name: p.name ?? "",
+        entries: (p.entries ?? []).map((e: Record<string, unknown>) => ({
+          id: String(e.id ?? ""),
+          label: String(e.label ?? ""),
+          references: Array.isArray(e.references)
+            ? (e.references as Array<Record<string, string>>).map((r) => ({
+                creator: r.creator ?? "",
+                title: r.title ?? "",
+                type: r.type,
+              }))
+            : [],
+          categories: Array.isArray(e.categories)
+            ? (e.categories as string[])
+            : [],
+          tags: Array.isArray(e.tags) ? (e.tags as string[]) : [],
+        })),
+      }));
+    }
+  } catch {
+    // Disk load failed — fall through to fixture data
+  }
   return FALLBACK_REFERENCE_PACKS;
 }
