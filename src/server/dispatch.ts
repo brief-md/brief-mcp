@@ -30,6 +30,7 @@ import {
   linkSectionDataset,
   parseSectionDatasets,
   readBrief,
+  readSection,
 } from "../io/project-state.js"; // check-rules-ignore
 import {
   browseOntology,
@@ -44,6 +45,10 @@ import { ontologyDraft } from "../ontology/draft.js"; // check-rules-ignore
 import { installOntology, listOntologies } from "../ontology/management.js"; // check-rules-ignore
 import { searchOntology } from "../ontology/search.js"; // check-rules-ignore
 import { listTags, removeTag, tagEntry } from "../ontology/tagging.js"; // check-rules-ignore
+import {
+  detectSupersessionStatus,
+  parseDecisions,
+} from "../parser/decisions.js"; // check-rules-ignore
 import { discoverReferences } from "../reference/discovery.js"; // check-rules-ignore
 import { lookupReference } from "../reference/lookup.js"; // check-rules-ignore
 import {
@@ -56,7 +61,6 @@ import { extractConflictPatterns } from "../type-intelligence/conflict-patterns.
 import { createTypeGuide } from "../type-intelligence/creation.js"; // check-rules-ignore
 import { getTypeGuide } from "../type-intelligence/loading.js"; // check-rules-ignore
 import { suggestTypeGuides } from "../type-intelligence/search.js"; // check-rules-ignore
-import type { CheckConflictsParams } from "../validation/conflicts.js"; // check-rules-ignore
 import { lintBrief } from "../validation/lint.js"; // check-rules-ignore
 import {
   checkConflictsWithSemantic,
@@ -295,6 +299,38 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       ? () => !!server.getClientCapabilities()?.sampling
       : undefined;
 
+    // Resolve project path from scope arg or active project
+    const resolved = withProjectPath({ project_path: args.scope, ...args });
+    const projectPath = String(
+      resolved.scope ?? resolved.project_path ?? resolved.projectPath ?? "",
+    );
+    if (!projectPath)
+      return { error: "No project path provided and no active project set." };
+
+    // Fetch decisions from BRIEF.md
+    const decisionBody = await readSection(projectPath, "Key Decisions");
+    const allDecisions = decisionBody
+      ? parseDecisions(decisionBody)
+      : parseDecisions("");
+    detectSupersessionStatus(allDecisions);
+
+    // Map Decision[] to ConflictDecisionInput[]
+    const conflictDecisions = allDecisions.map((d) => ({
+      text: d.text,
+      status: d.status,
+      exceptionTo: d.exceptionTo,
+    }));
+
+    // Map IntentionalTension[] to IntentionalTensionPair[]
+    const intentionalTensions = allDecisions.intentionalTensions.map((t) => ({
+      itemA: t.between[0] ?? "",
+      itemB: t.between[1] ?? "",
+    }));
+
+    // Fetch constraints from "What This Is NOT" section
+    const constraintResult = await getConstraints({ projectPath });
+    const constraints = constraintResult.constraints ?? [];
+
     // Resolve domain conflict patterns from type guide (best-effort)
     let domainPairs: ReadonlyArray<readonly [string, string]> | undefined;
     let tensionProse: string | undefined;
@@ -313,7 +349,9 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
     return checkConflictsWithSemantic(
       {
-        ...typed<CheckConflictsParams>(args),
+        decisions: conflictDecisions,
+        constraints,
+        intentionalTensions,
         domainPatterns: domainPairs,
         semantic: !!args.semantic,
       },
