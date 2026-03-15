@@ -38,12 +38,26 @@ export interface BriefMetadata {
 /** Parse **Key:** Value metadata lines from BRIEF.md content. */
 export function parseMetadata(content: string): BriefMetadata {
   const meta: Record<string, string> = {};
-  const metaRegex = /^\*\*(\w[\w\s]*):\*\*\s*(.*)$/gm;
-  let match = metaRegex.exec(content);
+  // Bold format: **Key:** value  OR  **Key**: value
+  const boldRegex = /^\*\*(\w[\w\s]*):\*\*\s*(.*)$/gm;
+  // Plain text format: Key: value (for lenient/non-canonical files)
+  const plainRegex = /^(\w[\w\s]*):\s+(.+)$/gm;
+
+  let match = boldRegex.exec(content);
   while (match !== null) {
     const key = match[1].trim().toLowerCase();
     meta[key] = match[2].trim();
-    match = metaRegex.exec(content);
+    match = boldRegex.exec(content);
+  }
+
+  // Fall back to plain text format for fields not already found
+  match = plainRegex.exec(content);
+  while (match !== null) {
+    const key = match[1].trim().toLowerCase();
+    if (!(key in meta)) {
+      meta[key] = match[2].trim();
+    }
+    match = plainRegex.exec(content);
   }
 
   const parseList = (val: string | undefined): string[] => {
