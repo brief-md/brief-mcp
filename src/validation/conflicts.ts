@@ -190,6 +190,7 @@ const NEGATION_PATTERNS: RegExp[] = [
 ];
 
 const ANTONYM_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  // General opposites
   ["minimal", "complex"],
   ["minimal", "comprehensive"],
   ["minimal", "extensive"],
@@ -225,6 +226,67 @@ const ANTONYM_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ["global", "local"],
   ["verbose", "concise"],
   ["tight", "loose"],
+
+  // Architecture & state
+  ["stateless", "stateful"],
+  ["cached", "uncached"],
+  ["caching", "stateless"],
+  ["shared", "isolated"],
+  ["coupled", "decoupled"],
+  ["embedded", "standalone"],
+  ["inline", "external"],
+  ["bundled", "unbundled"],
+  ["server", "client"],
+  ["frontend", "backend"],
+  ["blocking", "nonblocking"],
+
+  // Data & persistence
+  ["persistent", "ephemeral"],
+  ["relational", "nosql"],
+  ["normalized", "denormalized"],
+  ["eager", "lazy"],
+  ["batch", "streaming"],
+  ["pull", "push"],
+  ["readonly", "writable"],
+  ["encrypt", "plaintext"],
+
+  // Deployment & scale
+  ["horizontal", "vertical"],
+  ["single", "distributed"],
+  ["monorepo", "polyrepo"],
+  ["containerized", "bare"],
+  ["cloud", "onpremise"],
+  ["serverless", "dedicated"],
+
+  // Process & methodology
+  ["waterfall", "agile"],
+  ["sequential", "parallel"],
+  ["incremental", "complete"],
+  ["optimistic", "pessimistic"],
+  ["proactive", "reactive"],
+  ["permissive", "restrictive"],
+];
+
+/**
+ * Compound phrase pairs — multi-word concepts that conflict.
+ * Checked as substring matches against full decision/constraint text.
+ */
+const COMPOUND_CONFLICT_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ["shared state", "stateless"],
+  ["shared cache", "no caching"],
+  ["single source of truth", "eventual consistency"],
+  ["strong consistency", "eventual consistency"],
+  ["zero downtime", "breaking change"],
+  ["backwards compatible", "breaking change"],
+  ["no dependencies", "third party"],
+  ["vendor lock", "cloud agnostic"],
+  ["micro service", "monolith"],
+  ["microservice", "monolith"],
+  ["real time", "batch processing"],
+  ["pull based", "push based"],
+  ["schema first", "schema less"],
+  ["type safe", "dynamic typing"],
+  ["compile time", "runtime"],
 ];
 
 // ---------------------------------------------------------------------------
@@ -270,6 +332,20 @@ function hasAntonymConflict(
   return false;
 }
 
+function hasCompoundConflict(textA: string, textB: string): boolean {
+  const aLower = textA.toLowerCase();
+  const bLower = textB.toLowerCase();
+  for (const [phraseA, phraseB] of COMPOUND_CONFLICT_PAIRS) {
+    if (
+      (aLower.includes(phraseA) && bLower.includes(phraseB)) ||
+      (aLower.includes(phraseB) && bLower.includes(phraseA))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Pairwise conflict detectors
 // ---------------------------------------------------------------------------
@@ -279,6 +355,9 @@ function detectDecisionDecisionConflict(
   textB: string,
   antonyms: ReadonlyArray<readonly [string, string]> = ANTONYM_PAIRS,
 ): boolean {
+  // Compound phrase conflicts (e.g., "shared state" vs "stateless")
+  if (hasCompoundConflict(textA, textB)) return true;
+
   // Direct negation containment: "A" vs "Not A" (DEC-04 over-report)
   if (hasNegation(textA) !== hasNegation(textB)) {
     const plain = hasNegation(textA) ? textB : textA;
@@ -299,9 +378,9 @@ function detectDecisionDecisionConflict(
   const overlap = keywordOverlap(kwA, kwB);
   if (overlap > 0 && hasNegation(textA) !== hasNegation(textB)) return true;
 
-  // High keyword overlap → potential conflict (over-report per DEC-04)
+  // High keyword overlap → potential conflict (raised from 0.3 to 0.4 to reduce false positives)
   const minSize = Math.min(kwA.size, kwB.size);
-  if (minSize > 0 && overlap >= Math.max(1, Math.ceil(minSize * 0.3)))
+  if (minSize > 0 && overlap >= Math.max(1, Math.ceil(minSize * 0.4)))
     return true;
 
   return false;
@@ -312,6 +391,9 @@ function detectDecisionConstraintConflict(
   constraintText: string,
   antonyms: ReadonlyArray<readonly [string, string]> = ANTONYM_PAIRS,
 ): boolean {
+  // Compound phrase conflicts
+  if (hasCompoundConflict(decisionText, constraintText)) return true;
+
   const kwD = extractKeywords(decisionText);
   const kwC = extractKeywords(constraintText);
   if (kwD.size === 0 || kwC.size === 0) return false;
@@ -332,6 +414,9 @@ function detectConstraintConstraintConflict(
   textB: string,
   antonyms: ReadonlyArray<readonly [string, string]> = ANTONYM_PAIRS,
 ): boolean {
+  // Compound phrase conflicts
+  if (hasCompoundConflict(textA, textB)) return true;
+
   const kwA = extractKeywords(textA);
   const kwB = extractKeywords(textB);
   if (kwA.size === 0 || kwB.size === 0) return false;
@@ -339,10 +424,10 @@ function detectConstraintConstraintConflict(
   // Antonym pairs → conflict
   if (hasAntonymConflict(kwA, kwB, antonyms)) return true;
 
-  // Overlapping keywords (potential redundancy/contradiction)
+  // Overlapping keywords (raised from 0.3 to 0.4 to reduce false positives)
   const overlap = keywordOverlap(kwA, kwB);
   const minSize = Math.min(kwA.size, kwB.size);
-  if (minSize > 0 && overlap >= Math.max(1, Math.ceil(minSize * 0.3))) {
+  if (minSize > 0 && overlap >= Math.max(1, Math.ceil(minSize * 0.4))) {
     return true;
   }
 
