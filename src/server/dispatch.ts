@@ -182,7 +182,10 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   brief_create_sub_project: (args) =>
     createSubProject(
       typed<Parameters<typeof createSubProject>[0]>(
-        remap(args, { parent_path: "parentPath" }),
+        remap(withProjectPath(args), {
+          parent_path: "parentPath",
+          project_path: "parentPath",
+        }),
       ),
     ),
   brief_reenter_project: async (args) => {
@@ -262,7 +265,11 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   brief_resolve_question: (args) =>
     handleResolveQuestion(
       typed<Parameters<typeof handleResolveQuestion>[0]>(
-        remap(withProjectPath(args), { project_path: "projectPath" }),
+        remap(withProjectPath(args), {
+          project_path: "projectPath",
+          text: "question",
+          decision: "resolution",
+        }),
       ),
     ),
   brief_capture_external_session: (args) =>
