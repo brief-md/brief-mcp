@@ -30,20 +30,27 @@ const FIELD_MARKERS: readonly string[] = [
 ];
 
 function isFullFormat(body: string): boolean {
-  return FIELD_MARKERS.some((m) => body.includes(m));
+  const normalized = body.replace(/\*\*/g, "");
+  return FIELD_MARKERS.some((m) => normalized.includes(m));
 }
 
 function extractField(body: string, marker: string): string | undefined {
-  const idx = body.indexOf(marker);
+  // Strip bold markers so **REPLACES:** matches REPLACES:
+  const normalized = body.replace(/\*\*/g, "");
+  const idx = normalized.indexOf(marker);
   if (idx === -1) return undefined;
   const start = idx + marker.length;
-  let end = body.length;
+  let end = normalized.length;
   for (const m of FIELD_MARKERS) {
     if (m === marker) continue;
-    const mIdx = body.indexOf(m, start);
+    const mIdx = normalized.indexOf(m, start);
     if (mIdx !== -1 && mIdx < end) end = mIdx;
   }
-  const value = body.slice(start, end).trim();
+  // Strip HTML comments (e.g. <!-- CONFLICT: ... -->) from the extracted value
+  const value = normalized
+    .slice(start, end)
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .trim();
   return value.length > 0 ? value : undefined;
 }
 
