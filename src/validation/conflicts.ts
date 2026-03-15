@@ -16,6 +16,7 @@ export interface ConflictDecisionInput {
   status: string;
   section?: string;
   exceptionTo?: string;
+  amends?: string;
 }
 
 export interface IntentionalTensionPair {
@@ -377,6 +378,20 @@ function isSuppressedByTension(
   return false;
 }
 
+// Amendment suppression — skip pairs where one decision amends the other
+function isAmendmentPair(
+  a: ConflictDecisionInput,
+  b: ConflictDecisionInput,
+): boolean {
+  if (a.amends && b.text.toLowerCase().includes(a.amends.toLowerCase())) {
+    return true;
+  }
+  if (b.amends && a.text.toLowerCase().includes(b.amends.toLowerCase())) {
+    return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Main export — checkConflicts
 // ---------------------------------------------------------------------------
@@ -422,6 +437,9 @@ export function checkConflicts(
 
       // Intentional tension suppression (DEC-09)
       if (isSuppressedByTension(a.text, b.text, intentionalTensions)) continue;
+
+      // Amendment suppression: skip pairs where one amends the other
+      if (isAmendmentPair(a, b)) continue;
 
       if (detectDecisionDecisionConflict(a.text, b.text, effectiveAntonyms)) {
         const conflict: DetectedConflict = {

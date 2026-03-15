@@ -100,6 +100,7 @@ function parseDecisionBlock(content: string, decisions: Decision[]): void {
     const hasLabel = hasSupersededLabel(heading);
     const supersededByField = extractField(body, "SUPERSEDED BY:");
     const exceptionToField = extractField(body, "EXCEPTION TO:");
+    const amendsField = extractField(body, "AMENDS:");
 
     const isSuperseded =
       hasStrike || hasLabel || supersededByField !== undefined;
@@ -125,6 +126,7 @@ function parseDecisionBlock(content: string, decisions: Decision[]): void {
         status,
         format,
         ...(rationale !== undefined ? { rationale } : {}),
+        ...(amendsField !== undefined ? { amends: amendsField } : {}),
       });
     } else {
       // Full format: extract all structured fields (PARSE-11)
@@ -160,6 +162,7 @@ function parseDecisionBlock(content: string, decisions: Decision[]): void {
           ? { alternativesConsidered }
           : {}),
         ...(replaces !== undefined ? { replaces } : {}),
+        ...(amendsField !== undefined ? { amends: amendsField } : {}),
         ...(exceptionToField !== undefined
           ? { exceptionTo: exceptionToField }
           : {}),

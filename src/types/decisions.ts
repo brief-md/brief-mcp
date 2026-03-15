@@ -14,6 +14,7 @@ export interface Decision {
   readonly when?: string;
   readonly alternativesConsidered?: string[];
   readonly replaces?: string;
+  readonly amends?: string;
   readonly exceptionTo?: string;
   readonly supersededBy?: string;
   readonly resolvedFrom?: string;
