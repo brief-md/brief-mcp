@@ -67,14 +67,15 @@ _initDefaultRefs();
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function buildReferenceText(
-  creator: string,
+  creator: string | undefined,
   title: string,
   notes?: string,
 ): string {
+  const prefix = creator ? `${creator}: ` : "";
   if (notes) {
-    return `${creator}: ${title} (${notes})`;
+    return `${prefix}${title} (${notes})`;
   }
-  return `${creator}: ${title}`;
+  return `${prefix}${title}`;
 }
 
 function buildRefLinkComment(pack: string, entryId: string): string {

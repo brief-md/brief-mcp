@@ -688,7 +688,7 @@ function checkNonConformantExtensions(
   findings: LintFinding[],
 ): void {
   const extensions = parsed.extensions ?? [];
-  const validExtName = /^[A-Z0-9][A-Z0-9 ]*$/;
+  const validExtName = /^[A-Za-z0-9][A-Za-z0-9_ ]*$/;
 
   for (const ext of extensions) {
     if (ext && !validExtName.test(ext)) {
@@ -696,7 +696,7 @@ function checkNonConformantExtensions(
         makeFinding(
           "NONCONFORMANT_EXTENSION",
           "info",
-          `Extension name "${ext}" does not conform to expected format [A-Z0-9 ]+`,
+          `Extension name "${ext}" does not conform to expected format [A-Za-z0-9_ ]+`,
         ),
       );
     }

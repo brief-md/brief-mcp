@@ -783,8 +783,13 @@ export async function startTutorial(
 
 export async function setTutorialDismissed(params: {
   permanent: boolean;
-}): Promise<{ tutorialDismissed: boolean }> {
+}): Promise<{ tutorialDismissed: boolean; message: string }> {
   // Persist dismissed state via shared tutorial module
   setDismissedFlag(params.permanent);
-  return { tutorialDismissed: params.permanent };
+  return {
+    tutorialDismissed: params.permanent,
+    message: params.permanent
+      ? "Tutorial permanently dismissed."
+      : "Tutorial re-enabled.",
+  };
 }
