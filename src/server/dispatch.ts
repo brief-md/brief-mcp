@@ -30,6 +30,7 @@ import { buildHierarchyTree } from "../hierarchy/tree.js"; // check-rules-ignore
 import { walkUpward } from "../hierarchy/walker.js"; // check-rules-ignore
 import {
   linkSectionDataset,
+  parseMetadata,
   parseSectionDatasets,
   readBrief,
   readSection,
@@ -144,7 +145,12 @@ function remap(args: Args, mapping: Record<string, string>): Args {
  */
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   // Workspace
-  brief_list_projects: (args) => listProjects(args),
+  brief_list_projects: (args) =>
+    listProjects({
+      ...args,
+      workspaceRoots: args.workspace ? [String(args.workspace)] : undefined,
+      recursive: !!args.recursive,
+    }),
   brief_set_active_project: (args) =>
     setActiveProject(
       typed<Parameters<typeof setActiveProject>[0]>(
@@ -531,7 +537,23 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
     ),
 
   // Type intelligence
-  brief_get_type_guide: (args) => getTypeGuide(args),
+  brief_get_type_guide: async (args) => {
+    let type = args.type ? String(args.type) : "";
+    if (!type) {
+      // Auto-resolve from active project metadata
+      const active = getActiveProject();
+      if (active?.path) {
+        try {
+          const content = await readBrief(active.path);
+          const meta = parseMetadata(content);
+          type = meta.type || "";
+        } catch {
+          // Non-fatal
+        }
+      }
+    }
+    return getTypeGuide({ ...args, type });
+  },
   brief_create_type_guide: (args) =>
     createTypeGuide(
       remap(args, {
