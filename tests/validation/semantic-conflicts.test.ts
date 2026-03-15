@@ -182,7 +182,7 @@ describe("semantic-conflicts: checkConflictsWithSemantic", () => {
     expect(result.semanticAnalysis).toBeUndefined();
   });
 
-  it("semantic: true, no sampling → semanticAnalysis.status === 'unavailable'", async () => {
+  it("semantic: true, no sampling, no pairs → semanticAnalysis.status === 'skipped'", async () => {
     const result = await checkConflictsWithSemantic(
       {
         decisions: [{ text: "A", status: "active" }],
@@ -193,10 +193,10 @@ describe("semantic-conflicts: checkConflictsWithSemantic", () => {
       undefined, // no availability checker
     );
     expect(result.semanticAnalysis).toBeDefined();
-    expect(result.semanticAnalysis!.status).toBe("unavailable");
+    expect(result.semanticAnalysis!.status).toBe("skipped");
   });
 
-  it("semantic: true, sampling unavailable → status 'unavailable'", async () => {
+  it("semantic: true, sampling unavailable, no pairs → status 'skipped'", async () => {
     const fn = mockSamplingFn(validAiResponse([]));
     const result = await checkConflictsWithSemantic(
       {
@@ -207,7 +207,30 @@ describe("semantic-conflicts: checkConflictsWithSemantic", () => {
       fn,
       () => false, // sampling not available
     );
-    expect(result.semanticAnalysis!.status).toBe("unavailable");
+    expect(result.semanticAnalysis!.status).toBe("skipped");
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("semantic: true, sampling unavailable, has pairs → status 'client-review' with prompt", async () => {
+    const fn = mockSamplingFn(validAiResponse([]));
+    const result = await checkConflictsWithSemantic(
+      {
+        decisions: [
+          { text: "Use shared caching for all services", status: "active" },
+          { text: "Keep architecture stateless", status: "active" },
+        ],
+        constraints: [],
+        semantic: true,
+      },
+      fn,
+      () => false, // sampling not available
+    );
+    expect(result.semanticAnalysis).toBeDefined();
+    expect(result.semanticAnalysis!.status).toBe("client-review");
+    expect(result.semanticAnalysis!.analysisPrompt).toBeDefined();
+    expect(result.semanticAnalysis!.pairs).toBeDefined();
+    expect(result.semanticAnalysis!.pairs!.length).toBe(1);
+    expect(result.semanticAnalysis!.clientInstructions).toBeDefined();
     expect(fn).not.toHaveBeenCalled();
   });
 

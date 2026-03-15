@@ -30,11 +30,22 @@ export type SamplingFn = (params: {
 }) => Promise<{ content: unknown; model: string; role: string }>;
 
 export interface SemanticAnalysisResult {
-  readonly status: "completed" | "unavailable" | "error" | "skipped";
+  readonly status:
+    | "completed"
+    | "unavailable"
+    | "client-review"
+    | "error"
+    | "skipped";
   readonly conflicts: DetectedConflict[];
   readonly pairsAnalyzed: number;
   readonly durationMs: number;
   readonly errorMessage?: string;
+  /** When status is "client-review", contains the prompt for the AI client to evaluate */
+  readonly analysisPrompt?: string;
+  /** When status is "client-review", contains the pairs for the AI client to evaluate */
+  readonly pairs?: Array<{ a: string; b: string; pairType: string }>;
+  /** Instructions for the AI client when doing inline semantic analysis */
+  readonly clientInstructions?: string;
 }
 
 export interface CheckConflictsWithSemanticResult extends CheckConflictsResult {
@@ -397,15 +408,46 @@ export async function checkConflictsWithSemantic(
     return heuristicResult;
   }
 
-  // 3. If sampling unavailable, signal it
+  // 3. If sampling unavailable, return pairs for client-side AI analysis
   if (!samplingFn || (isSamplingAvailable && !isSamplingAvailable())) {
+    const allPairs = generatePairs(
+      params.decisions,
+      params.constraints,
+      params.intentionalTensions ?? [],
+    );
+
+    if (allPairs.length === 0) {
+      return {
+        ...heuristicResult,
+        semanticAnalysis: {
+          status: "skipped",
+          conflicts: [],
+          pairsAnalyzed: 0,
+          durationMs: 0,
+        },
+      };
+    }
+
+    const prompt = buildSemanticPrompt(allPairs, domainContext?.tensionProse);
+
     return {
       ...heuristicResult,
       semanticAnalysis: {
-        status: "unavailable",
+        status: "client-review",
         conflicts: [],
-        pairsAnalyzed: 0,
+        pairsAnalyzed: allPairs.length,
         durationMs: 0,
+        analysisPrompt: prompt,
+        pairs: allPairs.map((p) => ({
+          a: p.a,
+          b: p.b,
+          pairType: p.pairType,
+        })),
+        clientInstructions:
+          "MCP sampling is not available in this client. Please analyze the pairs above for semantic conflicts. " +
+          "For each pair, determine if achieving both simultaneously is impractical, contradictory, or creates tension. " +
+          "Report any conflicts you find to the user with your reasoning. " +
+          "Ignore pairs that are merely related but not contradictory.",
       },
     };
   }
