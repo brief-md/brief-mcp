@@ -2,6 +2,7 @@
 
 import { getKnownExtensions } from "../extension/creation.js"; // check-rules-ignore
 import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
+import { parseComments } from "../parser/comments.js"; // check-rules-ignore
 import { getActiveProject } from "../workspace/active.js"; // check-rules-ignore
 import { getPackIndex, installPack } from "./management.js";
 import { appendTableRow } from "./table-render.js";
@@ -401,7 +402,9 @@ export async function listTags(params?: {
   total: number;
 }> {
   const tags: TagInfo[] = [];
+  const seenKeys = new Set<string>();
 
+  // 1. Tags from in-memory registry (current session)
   for (const [key, label] of tagRegistry) {
     const parts = key.split(":");
     if (parts.length < 3) continue;
@@ -424,7 +427,43 @@ export async function listTags(params?: {
       if (scopeInfo.extensionName !== params.extensionFilter) continue;
     }
 
+    seenKeys.add(key);
     tags.push(tag);
+  }
+
+  // 2. Tags from BRIEF.md on disk (pre-existing inline HTML comments)
+  try {
+    const projectPath =
+      params?.projectPath || getActiveProject()?.path || undefined;
+    if (projectPath) {
+      const content = await readBrief(projectPath);
+      const { tags: parsedTags } = parseComments(content);
+      const lines = content.split("\n");
+
+      for (const bt of parsedTags) {
+        if (bt.type !== "ontology") continue;
+        const section = findSectionForLine(lines, bt.associatedLine);
+        const key = `${bt.pack}:${bt.entryId}:${section}`;
+        if (seenKeys.has(key)) continue;
+
+        const scopeInfo = validateExtensionSection(section);
+        if (params?.extensionFilter) {
+          if (scopeInfo.extensionName !== params.extensionFilter) continue;
+        }
+
+        seenKeys.add(key);
+        tags.push({
+          ontology: bt.pack,
+          entryId: bt.entryId,
+          label: bt.label,
+          section,
+          paragraph: bt.associatedParagraph,
+          extensionName: scopeInfo.extensionName,
+        });
+      }
+    }
+  } catch {
+    // Non-fatal — fall back to registry-only
   }
 
   // Group by extension
@@ -436,6 +475,15 @@ export async function listTags(params?: {
   }
 
   return { tags, groupedByExtension, total: tags.length };
+}
+
+/** Find the nearest ## heading above a given line number (1-indexed). */
+function findSectionForLine(lines: string[], lineNum: number): string {
+  for (let i = Math.min(lineNum - 1, lines.length - 1); i >= 0; i--) {
+    const match = lines[i].match(/^##\s+(.+)/);
+    if (match) return match[1].trim();
+  }
+  return "(unknown)";
 }
 
 // ─── removeTag (WP2/GAP-E) ─────────────────────────────────────────────────
