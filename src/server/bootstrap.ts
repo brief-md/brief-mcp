@@ -64,6 +64,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "string",
           description: "Filter to a specific workspace path.",
         },
+        recursive: {
+          type: "boolean",
+          description:
+            "Scan subdirectories recursively (up to 10 levels deep). Default: false (direct children only).",
+        },
       },
     },
   },

@@ -120,7 +120,48 @@ function extractFields(content: string): Record<string, string> {
 // scanRoot — discover projects in a single workspace root
 // ---------------------------------------------------------------------------
 
-async function scanRoot(root: string): Promise<{
+/** Count H3 decision headings in a BRIEF.md content string. */
+function countDecisions(content: string): number {
+  const sectionMatch = content.match(/^##\s+Key\s+Decisions\b/im);
+  if (!sectionMatch) return 0;
+  const startIdx = sectionMatch.index! + sectionMatch[0].length;
+  const rest = content.slice(startIdx);
+  // Find next H2 boundary
+  const nextH2 = rest.search(/^##\s/m);
+  const sectionBody = nextH2 !== -1 ? rest.slice(0, nextH2) : rest;
+  // Count H3 headings (full format) or list items with decision IDs (minimal format)
+  const h3Count = (sectionBody.match(/^###\s/gm) || []).length;
+  const listCount = (sectionBody.match(/^-\s+\*?\*?[A-Z]+-\d+/gm) || []).length;
+  return Math.max(h3Count, listCount);
+}
+
+/** Build a project entry from a BRIEF.md file. */
+function buildProjectEntry(
+  content: string,
+  fields: Record<string, string>,
+  briefFilePath: string,
+  dirPath: string,
+  root: string,
+  fallbackName: string,
+): Record<string, unknown> {
+  return {
+    name: fields.Project || fields.project || fallbackName,
+    type: fields.Type || fields.type || undefined,
+    status: (fields.Status || fields.status || "").toLowerCase() || undefined,
+    updated: fields.Updated || fields.updated || undefined,
+    decisionCount: countDecisions(content),
+    questionCount: Number(fields.Questions || fields.questions || "0") || 0,
+    path: briefFilePath,
+    dirPath,
+    root,
+    workspaceRoot: root,
+  };
+}
+
+async function scanRoot(
+  root: string,
+  options?: { recursive?: boolean },
+): Promise<{
   projects: unknown[];
   warning?: string;
 }> {
@@ -139,6 +180,7 @@ async function scanRoot(root: string): Promise<{
           decisionCount: 0,
           questionCount: 0,
           path: root,
+          dirPath: root,
           root,
           workspaceRoot: root,
         },
@@ -147,46 +189,34 @@ async function scanRoot(root: string): Promise<{
     };
   }
 
-  // Root exists — scan for BRIEF.md files in subdirectories
   const projects: unknown[] = [];
+
+  // GP-3: Check if root itself has a BRIEF.md
   try {
-    const entries = await fsp.readdir(root, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-      const dirPath = path.join(root, entry.name);
-      try {
-        const files = await fsp.readdir(dirPath);
-        const briefFile = files.find((f) => f.toLowerCase() === "brief.md");
-        if (briefFile) {
-          const content = await fsp.readFile(
-            path.join(dirPath, briefFile),
-            "utf-8",
-          );
-          const fields = extractFields(content);
-          projects.push({
-            name: fields.Project || fields.project || entry.name,
-            type: fields.Type || fields.type || undefined,
-            status:
-              (fields.Status || fields.status || "").toLowerCase() || undefined,
-            updated: fields.Updated || fields.updated || undefined,
-            decisionCount:
-              Number(fields.Decisions || fields.decisions || "0") || 0,
-            questionCount:
-              Number(fields.Questions || fields.questions || "0") || 0,
-            path: path.join(dirPath, briefFile),
-            root,
-            workspaceRoot: root,
-          });
-        }
-      } catch {
-        // Skip unreadable subdirectories
-      }
+    const rootFiles = await fsp.readdir(root);
+    const rootBrief = rootFiles.find((f) => f.toLowerCase() === "brief.md");
+    if (rootBrief) {
+      const content = await fsp.readFile(path.join(root, rootBrief), "utf-8");
+      const fields = extractFields(content);
+      projects.push(
+        buildProjectEntry(
+          content,
+          fields,
+          path.join(root, rootBrief),
+          root,
+          root,
+          path.basename(root) || root,
+        ),
+      );
     }
   } catch {
-    // readdir failed — treat as empty
+    // Non-fatal
   }
 
-  // If no BRIEF.md projects found, create a fallback entry for the root
+  // Scan subdirectories for BRIEF.md
+  await scanDir(root, root, projects, options?.recursive ? 10 : 1);
+
+  // If no BRIEF.md projects found at all, create a fallback entry
   if (projects.length === 0) {
     projects.push({
       name: path.basename(root) || root,
@@ -196,12 +226,61 @@ async function scanRoot(root: string): Promise<{
       decisionCount: 0,
       questionCount: 0,
       path: root,
+      dirPath: root,
       root,
       workspaceRoot: root,
     });
   }
 
   return { projects };
+}
+
+/** Recursively scan directories for BRIEF.md files up to maxDepth levels. */
+async function scanDir(
+  dir: string,
+  root: string,
+  projects: unknown[],
+  maxDepth: number,
+  currentDepth = 0,
+): Promise<void> {
+  if (currentDepth >= maxDepth) return;
+  try {
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+      if (entry.name === "node_modules") continue;
+      const dirPath = path.join(dir, entry.name);
+      try {
+        const files = await fsp.readdir(dirPath);
+        const briefFile = files.find((f) => f.toLowerCase() === "brief.md");
+        if (briefFile) {
+          const content = await fsp.readFile(
+            path.join(dirPath, briefFile),
+            "utf-8",
+          );
+          const fields = extractFields(content);
+          projects.push(
+            buildProjectEntry(
+              content,
+              fields,
+              path.join(dirPath, briefFile),
+              dirPath,
+              root,
+              entry.name,
+            ),
+          );
+        }
+        // Recurse into subdirectory if recursive mode
+        if (maxDepth > 1) {
+          await scanDir(dirPath, root, projects, maxDepth, currentDepth + 1);
+        }
+      } catch {
+        // Skip unreadable subdirectories
+      }
+    }
+  } catch {
+    // readdir failed
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +291,7 @@ export async function listProjects(params?: {
   workspaceRoots?: string[];
   statusFilter?: string;
   typeFilter?: string;
+  recursive?: boolean;
   simulateHomoglyphProjects?: string[] | boolean;
 }): Promise<{
   groups: Array<{ projects: unknown[]; name: string; root: string }>;
@@ -236,7 +316,9 @@ export async function listProjects(params?: {
 
   // Scan all roots concurrently using Promise.allSettled (ERR-11)
   const scanResults = await Promise.allSettled(
-    workspaceRoots.map((root) => scanRoot(root)),
+    workspaceRoots.map((root) =>
+      scanRoot(root, { recursive: params?.recursive }),
+    ),
   );
 
   for (let i = 0; i < scanResults.length; i++) {
