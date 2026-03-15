@@ -2,7 +2,15 @@
 // Reads project data from BRIEF.md on disk, with simulation test seams
 // and fallback stubs for backwards compatibility.
 
-import { projectExists, readBrief, readSection } from "../io/project-state.js"; // check-rules-ignore
+import path from "node:path";
+import { assembleContext } from "../hierarchy/context.js"; // check-rules-ignore
+import { walkUpward } from "../hierarchy/walker.js"; // check-rules-ignore
+import {
+  parseMetadata,
+  projectExists,
+  readBrief,
+  readSection,
+} from "../io/project-state.js"; // check-rules-ignore
 import type {
   Decision,
   DecisionFormat,
@@ -490,6 +498,45 @@ function stubQuestions(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Hierarchy level builder                                            */
+/* ------------------------------------------------------------------ */
+
+async function buildHierarchyLevels(
+  _scopePath: string,
+  briefPaths: string[],
+): Promise<Record<string, unknown>[]> {
+  const levels: Record<string, unknown>[] = [];
+  // briefPaths[0] is scope (depth 0), rest are ancestors (depth 1, 2, ...)
+  for (let i = 0; i < briefPaths.length; i++) {
+    const briefFilePath = briefPaths[i];
+    const dirPath = path.dirname(briefFilePath);
+    try {
+      const rawContent = await readBrief(dirPath);
+      const meta = parseMetadata(rawContent);
+      // Parse decisions from the Key Decisions section
+      const decisionBody = await readSection(dirPath, "Key Decisions");
+      const decisions = decisionBody ? parseDecisions(decisionBody) : [];
+      levels.push({
+        depth: i,
+        dirPath,
+        project: meta.project || path.basename(dirPath),
+        type: meta.type || "project",
+        status: meta.status || "active",
+        decisions,
+        questions: [],
+        extensions: meta.extensions || [],
+        sections: [],
+        constraints: [],
+        excludes: [],
+      });
+    } catch {
+      // Skip unreadable levels
+    }
+  }
+  return levels;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Exported read functions                                            */
 /* ------------------------------------------------------------------ */
 
@@ -566,6 +613,38 @@ export async function getContext(
       return {
         levels: [{ label: "project", project: projectPath }],
         sections: sectionResults,
+        filesModified: 0,
+        filePath: `${projectPath}/BRIEF.md`,
+        projectPath,
+        content,
+      };
+    }
+
+    // --- Hierarchy context inheritance ---
+    // Walk upward to find parent BRIEF.md files
+    const briefPaths = await walkUpward(projectPath);
+    // briefPaths[0] is the scope project, rest are ancestors
+    if (briefPaths.length > 1) {
+      const hierarchyLevels = await buildHierarchyLevels(
+        projectPath,
+        briefPaths,
+      );
+      const assembled = await assembleContext(hierarchyLevels, {
+        contextDepth: params.contextDepth,
+        sizeCap: params.sizeLimitBytes,
+        includeSuperseded: params.includeSuperseded,
+      });
+      return {
+        levels: assembled.levels.map((l) => ({
+          label: l.label,
+          project: l.project,
+        })),
+        mergedMetadata: assembled.mergedMetadata,
+        mergedSections: assembled.mergedSections,
+        allDecisions: assembled.allDecisions,
+        allQuestions: assembled.allQuestions,
+        truncated: assembled.truncated,
+        truncationSignal: assembled.truncationSignal,
         filesModified: 0,
         filePath: `${projectPath}/BRIEF.md`,
         projectPath,

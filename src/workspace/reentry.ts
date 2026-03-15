@@ -2,7 +2,9 @@
 
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
+import { walkUpward } from "../hierarchy/walker.js"; // check-rules-ignore
 import {
+  parseMetadata,
   projectExists,
   readBrief,
   readBriefMetadata,
@@ -533,14 +535,50 @@ export async function generateReentrySummary(params: {
       .filter((l) => l.startsWith("- "))
       .map((l) => l.replace(/^-\s+/, ""));
 
-    // Run conflict detection
+    // --- Inherit parent decisions ---
+    const inheritedDecisions: Array<{ date?: string; title?: string }> = [];
+    const parentConstraints: string[] = [];
+    try {
+      const briefPaths = await walkUpward(projectPath);
+      // briefPaths[0] is scope, rest are ancestors
+      for (let i = 1; i < briefPaths.length; i++) {
+        const parentDir = path.dirname(briefPaths[i]);
+        const parentContent = await readBrief(parentDir);
+        const parentMeta = parseMetadata(parentContent);
+        const parentDecBody =
+          (await readSection(parentDir, "Key Decisions")) || "";
+        const { decisions: parentDecs } = parseDecisionEntries(parentDecBody);
+        const activeParentDecs = parentDecs.filter(
+          (d) => d.status !== "superseded",
+        );
+        inheritedDecisions.push(
+          ...activeParentDecs.map((d) => ({
+            date: d.date,
+            title: `[${parentMeta.project || path.basename(parentDir)}] ${d.title || ""}`,
+          })),
+        );
+        // Also collect parent constraints for conflict detection
+        const parentConstraintsBody =
+          (await readSection(parentDir, "Constraints")) || "";
+        const pConstraints = parentConstraintsBody
+          .split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l.startsWith("- "))
+          .map((l) => l.replace(/^-\s+/, ""));
+        parentConstraints.push(...pConstraints);
+      }
+    } catch {
+      // Hierarchy traversal failure is non-fatal
+    }
+
+    // Run conflict detection (including parent constraints)
     const conflictInput = parsedDecisions.map((d) => ({
       text: d.title || "",
       status: d.status,
     }));
     const conflictResult = checkConflicts({
       decisions: conflictInput,
-      constraints: constraintLines,
+      constraints: [...constraintLines, ...parentConstraints],
     });
 
     // Extract ontology tags
@@ -576,6 +614,7 @@ export async function generateReentrySummary(params: {
       status: string;
       timeSinceUpdate: string;
       decisions: Array<{ date?: string; title?: string }>;
+      inheritedDecisions?: Array<{ date?: string; title?: string }>;
       openQuestions: { toResolveCount: number; toKeepOpenCount: number };
       decisionHistory?: unknown[];
       supersededCount?: number;
@@ -611,6 +650,10 @@ export async function generateReentrySummary(params: {
       subProjects,
       externalSessionPrompt: `Did you work in any external tools since your last update?`,
     };
+
+    if (inheritedDecisions.length > 0) {
+      result.inheritedDecisions = inheritedDecisions;
+    }
 
     if (isPositiveState) {
       result.positiveState = true;

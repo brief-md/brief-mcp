@@ -2,6 +2,7 @@
 // Maps MCP tool names to their implementation functions.
 // Cross-module imports are intentional: this is the server's composition root.
 
+import path from "node:path";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js"; // check-rules-ignore
 import { searchRegistry } from "../cli/registry-tools.js"; // check-rules-ignore
 import {
@@ -26,6 +27,7 @@ import { removeExtension } from "../extension/removal.js"; // check-rules-ignore
 import { suggestExtensions } from "../extension/suggestion.js"; // check-rules-ignore
 import { getHierarchyPosition } from "../hierarchy/position.js"; // check-rules-ignore
 import { buildHierarchyTree } from "../hierarchy/tree.js"; // check-rules-ignore
+import { walkUpward } from "../hierarchy/walker.js"; // check-rules-ignore
 import {
   linkSectionDataset,
   parseSectionDatasets,
@@ -330,6 +332,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       text: d.text,
       status: d.status,
       exceptionTo: d.exceptionTo,
+      amends: d.amends,
     }));
 
     // Map IntentionalTension[] to IntentionalTensionPair[]
@@ -340,7 +343,47 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
     // Fetch constraints from "What This Is NOT" section
     const constraintResult = await getConstraints({ projectPath });
-    const constraints = constraintResult.constraints ?? [];
+    const constraints = [...(constraintResult.constraints ?? [])];
+
+    // --- Cross-hierarchy: include parent decisions and constraints ---
+    try {
+      const briefPaths = await walkUpward(projectPath);
+      // briefPaths[0] is scope, rest are ancestors
+      for (let i = 1; i < briefPaths.length; i++) {
+        const parentDir = path.dirname(briefPaths[i]);
+        const parentDecBody = await readSection(parentDir, "Key Decisions");
+        if (parentDecBody) {
+          const parentDecs = parseDecisions(parentDecBody);
+          detectSupersessionStatus(parentDecs);
+          for (const d of parentDecs) {
+            if (d.status !== "superseded") {
+              conflictDecisions.push({
+                text: `[parent] ${d.text}`,
+                status: d.status,
+                exceptionTo: d.exceptionTo,
+                amends: d.amends,
+              });
+            }
+          }
+          // Include parent intentional tensions
+          for (const t of parentDecs.intentionalTensions) {
+            intentionalTensions.push({
+              itemA: t.between[0] ?? "",
+              itemB: t.between[1] ?? "",
+            });
+          }
+        }
+        // Include parent constraints
+        const parentConstraintResult = await getConstraints({
+          projectPath: parentDir,
+        });
+        if (parentConstraintResult.constraints) {
+          constraints.push(...parentConstraintResult.constraints);
+        }
+      }
+    } catch {
+      // Hierarchy traversal failure is non-fatal
+    }
 
     // Resolve domain conflict patterns from type guide (best-effort)
     let domainPairs: ReadonlyArray<readonly [string, string]> | undefined;
