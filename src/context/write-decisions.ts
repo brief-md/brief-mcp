@@ -64,48 +64,50 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Format a decision line for BRIEF.md */
-function formatDecisionLine(
+/** Format a decision block for BRIEF.md in the canonical H3 format
+ *  that the parser can read back (### Title / WHAT / WHY / WHEN). */
+function formatDecisionBlock(
   title: string,
   why: string | undefined,
   dateStr: string,
 ): string {
-  return why
-    ? `- ${title} (why: ${why}) [${dateStr}]`
-    : `- ${title} [${dateStr}]`;
+  const lines = [`### ${title}`, "", `**WHAT:** ${title}`, ""];
+  if (why) {
+    lines.push(`**WHY:** ${why}`, "");
+  }
+  lines.push(`**WHEN:** ${dateStr}`);
+  return lines.join("\n");
 }
 
-/** Read existing decision lines from BRIEF.md "Key Decisions" section. */
-async function readDecisionLines(
+/** Read existing decision headings from BRIEF.md "Key Decisions" section. */
+async function readDecisionHeadings(
   projectPath: string,
-): Promise<{ lines: string[]; body: string }> {
+): Promise<{ headings: string[]; body: string }> {
   if (!(await projectExists(projectPath))) {
-    return { lines: [], body: "" };
+    return { headings: [], body: "" };
   }
   const body = (await readSection(projectPath, "Key Decisions")) || "";
-  const lines = body
+  const headings = body
     .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith("-"));
-  return { lines, body };
+    .filter((l) => l.startsWith("### "))
+    .map((l) => l.slice(4).trim());
+  return { headings, body };
 }
 
-/** Find a decision line by title (case-insensitive substring match). */
-function findDecisionLine(
-  lines: string[],
+/** Find a decision heading by title (case-insensitive match, ignoring superseded markers). */
+function findDecisionHeading(
+  headings: string[],
   searchTitle: string,
-): { index: number; line: string } | undefined {
+): { index: number; heading: string } | undefined {
   const lower = searchTitle.toLowerCase();
-  for (let i = 0; i < lines.length; i++) {
-    // Extract title from line: "- Title (why: ...) [date]" or "- Title [date]"
-    const lineText = lines[i].replace(/^-\s*/, "").trim();
-    // Check title before any metadata
-    const titlePart = lineText
-      .replace(/\s*\(why:.*?\)/, "")
-      .replace(/\s*\[.*?\]/g, "")
+  for (let i = 0; i < headings.length; i++) {
+    // Strip strikethrough and (superseded) markers for matching
+    const clean = headings[i]
+      .replace(/~~/g, "")
+      .replace(/\s*\(superseded\)/i, "")
       .trim();
-    if (titlePart.toLowerCase() === lower) {
-      return { index: i, line: lines[i] };
+    if (clean.toLowerCase() === lower) {
+      return { index: i, heading: headings[i] };
     }
   }
   return undefined;
@@ -193,45 +195,37 @@ export async function handleAddDecision(
   // ------------------------------------------------------------------
   if (replaces) {
     const diskExists = await projectExists(projectPath);
-    const { lines, body } = diskExists
-      ? await readDecisionLines(projectPath)
-      : { lines: [], body: "" };
+    const { headings, body } = diskExists
+      ? await readDecisionHeadings(projectPath)
+      : { headings: [], body: "" };
 
-    // If we have lines (from disk) and can't find the target, error with suggestion
-    if (diskExists && lines.length > 0) {
-      const found = findDecisionLine(lines, replaces);
+    // If we have headings (from disk) and can't find the target, error with suggestion
+    if (diskExists && headings.length > 0) {
+      const found = findDecisionHeading(headings, replaces);
       if (!found) {
-        const existingTitles = lines.map((l) =>
-          l
-            .replace(/^-\s*/, "")
-            .replace(/\s*\(why:.*?\)/, "")
-            .replace(/\s*\[.*?\]/g, "")
-            .trim(),
-        );
         return {
           success: false,
           isError: true,
           content: [
             { type: "text", text: `Decision '${replaces}' not found.` },
           ],
-          suggestion: `Decision not found: '${replaces}'. Existing decisions: ${existingTitles.join(", ")}`,
+          suggestion: `Decision not found: '${replaces}'. Existing decisions: ${headings.join(", ")}`,
         };
       }
 
-      // Mark old decision as superseded, add new decision
-      const newLine = formatDecisionLine(title, why, decisionDate);
-      const updatedBody = body.replace(
-        found.line,
-        `${found.line} [superseded]`,
-      );
+      // Mark old decision heading as superseded, add new decision
+      const newBlock = formatDecisionBlock(title, why, decisionDate);
+      const oldHeadingLine = `### ${found.heading}`;
+      const supersededHeading = `### ~~${found.heading}~~ (superseded)`;
+      const updatedBody = body.replace(oldHeadingLine, supersededHeading);
       await writeSection(
         projectPath,
         "Key Decisions",
-        `${updatedBody}\n${newLine}`,
+        `${updatedBody}\n\n${newBlock}\n\n**REPLACES:** ${replaces}`,
       );
     } else if (diskExists) {
       // Disk exists but no decisions yet — just append
-      const newLine = formatDecisionLine(title, why, decisionDate);
+      const newLine = formatDecisionBlock(title, why, decisionDate);
       await appendToSection(projectPath, "Key Decisions", newLine);
     } else {
       // No disk project — test/fallback: return error if title doesn't match known stubs
@@ -269,7 +263,7 @@ export async function handleAddDecision(
   // Exception flow [DEC-02] — write exception to disk
   // ------------------------------------------------------------------
   if (exception_to) {
-    const newLine = `${formatDecisionLine(title, why, decisionDate)} [exception to: ${exception_to}]`;
+    const newLine = `${formatDecisionBlock(title, why, decisionDate)}\n\n**EXCEPTION TO:** ${exception_to}`;
 
     if (await projectExists(projectPath)) {
       await appendToSection(projectPath, "Key Decisions", newLine);
@@ -297,17 +291,24 @@ export async function handleAddDecision(
     const diskExists = await projectExists(projectPath);
 
     if (diskExists) {
-      const { lines, body } = await readDecisionLines(projectPath);
-      const found = findDecisionLine(lines, title);
+      const { headings, body } = await readDecisionHeadings(projectPath);
+      const found = findDecisionHeading(headings, title);
 
       if (found) {
-        // Extract original date from the found line
-        const dateMatch = found.line.match(/\[(\d{4}-\d{2}-\d{2})\]/);
+        // Extract original date from the decision block's WHEN field
+        const whenRegex = new RegExp(
+          `### ${found.heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?\\*\\*WHEN:\\*\\*\\s*(\\d{4}-\\d{2}-\\d{2})`,
+        );
+        const dateMatch = body.match(whenRegex);
         const originalWhenDate = dateMatch ? dateMatch[1] : decisionDate;
 
-        // Replace the old line with the amended version (preserving original date)
-        const amendedLine = formatDecisionLine(title, why, originalWhenDate);
-        const updatedBody = body.replace(found.line, amendedLine);
+        // Replace the old heading block with the amended version (preserving original date)
+        // Find the full block from ### heading to next ### or end
+        const blockRegex = new RegExp(
+          `### ${found.heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?(?=\\n### |$)`,
+        );
+        const amendedBlock = formatDecisionBlock(title, why, originalWhenDate);
+        const updatedBody = body.replace(blockRegex, amendedBlock);
         await writeSection(projectPath, "Key Decisions", updatedBody);
 
         return {
@@ -326,7 +327,7 @@ export async function handleAddDecision(
       }
 
       // Decision not found on disk — add as new
-      const newLine = formatDecisionLine(title, why, decisionDate);
+      const newLine = formatDecisionBlock(title, why, decisionDate);
       await appendToSection(projectPath, "Key Decisions", newLine);
 
       return {
@@ -364,7 +365,7 @@ export async function handleAddDecision(
   // External session integration [DEC-16] — write to disk
   // ------------------------------------------------------------------
   if (afterExternalSession) {
-    const newLine = formatDecisionLine(title, why, decisionDate);
+    const newLine = formatDecisionBlock(title, why, decisionDate);
 
     if (await projectExists(projectPath)) {
       await appendToSection(projectPath, "Key Decisions", newLine);
@@ -387,7 +388,7 @@ export async function handleAddDecision(
   // ------------------------------------------------------------------
   // Default: new decision — write to disk if project exists
   // ------------------------------------------------------------------
-  const decisionLine = formatDecisionLine(title, why, decisionDate);
+  const decisionLine = formatDecisionBlock(title, why, decisionDate);
 
   if (await projectExists(projectPath)) {
     await appendToSection(projectPath, "Key Decisions", decisionLine);

@@ -63,7 +63,9 @@ describe("WP7/GAP-G: addExtension with sectionModes", () => {
     expect(content).toContain("<!-- brief:section-dataset -->");
     // Comment should appear after the "## Sound Palette" heading
     const lines = content.split("\n");
-    const headingIdx = lines.findIndex((l) => l.startsWith("## Sound Palette"));
+    const headingIdx = lines.findIndex((l) =>
+      l.startsWith("### Sound Palette"),
+    );
     expect(headingIdx).toBeGreaterThan(-1);
     // Find the dataset comment after the heading
     const commentIdx = lines.findIndex(
@@ -123,12 +125,12 @@ describe("WP7/GAP-G: addExtension with sectionModes", () => {
     const lines = content.split("\n");
     // Find Production Approach heading
     const prodIdx = lines.findIndex((l) =>
-      l.startsWith("## Production Approach"),
+      l.startsWith("### Production Approach"),
     );
     expect(prodIdx).toBeGreaterThan(-1);
     // Find next heading after Production Approach
     const nextHeadingIdx = lines.findIndex(
-      (l, i) => i > prodIdx && l.startsWith("## "),
+      (l, i) => i > prodIdx && l.startsWith("### "),
     );
     // Check no dataset comment between Production Approach and next heading
     const sectionLines =

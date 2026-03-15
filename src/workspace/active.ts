@@ -122,7 +122,7 @@ export async function addWorkspace(params: { path: string }): Promise<{
 
 export async function setActiveProject(params: {
   identifier: string;
-  workspaceRoots: string[];
+  workspaceRoots?: string[];
   scope?: string;
   simulateDuplicates?: boolean;
 }): Promise<{
@@ -133,7 +133,7 @@ export async function setActiveProject(params: {
   isError?: boolean;
   error?: string;
 }> {
-  const { identifier, workspaceRoots, scope, simulateDuplicates } = params;
+  const { identifier, workspaceRoots = [], scope, simulateDuplicates } = params;
 
   // --- Scope validation ---
   if (scope !== undefined) {
@@ -165,11 +165,30 @@ export async function setActiveProject(params: {
   }
 
   // --- Resolve identifier ---
-  const isAbsolute = isAbsolutePath(identifier);
+  let resolvedIdentifier = identifier;
+
+  // Normalize Git Bash paths (/c/Users/...) to Windows format (C:\Users\...)
+  const gitBashMatch = /^\/([a-zA-Z])\/(.*)$/.exec(resolvedIdentifier);
+  if (gitBashMatch) {
+    resolvedIdentifier = `${gitBashMatch[1].toUpperCase()}:\\${gitBashMatch[2].replace(/\//g, "\\")}`;
+  }
+
+  // Resolve relative paths against CWD
+  if (!isAbsolutePath(resolvedIdentifier)) {
+    const resolved = path.resolve(resolvedIdentifier);
+    try {
+      await fsp.stat(resolved);
+      resolvedIdentifier = resolved;
+    } catch {
+      // resolved path doesn't exist — fall through to name-based lookup
+    }
+  }
+
+  const isAbsolute = isAbsolutePath(resolvedIdentifier);
 
   if (isAbsolute) {
-    const name = path.basename(identifier) || identifier;
-    const project = { name, path: identifier };
+    const name = path.basename(resolvedIdentifier) || resolvedIdentifier;
+    const project = { name, path: resolvedIdentifier };
     _activeProject = project;
     _activeScope = scope;
 
@@ -186,7 +205,7 @@ export async function setActiveProject(params: {
     if (scope !== undefined) {
       result.activeScope = scope;
       // Check if scope path exists on disk (FS-12: lenient)
-      const resolvedScope = path.join(identifier, scope);
+      const resolvedScope = path.join(resolvedIdentifier, scope);
       try {
         await fsp.access(resolvedScope);
       } catch {

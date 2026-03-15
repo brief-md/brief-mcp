@@ -358,7 +358,7 @@ export async function addExtension(params: {
       headingFormat,
       metadataKey: metadataFormat,
       subsections: resolvedSubsections,
-      content: `# ${headingFormat}`,
+      content: `## ${headingFormat}`,
     };
   }
 
@@ -373,7 +373,7 @@ export async function addExtension(params: {
       headingFormat,
       metadataKey: metadataFormat,
       subsections: existing.subsections,
-      content: `# ${headingFormat}`,
+      content: `## ${headingFormat}`,
       success: true,
     };
   }
@@ -381,9 +381,9 @@ export async function addExtension(params: {
   /* Generate content with guidance prompts */
   const sectionModes = params.sectionModes;
   const subsectionDescriptions = params.subsectionDescriptions;
-  const contentLines = [`# ${headingFormat}`, ""];
+  const contentLines = [`## ${headingFormat}`, ""];
   for (const sub of resolvedSubsections) {
-    contentLines.push(`## ${sub}`, "");
+    contentLines.push(`### ${sub}`, "");
     // Insert section-dataset marker for structured sections (WP7/GAP-G)
     if (sectionModes?.[sub] === "structured") {
       contentLines.push(`<!-- brief:section-dataset -->`, "");

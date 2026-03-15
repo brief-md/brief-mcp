@@ -184,7 +184,16 @@ export async function writeSection(
     );
     const headingLine = `${"#".repeat(target.level)} ${canonicalHeading}`;
     const before = normalized.slice(0, target.headingStart);
-    const after = normalized.slice(target.bodyEnd);
+    // Level-aware body end: section body extends to next heading at same or higher level,
+    // not to sub-headings (e.g. H3 within an H2 section). Matches readBriefSection behavior.
+    let levelAwareEnd = target.bodyEnd;
+    for (const s of sections) {
+      if (s.headingStart > target.headingStart && s.level <= target.level) {
+        levelAwareEnd = s.headingStart;
+        break;
+      }
+    }
+    const after = normalized.slice(levelAwareEnd);
     const bodyContent = formatSectionBody(newContent);
     result = before + headingLine + bodyContent + after;
   } else {

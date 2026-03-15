@@ -224,12 +224,16 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
         remap(withProjectPath(args), { project_path: "projectPath" }),
       ),
     ),
-  brief_get_decisions: (args) =>
-    getDecisions(
-      typed<Parameters<typeof getDecisions>[0]>(
-        remap(withProjectPath(args), { project_path: "projectPath" }),
-      ),
-    ),
+  brief_get_decisions: (args) => {
+    const mapped = remap(withProjectPath(args), {
+      project_path: "projectPath",
+    });
+    // Map MCP status param to internal includeSuperseded flag
+    if (mapped.status === "all" || mapped.status === "superseded") {
+      mapped.includeSuperseded = true;
+    }
+    return getDecisions(typed<Parameters<typeof getDecisions>[0]>(mapped));
+  },
   brief_get_questions: (args) =>
     getQuestions(
       typed<Parameters<typeof getQuestions>[0]>(

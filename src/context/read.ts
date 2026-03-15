@@ -176,13 +176,13 @@ function parseDecisions(
       let status: DecisionStatus = "active";
       let format: DecisionFormat = "minimal";
 
-      // Detect superseded: ~~strikethrough~~ or (superseded) in heading
-      if (/^~~.+~~$/.test(heading)) {
+      // Detect superseded: ~~strikethrough~~ and/or (superseded) in heading
+      if (/~~.+~~/.test(heading) || /\(superseded\)/i.test(heading)) {
         status = "superseded";
-        heading = heading.replace(/^~~|~~$/g, "").trim();
-      } else if (/\(superseded\)/i.test(heading)) {
-        status = "superseded";
-        heading = heading.replace(/\(superseded\)/i, "").trim();
+        heading = heading
+          .replace(/~~([^~]+?)~~/g, "$1")
+          .replace(/\(superseded\)/gi, "")
+          .trim();
       }
 
       // Extract structured fields from body
