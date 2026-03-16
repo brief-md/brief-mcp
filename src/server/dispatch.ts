@@ -339,6 +339,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
     const conflictDecisions = allDecisions.map((d) => ({
       text: d.text,
       status: d.status,
+      section: "child",
       exceptionTo: d.exceptionTo,
       amends: d.amends,
     }));
@@ -368,6 +369,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
               conflictDecisions.push({
                 text: `[parent] ${d.text}`,
                 status: d.status,
+                section: "parent",
                 exceptionTo: d.exceptionTo,
                 amends: d.amends,
               });
