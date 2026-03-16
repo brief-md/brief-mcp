@@ -107,7 +107,7 @@ function extractFields(content: string): Record<string, string> {
       if (m) fields[m[1].trim()] = m[2].trim();
       continue;
     }
-    if (/^#{1,3}\s/.test(line)) break;
+    if (/^#{2,3}\s/.test(line)) break;
     const bold = line.match(/^\*\*(\w[\w\s]*?):\*\*\s*(.+)$/);
     if (bold) {
       fields[bold[1].trim()] = bold[2].trim();
