@@ -771,9 +771,13 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        type: { type: "string", description: "Project type name." },
+        type: {
+          type: "string",
+          description:
+            "Project type name. If omitted, auto-resolves from the active project's Type metadata.",
+        },
       },
-      required: ["type"],
+      required: [],
     },
   },
   {
@@ -1477,7 +1481,7 @@ const REQUIRED_STRING_PARAMS: Record<string, readonly string[]> = {
   brief_suggest_references: ["context"],
   brief_add_reference: ["section", "title"],
   brief_discover_references: ["extension_name"], // check-rules-ignore
-  brief_get_type_guide: ["type"],
+  brief_get_type_guide: [],
   brief_create_type_guide: ["type"],
   brief_suggest_extensions: ["project_type"],
   brief_design_extension: ["extension_name", "description"],
