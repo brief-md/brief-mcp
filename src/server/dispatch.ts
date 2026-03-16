@@ -217,7 +217,9 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   brief_start_tutorial: () => startTutorial(),
   brief_set_tutorial_dismissed: (args) =>
     setTutorialDismissed(
-      typed<Parameters<typeof setTutorialDismissed>[0]>(args),
+      typed<Parameters<typeof setTutorialDismissed>[0]>(
+        remap(args, { dismissed: "permanent" }),
+      ),
     ),
   brief_add_workspace: (args) =>
     addWorkspace(typed<Parameters<typeof addWorkspace>[0]>(args)),
