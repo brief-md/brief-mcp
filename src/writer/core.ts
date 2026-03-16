@@ -186,7 +186,8 @@ export async function writeSection(
     const before = normalized.slice(0, target.headingStart);
     // Level-aware body end: section body extends to next heading at same or higher level,
     // not to sub-headings (e.g. H3 within an H2 section). Matches readBriefSection behavior.
-    let levelAwareEnd = target.bodyEnd;
+    // Start from end-of-content; narrow only if a same-or-higher-level heading follows.
+    let levelAwareEnd = normalized.length;
     for (const s of sections) {
       if (s.headingStart > target.headingStart && s.level <= target.level) {
         levelAwareEnd = s.headingStart;
@@ -285,7 +286,8 @@ export async function readBriefSection(
 
   // Level-aware body end: an H2 section's body extends to the next H1 or H2,
   // not to H3 sub-headings which are part of the section's content.
-  let levelAwareEnd = target.bodyEnd;
+  // Start from end-of-content; narrow only if a same-or-higher-level heading follows.
+  let levelAwareEnd = normalized.length;
   for (const s of sections) {
     if (s.headingStart > target.headingStart && s.level <= target.level) {
       levelAwareEnd = s.headingStart;
