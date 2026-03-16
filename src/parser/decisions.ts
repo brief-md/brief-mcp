@@ -27,6 +27,7 @@ const FIELD_MARKERS: readonly string[] = [
   "EXCEPTION TO:",
   "SUPERSEDED BY:",
   "RESOLVED FROM:",
+  "AMENDS:",
 ];
 
 function isFullFormat(body: string): boolean {
