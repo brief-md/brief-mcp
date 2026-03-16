@@ -198,6 +198,7 @@ function parseDecisions(
       const why = parseField(block.bodyLines, "WHY");
       const when = parseField(block.bodyLines, "WHEN");
       const replaces = parseField(block.bodyLines, "REPLACES");
+      const amends = parseField(block.bodyLines, "AMENDS");
       const exceptionTo = parseField(block.bodyLines, "EXCEPTION TO");
       const supersededBy = parseField(block.bodyLines, "SUPERSEDED BY");
       const resolvedFrom = parseField(block.bodyLines, "RESOLVED FROM");
@@ -224,7 +225,7 @@ function parseDecisions(
           block.bodyLines
             .filter(
               (l) =>
-                !/^(?:\*\*)?(?:WHAT|WHY|WHEN|REPLACES|EXCEPTION TO|SUPERSEDED BY|RESOLVED FROM|ALTERNATIVES CONSIDERED)(?:\*\*)?:/i.test(
+                !/^(?:\*\*)?(?:WHAT|WHY|WHEN|REPLACES|AMENDS|EXCEPTION TO|SUPERSEDED BY|RESOLVED FROM|ALTERNATIVES CONSIDERED)(?:\*\*)?:/i.test(
                   l,
                 ),
             )
@@ -244,6 +245,7 @@ function parseDecisions(
       if (why) decision.why = why;
       if (when) decision.when = when;
       if (replaces) decision.replaces = replaces;
+      if (amends) decision.amends = amends;
       if (exceptionTo) decision.exceptionTo = exceptionTo;
       if (supersededBy) decision.supersededBy = supersededBy;
       if (resolvedFrom) decision.resolvedFrom = resolvedFrom;
