@@ -362,16 +362,29 @@ function checkDecisionConflictsLint(
   }
 }
 
+function buildDecisionLookup(decisions: Decision[]): Set<string> {
+  const lookup = new Set<string>();
+  for (const d of decisions) {
+    lookup.add(d.text.toLowerCase().trim());
+    // Also index the ID prefix (e.g. "WRITE-01" from "WRITE-01: Use regex...")
+    const idMatch = d.text.match(/^([A-Z][A-Z0-9_-]+(?:-[A-Z0-9]+)*):/i);
+    if (idMatch) {
+      lookup.add(idMatch[1].toLowerCase().trim());
+    }
+  }
+  return lookup;
+}
+
 function checkDanglingReplaces(
   parsed: ParsedBriefMd,
   findings: LintFinding[],
 ): void {
   const decisions = parsed.decisions ?? [];
-  const allTitles = new Set(decisions.map((d) => d.text.toLowerCase().trim()));
+  const lookup = buildDecisionLookup(decisions);
   for (const d of decisions) {
     if (d.replaces) {
       const target = d.replaces.toLowerCase().trim();
-      if (!allTitles.has(target)) {
+      if (!lookup.has(target)) {
         findings.push(
           makeFinding(
             "DANGLING_REPLACES",
@@ -389,11 +402,11 @@ function checkDanglingExceptionTo(
   findings: LintFinding[],
 ): void {
   const decisions = parsed.decisions ?? [];
-  const allTitles = new Set(decisions.map((d) => d.text.toLowerCase().trim()));
+  const lookup = buildDecisionLookup(decisions);
   for (const d of decisions) {
     if (d.exceptionTo) {
       const target = d.exceptionTo.toLowerCase().trim();
-      if (!allTitles.has(target)) {
+      if (!lookup.has(target)) {
         findings.push(
           makeFinding(
             "DANGLING_EXCEPTION",
@@ -411,11 +424,11 @@ function checkSupersededByMismatch(
   findings: LintFinding[],
 ): void {
   const decisions = parsed.decisions ?? [];
-  const allTitles = new Set(decisions.map((d) => d.text.toLowerCase().trim()));
+  const lookup = buildDecisionLookup(decisions);
   for (const d of decisions) {
     if (d.supersededBy) {
       const target = d.supersededBy.toLowerCase().trim();
-      if (!allTitles.has(target)) {
+      if (!lookup.has(target)) {
         findings.push(
           makeFinding(
             "SUPERSEDED_MISMATCH",
