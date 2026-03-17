@@ -276,12 +276,8 @@ export async function ensureBundledPacks(): Promise<string[]> {
  */
 export async function loadAllPacks(): Promise<PackData[]> {
   const names = await listInstalledPacks();
-  const packs: PackData[] = [];
-
-  for (const name of names) {
-    const pack = await loadPackFromDisk(name);
-    if (pack) packs.push(pack);
-  }
-
-  return packs;
+  const results = await Promise.all(
+    names.map((name) => loadPackFromDisk(name)),
+  );
+  return results.filter((pack): pack is PackData => pack !== null);
 }

@@ -151,8 +151,15 @@ function evictUntilBudget(
   exclude?: string,
 ): string | undefined {
   let lastEvicted: string | undefined;
+  const maxIterations = manager.cache.size;
+  let iterations = 0;
 
-  while (manager.totalBytes > manager.budgetBytes && manager.cache.size > 1) {
+  while (
+    manager.totalBytes > manager.budgetBytes &&
+    manager.cache.size > 1 &&
+    iterations < maxIterations
+  ) {
+    iterations++;
     const lru = findLRU(manager, exclude);
     if (!lru) break;
 

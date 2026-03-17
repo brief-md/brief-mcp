@@ -26,6 +26,8 @@ export async function initializeFromDisk(): Promise<void> {
   try {
     await ensureBundledPacks();
     const packs = await loadAllPacks();
+    // buildIndex is CPU-bound but packs are already loaded in parallel;
+    // indexing is fast enough to run sequentially here.
     for (const pack of packs) {
       const index = buildIndex({
         name: pack.name, // check-rules-ignore
