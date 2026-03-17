@@ -83,17 +83,35 @@ function parseYamlFrontmatter(content: string): {
   return { frontmatter, body };
 }
 
+// ---- Module-level caches (avoid repeated sync I/O) ----
+
+let _cachedAssetRoot: string | undefined;
+let _cachedGuideContent: string | undefined;
+let _cachedGenericGuide: ReturnType<typeof loadGenericGuide> | undefined;
+let _cachedExtensions:
+  | Array<{ name: string; [key: string]: unknown }>
+  | undefined;
+
 // ---- Asset root resolution ----
 
 function resolveAssetRoot(): string {
+  if (_cachedAssetRoot !== undefined) return _cachedAssetRoot;
+
   // Check if dist/assets/ exists (built layout)
   const distAssets = path.join(ASSETS_DIR, "..", "dist", "assets");
-  if (fs.existsSync(path.join(distAssets, "type-guides"))) return distAssets;
+  if (fs.existsSync(path.join(distAssets, "type-guides"))) {
+    _cachedAssetRoot = distAssets;
+    return distAssets;
+  }
 
   // Check project root assets/ (dev layout)
-  if (fs.existsSync(path.join(ASSETS_DIR, "type-guides"))) return ASSETS_DIR;
+  if (fs.existsSync(path.join(ASSETS_DIR, "type-guides"))) {
+    _cachedAssetRoot = ASSETS_DIR;
+    return ASSETS_DIR;
+  }
 
   // Fallback to ASSETS_DIR even if missing (caller handles absence)
+  _cachedAssetRoot = ASSETS_DIR;
   return ASSETS_DIR;
 }
 
@@ -155,12 +173,14 @@ function validateGuideContent(content: string): string[] {
 // ---- Source guide content (from assets or bedrock fallback) ----
 
 function getSourceGuideContent(assetRoot: string): string {
+  if (_cachedGuideContent !== undefined) return _cachedGuideContent;
   const guidePath = path.join(assetRoot, "type-guides", "_generic.md");
   try {
-    return fs.readFileSync(guidePath, "utf-8");
+    _cachedGuideContent = fs.readFileSync(guidePath, "utf-8");
   } catch {
-    return generateGenericGuideContent();
+    _cachedGuideContent = generateGenericGuideContent();
   }
+  return _cachedGuideContent;
 }
 
 // ---- Atomic write (WRITE-04 compliant) ----
@@ -190,6 +210,11 @@ export function loadGenericGuide(params?: Record<string, unknown>): {
   version?: string;
   [key: string]: unknown;
 } {
+  // Return cached result when no custom assetRoot is provided
+  if (!params?.assetRoot && _cachedGenericGuide !== undefined) {
+    return _cachedGenericGuide;
+  }
+
   const assetRoot =
     typeof params?.assetRoot === "string"
       ? params.assetRoot
@@ -209,7 +234,7 @@ export function loadGenericGuide(params?: Record<string, unknown>): {
 
   const { frontmatter, body } = parseYamlFrontmatter(content);
 
-  return {
+  const result = {
     content,
     frontmatter,
     body,
@@ -218,6 +243,13 @@ export function loadGenericGuide(params?: Record<string, unknown>): {
     version:
       typeof frontmatter.version === "string" ? frontmatter.version : undefined,
   };
+
+  // Cache when using default asset root
+  if (!params?.assetRoot) {
+    _cachedGenericGuide = result;
+  }
+
+  return result;
 }
 
 export async function verifyGenericGuide(
@@ -364,6 +396,11 @@ export async function installBundledContent(
 export function getExtensionDefinitions(
   params?: Record<string, unknown>,
 ): Array<{ name: string; [key: string]: unknown }> {
+  // Return cached result when no custom assetRoot is provided
+  if (!params?.assetRoot && _cachedExtensions !== undefined) {
+    return _cachedExtensions;
+  }
+
   const assetRoot =
     typeof params?.assetRoot === "string"
       ? params.assetRoot
@@ -371,7 +408,14 @@ export function getExtensionDefinitions(
   const jsonPath = path.join(assetRoot, "extensions", "extensions.json");
 
   const content = fs.readFileSync(jsonPath, "utf-8");
-  return JSON.parse(content);
+  const result = JSON.parse(content);
+
+  // Cache when using default asset root
+  if (!params?.assetRoot) {
+    _cachedExtensions = result;
+  }
+
+  return result;
 }
 
 /**
@@ -453,5 +497,8 @@ export async function resolveGuide(params?: Record<string, unknown>): Promise<{
 
 /** Reset module state — test seam for isolation */
 export function _resetState(): void {
-  // No module-level mutable state to reset
+  _cachedAssetRoot = undefined;
+  _cachedGuideContent = undefined;
+  _cachedGenericGuide = undefined;
+  _cachedExtensions = undefined;
 }
