@@ -32,6 +32,21 @@ const SOURCE_PRECEDENCE: Record<string, number> = {
 
 const SCRIPT_RE = /<script[\s>]/i;
 
+// Template placeholder markers — if a body contains these when force:true,
+// it means the AI passed template boilerplate instead of real content (A1).
+const TEMPLATE_PLACEHOLDER_MARKERS = [
+  "What defines this project type?",
+  "What is a ",
+  "List 4-6 dimensions most critical",
+  "List 3-5 common trade-offs",
+  "Recommended order of operations for this project type",
+  "What domain-specific metadata does this project type need?",
+  "List 3-5 concrete indicators",
+  "Where to find real-world references for this project type",
+  "What layers does a ",
+  "List 3-5 common mistakes or traps",
+];
+
 // ─── Fixture entry type ───────────────────────────────────────────────────────
 
 interface FixtureEntry {
@@ -342,6 +357,13 @@ export function generateTypeGuideTemplate(params: {
     "",
     "Recommended order of operations for this project type, as a numbered list.",
     "Include key decision points, common milestones, and where to expect iteration.",
+    "Map steps to the three lifecycle phases (Design, Scaffold, Build). Identify transition",
+    "criteria between phases. Crucially, describe what the Build phase looks like for this",
+    "project type — what artefacts are consumed, what the iteration loop is, and what 'done' means.",
+    "Identify blocking decision gates: which questions must be resolved before sub-project",
+    "BRIEFs can be created? (e.g., external dependency constraints, architecture decisions",
+    "affecting all modules). Sub-project creation should not proceed until gate questions",
+    "are resolved or explicitly deferred.",
     "",
     "## Known Tensions",
     "",
@@ -353,6 +375,10 @@ export function generateTypeGuideTemplate(params: {
     "",
     "List 3-5 common mistakes or traps for this project type. What do people",
     "get wrong? What should the AI flag if it sees it happening?",
+    "Include: 'Designing around external dependencies without researching their constraints.'",
+    "If the project depends on external systems, tools, services, or resources, the AI should",
+    "prompt the user to research constraints, limitations, and requirements before making",
+    "design decisions that depend on them.",
     "",
     "## Extension Guidance",
     "",
@@ -379,11 +405,23 @@ export function generateTypeGuideTemplate(params: {
     "",
     "List 3-5 concrete indicators that a project of this type is well-defined.",
     'What does "done enough to start building" look like?',
+    "Include a scaffolding readiness checklist: what must each sub-project BRIEF contain",
+    "before task packets can be generated? (e.g., identity sections filled, blocking",
+    "questions resolved, key decisions captured, interface dependencies documented).",
     "",
     "## Reference Sources",
     "",
     "Where to find real-world references for this project type (databases, catalogues,",
     "communities, documentation). Used by brief_discover_references to find relevant works.",
+    "Include documentation or references for any external dependencies the project relies on.",
+    "These should be consulted during design, not deferred to build.",
+    "",
+    "## Build Process",
+    "",
+    "How does this project type move from scaffolded artefacts to finished output?",
+    "Describe the execution loop, iteration pattern, and completion criteria.",
+    "Examples: software projects use task-packet-driven build loops; albums use",
+    "recording → mixing → mastering; films use pre-production → production → post.",
   ];
 
   if (params.suggestedExtensions && params.suggestedExtensions.length > 0) {
@@ -585,6 +623,24 @@ export async function createTypeGuide(
     }
     if (aliasResult.warning) {
       aliasWarning = aliasResult.warning;
+    }
+  }
+
+  // A1: Reject template placeholder bodies on force:true — prevents content loss
+  // when the AI accidentally passes template boilerplate instead of real content.
+  if (force && body && !templateUsed) {
+    const placeholderHits = TEMPLATE_PLACEHOLDER_MARKERS.filter((marker) =>
+      body.includes(marker),
+    );
+    if (placeholderHits.length >= 3) {
+      throw new Error(
+        `Type guide body appears to contain template placeholder text (${placeholderHits.length} markers detected). ` +
+          `When using force:true, include the collaboratively written content — not the template. ` +
+          `Detected markers: ${placeholderHits
+            .slice(0, 3)
+            .map((m) => `"${m}"`)
+            .join(", ")}`,
+      );
     }
   }
 

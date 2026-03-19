@@ -21,15 +21,15 @@ export const GUIDE_RESOURCE: GuideResource = {
 
 // ---------------------------------------------------------------------------
 // Guide content — built once at module load, cached in memory (static per
-// server version). Covers all 10 interaction patterns, DR-01..08,
-// QUEST-01..11, tool recommendations, multi-MCP guidance, signal format.
+// server version). Covers all 11 interaction patterns, DR-01..09,
+// QUEST-01..12, tool recommendations, multi-MCP guidance, signal format.
 // ---------------------------------------------------------------------------
 
 const GUIDE_CONTENT = `# BRIEF.md Interaction Guide
 
 This guide describes how an AI assistant should interact with the brief-mcp server.
-It covers the 10 interaction patterns, decision recognition rules (DR-01 through DR-08),
-question surfacing rules (QUEST-01 through QUEST-11), tool usage recommendations,
+It covers the 11 interaction patterns, decision recognition rules (DR-01 through DR-09),
+question surfacing rules (QUEST-01 through QUEST-12), tool usage recommendations,
 and signal block format documentation.
 
 > **IMPORTANT — Do not edit BRIEF.md directly.**
@@ -38,6 +38,22 @@ and signal block format documentation.
 > enforce formatting rules, structural validation, and metadata tracking that manual edits
 > bypass. If no \`brief_*\` tool exists for a specific change, ask the user how to proceed
 > rather than editing the file directly.
+
+---
+
+## Project Lifecycle
+
+Every BRIEF.md project follows three phases:
+
+1. **Design** — Identity, type guide, extensions, decisions, and hierarchy (Patterns 1-10)
+2. **Scaffold** — Generate build-ready artefacts from the completed design (Pattern 11)
+3. **Build** — Execute the plan using the scaffolded artefacts. What "build" means is
+   defined by the type guide's Suggested Workflow and Build Process sections (e.g., for
+   software: execute task packets via a build loop; for an album: record and mix tracks;
+   for a film: shoot and edit).
+
+Do not advance to the next phase until the current one is complete. The type guide defines
+phase-specific milestones and transition criteria.
 
 ---
 
@@ -55,6 +71,8 @@ At the start of every session, determine if this is an **existing project** or a
   open questions, section fill state, detected conflicts, intentional tensions, lifecycle
   phase, and required next steps. Follow the \`__REQUIRED_NEXT_STEPS__\` in the response
   before doing anything else. Ask about any external tool sessions since last visit (DR-06).
+  If resuming a project that was left mid-setup, run \`brief_lint\` first to catch any
+  structural issues before continuing.
 - **New project**: call \`brief_create_project\` to initialise a new BRIEF.md.
 
 Use \`brief_get_context\` **mid-session** for targeted lookups (e.g. reading specific
@@ -113,6 +131,15 @@ ontologies, use two separate subsections.
 **Workflow:**
 
 **Step 1 — Choose extension type:**
+
+**Clarify extension context first:** For tools, platforms, or services that *produce* domain-specific
+output (e.g. a music production tool, a film editing pipeline, a catalogue engine), clarify whether
+extensions should describe the tool's own architecture (build context — e.g. SYSTEM DESIGN, PIPELINE
+DESIGN) or the domain it operates in (output context — e.g. SONIC ARTS, NARRATIVE CREATIVE). A music
+production tool needs SYSTEM DESIGN on its own BRIEF, not SONIC ARTS — SONIC ARTS belongs on the
+projects the tool generates. Ask: "Should extensions describe how this project is built, or the
+domain of what it produces?"
+
 Ask the user: do they want a **predefined extension** (from the registry) or a **custom extension**?
 - For predefined: call \`brief_suggest_extensions\` to show available options. Present each
   with what it adds. The user picks one or more.
@@ -151,6 +178,11 @@ d. **If inherently freeform** (ontologyAction = "none"):
 Do NOT default everything to freeform. If ontologies are available that match a
 subsection's domain, recommend structured mode and explain why (entries as rows
 provide structure, searchability, and cross-project reuse).
+
+**Ontology gap blocking:** If a subsection references an ontology that doesn't exist or is
+insufficient (too few entries for the domain), pause and either create/expand it or log an
+Open Question via \`brief_add_question\`. Do NOT proceed with extension setup that depends on
+unavailable or thin ontologies without the user's explicit acknowledgment.
 
 **Step 4 — Confirm and create:**
 Summarise the final plan: each subsection with its agreed mode and ontology (if any).
@@ -257,32 +289,112 @@ a domain-specific guide with \`brief_create_type_guide\`.
 When creating a new type guide with \`brief_create_type_guide\`, follow this collaborative
 workflow — do NOT pre-write the body in a single call:
 
-1. **Get the template**: Call \`brief_create_type_guide\` with the type name and metadata
+1. **Get the template**: You MUST call \`brief_create_type_guide\` with the type name and metadata
    (aliases, suggested_extensions, reference_sources) but **no body**. The tool returns
-   a structured template with section prompts.
-2. **Walk through each section**: Present each template section to the user one at a time:
+   a structured template with section prompts. Do NOT skip this step or propose content
+   before retrieving the template.
+2. **Project Structure FIRST**: Before working through other sections, agree on the concrete
+   folder hierarchy — where sub-project BRIEF.md files will live, what the parent/child
+   relationship looks like. This MUST be agreed before extensions are built, because extensions
+   attach to specific hierarchy levels.
+3. **Walk through each section one at a time**: You MUST present each template section to the
+   user individually. Do NOT collapse multiple sections into one response unless the user
+   explicitly asks for batch mode ("do all sections at once"). Sections:
    - **Overview**: What defines this project type? Scope, medium, goals. What distinguishes it?
-   - **Project Structure**: Layers/hierarchy (e.g. tool → features → components). Informs parent/child types.
+   - **Project Structure**: Concrete folder hierarchy including where sub-project BRIEF.md files live.
    - **Key Dimensions**: 4-6 critical dimensions with one-line descriptions.
    - **Suggested Workflow**: Numbered steps with decision points, milestones, iteration loops.
    - **Known Tensions**: 3-5 trade-offs as **X vs Y** — these feed conflict detection.
    - **Anti-patterns**: 3-5 common mistakes the AI should flag.
    - **Extension Guidance**: What domain metadata this type needs and why — informs extension design.
+   - **Ontology Guidance**: What knowledge packs this type benefits from (bundled, url, custom).
    - **Quality Signals**: 3-5 concrete indicators of a well-defined project.
    - **Reference Sources**: Real databases/catalogues/docs for this domain (used by \`brief_discover_references\`).
-3. **Draft each section collaboratively**: For each section, propose content based on
+4. **Draft each section collaboratively**: For each section, propose content based on
    what you know, then ask the user to confirm, adjust, or expand. The user's voice
    and domain knowledge should drive the content.
-4. **Write the final body**: Once all sections are approved, call \`brief_create_type_guide\`
-   again with \`force: true\` and the complete body.
+5. **Write the final body**: Once all sections are approved, call \`brief_create_type_guide\`
+   again with \`force: true\` and the **complete body containing ALL collaboratively written
+   content**. Do NOT pass the template text — pass the actual approved content. The tool
+   will reject bodies that contain template placeholder text when \`force: true\`.
 
 The goal is a type guide that reflects the user's actual understanding of the domain,
 not generic AI-generated filler. A thin guide with real insights beats a long one with
 surface-level content.
 
+### Pattern 11: Build Scaffolding
+
+After the design phase (BRIEF.md hierarchy is complete, type guide reviewed, extensions set
+up), generate build-ready files from the BRIEF.md structure:
+
+1. **Read the hierarchy**: Use \`brief_get_context\` with \`scope: "tree"\` to load the root
+   BRIEF.md and all sub-projects.
+2. **Generate task packets**: For each module/sub-project, create a task packet markdown file
+   from the module's rules, interfaces, and constraints. Task packets are the input to
+   automated build loops (e.g. Ralph Loop).
+3. **Generate type stubs**: From the types sub-project BRIEF, produce TypeScript/Python/etc.
+   interface stubs based on the agreed type definitions.
+4. **Generate test skeletons**: From each module's rules, produce test file skeletons with
+   describe/it blocks matching the rule names.
+5. **Generate infrastructure files**: loop.sh (or equivalent), BUGS.md, and any CI/CD
+   templates referenced in the BRIEF.md.
+
+This pattern bridges the gap between design and build. Run \`brief_lint\` + \`brief_check_conflicts\`
+before scaffolding to ensure the BRIEF.md hierarchy is valid. Additionally, review the type
+guide's Quality Signals section — if it defines scaffolding readiness criteria, verify each
+sub-project meets them before generating task packets. If any sub-project has minimal or
+placeholder content, flag it to the user before proceeding.
+
+### Validation Checkpoints
+
+Run validation tools at these points — do NOT skip them:
+
+- **After identity sections are complete** → \`brief_lint\` (catch structural issues early)
+- **After extensions are populated** → \`brief_check_conflicts\` (catch contradictions between
+  extensions and decisions)
+- **Before scaffolding (Pattern 11)** → \`brief_lint\` + \`brief_check_conflicts\` (full validation)
+- **After bulk sub-project creation** → \`brief_lint\` on each sub-project (catch empty or
+  malformed BRIEFs)
+
+### Sub-Project Population Guidance
+
+Before creating sub-project BRIEFs, check \`brief_get_questions\` for high-priority unresolved
+questions. If blocking questions exist that affect sub-project design (e.g., external dependency
+constraints, architecture decisions affecting all modules), surface them to the user first.
+Do not create sub-projects whose structure depends on unresolved architectural decisions.
+
+When creating module sub-projects, populate each one immediately after creation rather than
+creating all empty first. For each sub-project:
+
+1. Call \`brief_create_sub_project\` with at minimum \`whatThisIs\`
+2. Immediately use Pattern 8 (collaborative authoring) to fill the identity sections
+3. If the parent has extensions, discuss which apply to this sub-project
+
+Bulk-creating empty sub-projects and deferring population leads to abandoned scaffolds. If
+the user wants to create multiple sub-projects in one batch, log an Open Question for each
+unpopulated one via \`brief_add_question\` so the next session surfaces them.
+
+### Milestone Synthesis
+
+After completing a significant milestone (filling a sub-project BRIEF, finishing all identity
+sections, completing extension setup, resolving a cluster of questions), pause and synthesise:
+
+1. **Decisions captured** this milestone (count + key titles)
+2. **Questions resolved** vs **still open** (blocking questions highlighted)
+3. **What comes next** — the immediate next step in the workflow
+
+Keep the synthesis to 3-5 sentences. Do not skip it to "keep momentum" — the synthesis IS
+the momentum, giving the user confidence that progress is real and nothing was missed.
+
+### Session End Guidance
+
+At session end, if work is incomplete: call \`brief_add_question\` for each unfinished item
+so the next session's \`brief_reenter_project\` surfaces them as action items. This prevents
+session continuity loss.
+
 ---
 
-## Decision Recognition Rules (DR-01 through DR-08)
+## Decision Recognition Rules (DR-01 through DR-09)
 
 ### DR-01: Decision Signal Detection
 
@@ -338,9 +450,19 @@ the deliberation without forcing a decision or deferral. Contribute suggestions,
 surface relevant context, offer trade-off analysis. Do not push for a decision or
 offer to add a question unless the user signals they want to park it.
 
+### DR-09: Post-Section Decision Sweep
+
+After completing collaborative authoring of a major section (Pattern 8) or a type guide
+section (Pattern 10), review the conversation for decisions that were agreed but not yet
+captured via \`brief_add_decision\`. Common missed decisions: technology choices ("let's use
+X for this"), architectural patterns ("we'll go with two types: X and Y"), scope boundaries
+("extension-agnostic architecture"), and configuration decisions. For each uncaptured
+decision, apply the DR-02 elicitation sequence before recording. Do NOT wait until end-of-
+session — sweep after each major section while context is fresh.
+
 ---
 
-## Question Surfacing Rules (QUEST-01 through QUEST-11)
+## Question Surfacing Rules (QUEST-01 through QUEST-12)
 
 ### QUEST-01: Placeholder vs. Question Detection
 
@@ -369,7 +491,11 @@ When a question blocks specific work, use \`brief_add_question\` with
 
 Do not interrupt constantly. Surface questions only when: (1) a conflict is detected,
 (2) the user explicitly expresses uncertainty, (3) a new decision point directly
-contradicts an existing decision. Batch questions where possible.
+contradicts an existing decision. Batch related questions together — present at most
+3 questions per response. For each batch, lead with a recommendation for the most
+impactful question (QUEST-12). If more questions remain, note how many are queued
+and address them in subsequent responses. Never present a wall of questions without
+recommendations.
 
 ### QUEST-06: Re-Entry Presentation
 
@@ -404,6 +530,15 @@ intent, emotional themes). Use context-aware narrowing for large option spaces.
 During detail-gathering, make deferral visible: "(or we can add this as an open
 question and come back to it)". Apply selectively to questions commonly hard to answer
 at project start. When deferred, call \`brief_add_question\` and continue setup.
+
+### QUEST-12: Recommend-First Posture
+
+When presenting options to the user, lead with a recommendation and rationale rather
+than an open-ended question. Format: "I'd recommend X because [reason]. The alternative
+is Y, which trades [tradeoff]. Want to go with X, or prefer Y?" This applies to extension
+choices, type guide selection, ontology picks, and any bounded decision where the AI has
+enough context to form a preference. If the AI genuinely cannot distinguish between options,
+say so explicitly rather than listing them without guidance.
 
 ---
 

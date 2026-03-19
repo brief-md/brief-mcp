@@ -1,5 +1,6 @@
 // src/workspace/creation.ts — TASK-22: Project creation
 
+import path from "node:path";
 import { suggestExtensions } from "../extension/suggestion.js"; // check-rules-ignore
 import {
   ensureProjectDir,
@@ -281,11 +282,16 @@ export async function createProject(params: {
   await writeBrief(projectPath, content);
 
   // --- Build result ---
+  // A2: Include resolved absolute path so users can find their files on disk.
+  // On Windows this ensures a drive letter is present (e.g. C:\Users\...).
+  const resolvedAbsolutePath = path.resolve(briefMdPath);
+
   const result: Record<string, unknown> = {
     content,
     success: true,
     filePath: briefMdPath,
     briefMdPath,
+    resolvedAbsolutePath,
     path: projectPath,
     directoriesCreated: directoryExists ? 0 : 2,
     warnings,
@@ -511,6 +517,7 @@ export async function createSubProject(params: {
 }): Promise<{
   success: boolean;
   path: string;
+  resolvedAbsolutePath: string;
   type?: string;
   typeInherited?: boolean;
   content?: string;
@@ -578,6 +585,7 @@ export async function createSubProject(params: {
   return {
     success: true,
     path: projectPath,
+    resolvedAbsolutePath: path.resolve(`${projectPath}/BRIEF.md`),
     type: normalizedType,
     typeInherited: typeInherited || undefined,
     content,
