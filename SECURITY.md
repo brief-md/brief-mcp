@@ -15,7 +15,7 @@ If you discover a security vulnerability in brief-mcp, please report it responsi
 ### How to Report
 
 1. Email: Send a detailed report to the project maintainers via the security contact listed in the repository
-2. GitHub Security Advisories: Use [GitHub's private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) feature on this repository
+2. GitHub Security Advisories: Use [GitHub's private vulnerability reporting](https://github.com/brief-md/brief-mcp/security/advisories/new) feature on this repository
 
 ### What to Include
 

@@ -58,7 +58,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/brief-mcp/brief-mcp.git"
+    "url": "https://github.com/brief-md/brief-mcp.git"
+  },
+  "homepage": "https://github.com/brief-md/brief-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/brief-md/brief-mcp/issues"
   },
   "keywords": [
     "mcp",

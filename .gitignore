@@ -13,6 +13,12 @@
 !assets/**
 
 
+# Documentation
+!docs/
+!docs/**
+!CONTRIBUTING.md
+!CODE_OF_CONDUCT.md
+
 # Package config
 !package.json
 !package-lock.json
@@ -22,6 +28,7 @@
 !vitest.setup.ts
 !biome.json
 !.gitignore
+!.gitattributes
 !LICENSE
 !README.md
 !CHANGELOG.md
