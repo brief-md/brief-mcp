@@ -203,6 +203,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "auto-root-project",
         type: "project",
         whatThisIs: "Uses default workspace root",
+        workspaceRoot: TEST_ROOT,
       });
       expect(result.success).toBe(true);
       expect(result.workspaceRoot).toBeDefined();
