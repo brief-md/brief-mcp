@@ -1,5 +1,7 @@
 # Configuration
 
+`brief-mcp` stores its configuration and data in `~/.brief/`. This is where ontology packs, type guides, workspace registrations, and server settings live — separate from your project files so they persist across projects.
+
 ## Config File
 
 The primary configuration file is located at:

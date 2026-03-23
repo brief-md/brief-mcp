@@ -1,6 +1,6 @@
 # Context Writing Tools
 
-6 tools for recording decisions, adding constraints, managing questions, capturing external sessions, and updating sections.
+These are the note-taking tools — they capture decisions, constraints, questions, and section content as you chat, so nothing important is lost when the conversation ends or the context window compacts.
 
 ---
 

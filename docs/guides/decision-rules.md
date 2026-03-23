@@ -1,6 +1,8 @@
 # Decision Recognition Rules
 
-Nine rules (DR-01 through DR-09) govern how decisions are detected, elicited, and recorded in BRIEF.md files.
+Decisions are the most valuable thing in a project conversation — and the first thing lost when context compacts or a session ends. These nine rules ensure decisions are caught as they happen, not reconstructed later from memory.
+
+DR-01 through DR-09 govern how the AI detects commitment signals, confirms intent, elicits rationale, and records decisions in BRIEF.md before the conversation moves on.
 
 ## DR-01: Decision Signal Detection
 

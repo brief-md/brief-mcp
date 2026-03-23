@@ -1,6 +1,6 @@
 # Workspace Management Tools
 
-9 tools for project lifecycle management: listing, creating, activating, and re-entering projects.
+These tools manage the project lifecycle — creating new BRIEF.md files, re-entering existing projects with full context, and organising projects into workspaces. The most important tool here is `brief_reenter_project`: it's the boot loader that loads your project's decisions, questions, and state at the start of every session.
 
 ---
 

@@ -1,5 +1,7 @@
 # Transport & Remote Access
 
+`brief-mcp` needs to communicate with the AI client you're using — Claude Desktop, Claude Code, Cursor, or any MCP-compatible tool. How it connects determines where the server can run and how you can access your project context.
+
 ## Current: stdio Transport
 
 brief-mcp uses **stdio transport** -- it communicates over stdin/stdout using JSON-RPC messages following the Model Context Protocol.

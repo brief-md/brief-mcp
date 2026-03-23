@@ -1,6 +1,8 @@
 # Question Surfacing Rules
 
-Twelve rules (QUEST-01 through QUEST-12) govern how questions are detected, categorized, and managed in BRIEF.md files.
+Not every unknown is worth tracking, but the ones that block progress or shape other decisions need to be captured before they slip out of the conversation. When you return to a project after a break, knowing what's still open is as important as knowing what's been decided.
+
+QUEST-01 through QUEST-12 govern how the AI distinguishes genuine open questions from passing uncertainties, and how it surfaces them without interrupting flow.
 
 ## QUEST-01: Placeholder vs Question Detection
 

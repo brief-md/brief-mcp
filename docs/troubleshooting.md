@@ -1,5 +1,7 @@
 # Troubleshooting
 
+Common issues when setting up or using `brief-mcp`. If you're new, start with the [Getting Started](getting-started.md) guide.
+
 ## Server Won't Start
 
 ### Node.js version too old
