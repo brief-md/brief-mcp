@@ -12,10 +12,6 @@
 !assets/
 !assets/**
 
-# Task specs and shared docs (loop infrastructure)
-!tasks/
-!tasks/**
-!ERROR_CONVENTIONS.md
 
 # Package config
 !package.json
