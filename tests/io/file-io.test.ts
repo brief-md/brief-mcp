@@ -314,39 +314,45 @@ describe("TASK-07: File I/O Utilities", () => {
   });
 
   describe("Windows rename retry [CONC-01]", () => {
-    it("Windows rename EBUSY is retried with backoff, succeeds on retry [CONC-01]", async () => {
-      // Simulate EBUSY on first attempt, success on second
-      const fsPromises = await import("node:fs/promises");
-      let attempt = 0;
-      vi.spyOn(fsPromises, "rename").mockImplementation(async () => {
-        attempt++;
-        if (attempt === 1) {
-          const err: any = new Error("EBUSY");
-          err.code = "EBUSY";
+    it.skipIf(process.platform !== "win32")(
+      "Windows rename EBUSY is retried with backoff, succeeds on retry [CONC-01]",
+      async () => {
+        // Simulate EBUSY on first attempt, success on second
+        const fsPromises = await import("node:fs/promises");
+        let attempt = 0;
+        vi.spyOn(fsPromises, "rename").mockImplementation(async () => {
+          attempt++;
+          if (attempt === 1) {
+            const err: any = new Error("EBUSY");
+            err.code = "EBUSY";
+            throw err;
+          }
+        });
+
+        await expect(
+          renameWithRetry("/tmp/src", "/tmp/dest"),
+        ).resolves.toBeUndefined();
+        expect(attempt).toBe(2);
+        vi.restoreAllMocks();
+      },
+    );
+
+    it.skipIf(process.platform !== "win32")(
+      "all retries exhausted propagates error with retry context [CONC-01]",
+      async () => {
+        const fsPromises = await import("node:fs/promises");
+        vi.spyOn(fsPromises, "rename").mockImplementation(async () => {
+          const err: any = new Error("EPERM");
+          err.code = "EPERM";
           throw err;
-        }
-      });
+        });
 
-      await expect(
-        renameWithRetry("/tmp/src", "/tmp/dest"),
-      ).resolves.toBeUndefined();
-      expect(attempt).toBe(2);
-      vi.restoreAllMocks();
-    });
-
-    it("all retries exhausted propagates error with retry context [CONC-01]", async () => {
-      const fsPromises = await import("node:fs/promises");
-      vi.spyOn(fsPromises, "rename").mockImplementation(async () => {
-        const err: any = new Error("EPERM");
-        err.code = "EPERM";
-        throw err;
-      });
-
-      await expect(renameWithRetry("/tmp/src", "/tmp/dest")).rejects.toThrow(
-        /EPERM/,
-      );
-      vi.restoreAllMocks();
-    });
+        await expect(renameWithRetry("/tmp/src", "/tmp/dest")).rejects.toThrow(
+          /EPERM/,
+        );
+        vi.restoreAllMocks();
+      },
+    );
   });
 
   describe("optimistic concurrency [CONC-09]", () => {

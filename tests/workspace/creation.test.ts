@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -6,6 +8,8 @@ import {
   normalizeProjectType,
   slugifyProjectName,
 } from "../../src/workspace/creation";
+
+const TEST_ROOT = join(tmpdir(), "brief-creation-test");
 
 // ---------------------------------------------------------------------------
 // Unit Tests
@@ -41,7 +45,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         displayName: "My Beautiful Project",
         type: "song",
         whatThisIs: "A test project",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
       });
       expect(result.content).toContain("**Project:** My Beautiful Project");
     });
@@ -51,7 +55,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "test-proj",
         type: "song",
         whatThisIs: "A test project",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
       });
       expect(result.content).toContain("**Project:** test-proj");
     });
@@ -69,7 +73,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "test",
         type: "song",
         whatThisIs: "A song about testing",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
       });
       expect(result.content).toContain("## What This Is");
       expect(result.content).toContain("A song about testing");
@@ -82,7 +86,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         whatThisIs: "Identity",
         whatThisIsNot: "Constraints",
         whyThisExists: "Motivation",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
       });
       expect(result.content).toContain("## What This Is");
       expect(result.content).toContain("## What This Is NOT");
@@ -96,7 +100,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "existing-dir",
         type: "project",
         whatThisIs: "Test",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
         directoryExists: true,
         hasBrief: false,
       });
@@ -112,7 +116,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
           projectName: "existing",
           type: "project",
           whatThisIs: "Test",
-          workspaceRoot: "/root",
+          workspaceRoot: TEST_ROOT,
           directoryExists: true,
           hasBrief: true,
         }),
@@ -126,7 +130,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "deep-project",
         type: "song",
         whatThisIs: "Test",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
       });
       expect(result.success).toBe(true);
       // G-150: assert directoriesCreated is greater than 0
@@ -141,7 +145,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         name: "track-one",
         type: "song",
         whatThisIs: "First track",
-        parentPath: "/root/album",
+        parentPath: join(TEST_ROOT, "album"),
         subdirectory: "songs",
       });
       expect(result.path).toContain("songs");
@@ -153,7 +157,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         name: "track-one",
         type: "song",
         whatThisIs: "First track",
-        parentPath: "/root/album",
+        parentPath: join(TEST_ROOT, "album"),
       });
       expect(result.path).not.toContain("songs");
     });
@@ -163,12 +167,12 @@ describe("TASK-22: Workspace — Project Creation", () => {
       await createProject({
         projectName: "album",
         type: "album",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
       });
       const result = await createSubProject({
         name: "track-two",
         whatThisIs: "Second track",
-        parentPath: "/root/album",
+        parentPath: join(TEST_ROOT, "album"),
         inheritTypeFromParent: true,
       });
       expect(result.success).toBe(true);
@@ -184,8 +188,8 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "track-three",
         type: "song",
         whatThisIs: "A track",
-        workspaceRoot: "/root",
-        parentProject: "/root/album",
+        workspaceRoot: TEST_ROOT,
+        parentProject: join(TEST_ROOT, "album"),
       });
       expect(result.success).toBe(true);
       expect(result.content).toMatch(/parent|sub-project/i);
@@ -213,7 +217,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "first",
         type: "project",
         whatThisIs: "The first",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
         isFirstProject: true,
       });
       expect(result.firstProject).toBe(true);
@@ -226,7 +230,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "second",
         type: "project",
         whatThisIs: "Another",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
         isFirstProject: false,
       });
       // G-152: assert tutorial fields NOT set when isFirstProject is false
@@ -241,7 +245,7 @@ describe("TASK-22: Workspace — Project Creation", () => {
         projectName: "no-type",
         type: undefined as any,
         whatThisIs: "Missing type",
-        workspaceRoot: "/root",
+        workspaceRoot: TEST_ROOT,
       });
       expect(
         result.warnings.some((w: string) => /type.*required/i.test(w)),
@@ -319,7 +323,7 @@ describe("TASK-22: Property Tests", () => {
             projectName: name,
             type,
             whatThisIs: "Test",
-            workspaceRoot: "/root",
+            workspaceRoot: TEST_ROOT,
           });
           expect(result.content).toContain("**Project:**");
           expect(result.content).toContain("**Type:**");

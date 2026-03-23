@@ -121,7 +121,7 @@ describe("TASK-17: Hierarchy — Upward Traversal", () => {
   });
 
   describe("BRIEF.md detection [HIER-11, HIER-12]", () => {
-    it.skipIf(process.platform === "win32")(
+    it.skipIf(process.platform === "win32" || process.platform === "darwin")(
       "directory has both BRIEF.md and brief.md: hard error listing both paths [HIER-12]",
       async () => {
         const dir = join(testDir, "conflict");

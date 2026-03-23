@@ -1,10 +1,19 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
+  _installFixtures,
   browseOntology,
   FIXTURE_ENTRY_IDS_BY_PACK,
   getOntologyEntry,
 } from "../../src/ontology/browse";
+import { clearIndexes } from "../../src/ontology/management";
+
+// Force-reinstall fixtures before each test to avoid stale pack data
+// from disk-loaded packs overwriting the in-memory fixtures in other test files.
+beforeEach(() => {
+  clearIndexes();
+  _installFixtures();
+});
 
 // ---------------------------------------------------------------------------
 // Unit Tests

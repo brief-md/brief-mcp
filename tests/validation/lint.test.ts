@@ -416,7 +416,7 @@ describe("TASK-29: Property Tests", () => {
       fc.asyncProperty(
         fc
           .string({ minLength: 1, maxLength: 30 })
-          .filter((s) => /^[a-zA-Z0-9 ]+$/.test(s)),
+          .filter((s) => /^[a-zA-Z0-9 ]+$/.test(s) && s.trim().length > 0),
         async (projectName) => {
           const content = `**Project:** ${projectName}\n**Type:** song\n**Created:** 2025-01-01\n## What This Is\nContent.\n`;
           const result = await lintBrief(content);
