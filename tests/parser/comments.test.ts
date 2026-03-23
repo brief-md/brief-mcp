@@ -300,7 +300,7 @@ describe("TASK-12: Property Tests", () => {
           expect(result.tags).toHaveLength(1);
           expect((result.tags[0] as OntologyTag).pack).toBe(pack);
           expect((result.tags[0] as OntologyTag).entryId).toBe(id);
-          expect((result.tags[0] as OntologyTag).label).toBe(label);
+          expect((result.tags[0] as OntologyTag).label).toBe(label.trim());
         },
       ),
     );
