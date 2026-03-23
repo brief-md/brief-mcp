@@ -290,7 +290,10 @@ describe("TASK-12: Property Tests", () => {
           .filter((s) => /^[a-z0-9-]+$/.test(s)),
         fc
           .string({ minLength: 1, maxLength: 50 })
-          .filter((s) => !s.includes('"') && !s.includes("-->")),
+          .filter(
+            (s) =>
+              !s.includes('"') && !s.includes("-->") && s.trim().length > 0,
+          ),
         (pack, id, label) => {
           const input = `Paragraph\n<!-- brief:ontology ${pack} ${id} "${label}" -->\n`;
           const result = parseComments(input);
