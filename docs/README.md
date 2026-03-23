@@ -1,6 +1,6 @@
 # brief-mcp Documentation
 
-Documentation for the `brief-mcp` MCP server -- a Model Context Protocol server for managing project context through BRIEF.md files.
+`brief-mcp` is a note taker while you chat, and a boot loader when you start a new session. It captures your project's decisions, constraints, and open questions into a structured [BRIEF.md](https://github.com/brief-md/spec) file as you work — so every session starts with context, not a blank slate.
 
 ## Table of Contents
 
@@ -27,6 +27,6 @@ Documentation for the `brief-mcp` MCP server -- a Model Context Protocol server 
 
 - [Configuration](configuration.md) -- Config file, environment variables, CLI flags
 - [Transport & Remote Access](transport.md) -- stdio transport, remote access patterns, HTTP/SSE roadmap
-- [BRIEF.md Specification](../BRIEF_SPEC.md) -- The BRIEF.md file format specification
-- [Implementation Guide](../IMPLEMENTATION.md) -- Server implementation details
+- [BRIEF.md Specification](specification.md) -- The BRIEF.md file format specification
+- [Implementation Guide](implementation-guide.md) -- Integration and implementation details
 - [Troubleshooting](troubleshooting.md) -- Common issues and solutions

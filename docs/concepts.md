@@ -1,5 +1,13 @@
 # Core Concepts
 
+## Why BRIEF.md Exists
+
+Projects already use files like README.md, CONTRIBUTING.md, and package.json to help tools understand them. But none of these capture *intent* — the decisions that shaped the project, the constraints that bound it, the questions still open.
+
+BRIEF.md extends that convention. Like Git stores the history of your code, BRIEF.md stores the history of your thinking.
+
+It is not a project management tool, a documentation platform, or a database. It is a single structured file that captures what matters — chosen by you — so any tool can pick it up and start where you left off.
+
 ## BRIEF.md File Format
 
 A BRIEF.md file is a markdown document that captures the intent, decisions, and context of a project. It is:

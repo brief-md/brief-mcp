@@ -1,5 +1,13 @@
 # Getting Started with brief-mcp
 
+## What brief-mcp Does
+
+When you plan a project in an AI chat, decisions get made and direction gets clear — but the context window compacts it away, new sessions start blank, and coming back after a break means piecing things together from memory.
+
+`brief-mcp` is a note taker while you chat, and a boot loader when you start a new session. It captures decisions, constraints, and open questions into a structured BRIEF.md file as you work. When you return, it loads that context automatically — you start briefed, not blank.
+
+Because BRIEF.md is just a markdown file in your project folder, it works across tools. Plan in one AI client, build in another — the same context follows.
+
 ## Requirements
 
 - **Node.js >= 20** (enforced at startup)

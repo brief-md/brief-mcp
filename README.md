@@ -4,20 +4,32 @@
 
 # brief-mcp
 
-MCP server for [BRIEF.md](https://github.com/brief-md/brief-mcp) project context management.
+The MCP server for [BRIEF.md](https://github.com/brief-md) — a note taker while you chat, and a boot loader when you start a new session.
 
-BRIEF.md is a lightweight, human-readable file that preserves the *why* behind a project — its purpose, boundaries, key decisions, and open questions — so that re-entry becomes continuation rather than reconstruction. `brief-mcp` exposes this as a set of tools over the [Model Context Protocol](https://modelcontextprotocol.io), giving AI agents structured access to project intent.
+## The Problem
+
+When you plan a complex project in an AI chat, decisions get made, constraints get set, direction gets clear. As the conversation grows, the AI compacts it to manage the context window, keeping what it thinks matters — which isn't always what matters to you.
+
+Starting a new session means re-explaining the project, or copying across old conversations, which fills the new context with stuff you don't need. Come back after a break and the same problem exists for you personally — the intent and decisions are somewhere in your head, or scattered across documents and chat histories.
+
+## How brief-mcp Solves This
+
+As you chat, `brief-mcp` captures decisions, constraints, and open questions into a structured [BRIEF.md](https://github.com/brief-md/spec) file in the background. When you return to a project, it loads that context automatically — you start briefed, not blank.
+
+Because BRIEF.md is just a file, any tool can read it. Planning in ChatGPT, coding in Cursor, reviewing in Claude — all referencing the same BRIEF.md. Instead of hunting through a lengthy chat history to find what actually matters, it's already distilled and ready.
+
+README explains how a project works. BRIEF.md captures what it is and why it exists.
 
 ## Features
 
 - **57 MCP tools** — full read/write access to BRIEF.md project context
-- **Hierarchy-aware context** — walk upward through nested BRIEF.md files
+- **Hierarchy-aware context** — walk upward through nested BRIEF.md files to build full context
 - **Ontology system** — install, search, browse, and tag domain knowledge packs
 - **Reference system** — bibliographic references with reverse index and suggestions
 - **Conflict detection** — surface contradictions across decisions and constraints
 - **Type guides and extensions** — domain-specific structure on top of a universal core
 - **Lifecycle tracking** — maturity signals and phase-aware nudges
-- **Security** — path validation, input sanitisation, resource limits
+- **Works with any domain** — software, music, film, research, architecture, business — the core format extends to fit
 
 > **Full documentation**: See the [docs/](docs/) directory for the complete manual including tool reference, interaction patterns, and guides.
 
