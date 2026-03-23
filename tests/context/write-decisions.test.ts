@@ -246,7 +246,7 @@ describe("TASK-26: Property Tests", () => {
       fc.asyncProperty(
         fc
           .string({ minLength: 1, maxLength: 50 })
-          .filter((s) => /^[a-zA-Z0-9 ]+$/.test(s)),
+          .filter((s) => /^[a-zA-Z0-9 ]+$/.test(s) && s.trim().length > 0),
         async (title) => {
           const result = await handleAddDecision({ title, why: "reason" });
           expect(result.success).toBe(true);

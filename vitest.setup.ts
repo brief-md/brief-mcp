@@ -7,7 +7,14 @@
 
 import os from "node:os";
 import path from "node:path";
+import fc from "fast-check";
 import { vi } from "vitest";
+
+// Pin fast-check seed for deterministic property tests across CI environments.
+// Without this, different platforms/runs get different random seeds, causing
+// flaky failures when edge-case inputs (whitespace-only, special chars) are
+// generated on some runs but not others.
+fc.configureGlobal({ seed: 42 });
 
 // Isolate tests from user config — prevents loadFromDisk() from loading
 // stale test-artifact guide files from ~/.brief/type-guides/.

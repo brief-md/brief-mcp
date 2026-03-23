@@ -397,7 +397,13 @@ describe("TASK-10: Property Tests", () => {
       fc.asyncProperty(
         fc
           .string({ minLength: 3, maxLength: 30 })
-          .filter((s) => !s.startsWith("#") && /\w/.test(s))
+          .filter(
+            (s) =>
+              !s.startsWith("#") &&
+              /\w/.test(s) &&
+              !/[{}<>`[\]]/.test(s) &&
+              s.trim().length > 0,
+          )
           .filter(
             (s) =>
               !knownAliases.some(

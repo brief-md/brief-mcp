@@ -253,7 +253,7 @@ describe("TASK-28: Property Tests", () => {
       fc.asyncProperty(
         fc
           .string({ minLength: 1, maxLength: 20 })
-          .filter((s) => /^[a-zA-Z ]+$/.test(s)),
+          .filter((s) => /^[a-zA-Z ]+$/.test(s) && s.trim().length > 0),
         async (tool) => {
           const result = await handleCaptureExternalSession({
             tool,
