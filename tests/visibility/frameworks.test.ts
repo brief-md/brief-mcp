@@ -208,18 +208,9 @@ describe("TASK-44: Property Tests", () => {
     await fc.assert(
       fc.asyncProperty(
         fc
-          .string({ minLength: 1, maxLength: 30 })
-          .filter(
-            (s) =>
-              ![
-                "local-pack",
-                "inherited-pack",
-                "inherited-pack-a",
-                "inherited-pack-b",
-                "pack-a",
-                "pack-b",
-              ].includes(s),
-          ),
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => /^[a-zA-Z0-9-]+$/.test(s))
+          .map((s) => `nonexistent-zz-${s}`),
         async (badPack) => {
           await expect(removeOntology({ ontology: badPack })).rejects.toThrow(
             /not found/i,

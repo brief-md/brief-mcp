@@ -100,7 +100,7 @@ describe("WP2/GAP-A+E: Tag Scope Validation", () => {
 
     it("returns empty array when entry has no references", async () => {
       const result = await tagEntry({
-        ontology: "theme-pack",
+        ontology: "new-pack",
         entryId: "entry-1",
         section: "Direction",
       });

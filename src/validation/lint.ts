@@ -199,6 +199,9 @@ export async function lintBrief(
     checkOrphanedRefLinks(parsed, findings);
     checkNonConformantExtensions(parsed, findings);
     checkUnrecognisedComments(content, parsed, findings);
+    if (options?.checkBundledGuides) {
+      checkBundledGuideNotifications(parsed, findings);
+    }
   } catch {
     // Property invariant: lint never throws
     findings.push(
@@ -805,5 +808,23 @@ function checkUnrecognisedComments(
       ),
     );
     return;
+  }
+}
+
+function checkBundledGuideNotifications(
+  parsed: ParsedBriefMd,
+  findings: LintFinding[],
+): void {
+  const extensions = parsed.extensions ?? [];
+  for (const ext of extensions) {
+    if (ext) {
+      findings.push(
+        makeFinding(
+          "BUNDLED_GUIDE_AVAILABLE",
+          "info",
+          `Extension "${ext}" is registered but no guide is loaded. A bundled guide may be available for ${ext}.`,
+        ),
+      );
+    }
   }
 }

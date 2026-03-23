@@ -20,7 +20,10 @@ vi.mock("../../src/type-intelligence/loading", () => {
             type,
             source: "bundled",
             version: "1.0",
-            suggestedExtensions: ["sonic_arts", "lyrical_craft"],
+            suggestedExtensions: [
+              { slug: "sonic_arts" },
+              { slug: "lyrical_craft" },
+            ],
           },
           content: "",
           path: `<builtin>/${type}.md`,

@@ -203,9 +203,27 @@ export async function syncExtensionMetadata(
  */
 export async function syncOntologyMetadata(
   inputContent: string,
-  _params: { pack: string; version?: string },
+  params: { pack: string; version?: string },
 ): Promise<string> {
-  return inputContent;
+  const { pack, version } = params;
+  const versionSuffix = version ? ` (${version})` : "";
+  const entry = `${pack}${versionSuffix}`;
+
+  // If Ontologies field exists, append to it
+  if (/\*\*Ontologies:\*\*/.test(inputContent)) {
+    return inputContent.replace(
+      /(\*\*Ontologies:\*\*\s*)(.*)/,
+      (_match, prefix: string, existing: string) => {
+        const trimmed = existing.trim();
+        if (!trimmed) return `${prefix}${entry}`;
+        if (trimmed.includes(pack)) return `${prefix}${trimmed}`;
+        return `${prefix}${trimmed}, ${entry}`;
+      },
+    );
+  }
+
+  // No Ontologies field — prepend one
+  return `**Ontologies:** ${entry}\n${inputContent}`;
 }
 
 // ---------------------------------------------------------------------------
