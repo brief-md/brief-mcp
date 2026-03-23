@@ -220,15 +220,44 @@ function toMetadataFormat(name: string): string {
 /*  Module State                                                       */
 /* ------------------------------------------------------------------ */
 
-const createdExtensions = new Map<
-  string,
-  {
-    name: string;
-    slug: string;
-    subsections: string[];
-    description: string;
+type ExtensionEntry = {
+  name: string;
+  slug: string;
+  subsections: string[];
+  description: string;
+};
+
+/** Outer key: normalized project path (or sentinel). Inner key: extension slug. */
+const createdExtensions = new Map<string, Map<string, ExtensionEntry>>();
+
+const NO_PROJECT = "__no_project__";
+
+function getProjectExtensions(
+  projectPath?: string,
+): Map<string, ExtensionEntry> {
+  const key = projectPath ?? NO_PROJECT;
+  let map = createdExtensions.get(key);
+  if (!map) {
+    map = new Map();
+    createdExtensions.set(key, map);
   }
->();
+  return map;
+}
+
+/** Iterate all extension entries across every project (for global lookups). */
+function allExtensionEntries(): Iterable<[string, ExtensionEntry]> {
+  const seen = new Set<string>();
+  const entries: Array<[string, ExtensionEntry]> = [];
+  for (const projectMap of createdExtensions.values()) {
+    for (const [slug, ext] of projectMap) {
+      if (!seen.has(slug)) {
+        seen.add(slug);
+        entries.push([slug, ext]);
+      }
+    }
+  }
+  return entries;
+}
 
 /** @internal Reset module-level state for test isolation */
 export function _resetState(): void {
@@ -261,7 +290,7 @@ function findSubsectionMatches(
     }
   }
 
-  for (const [slug, ext] of createdExtensions) {
+  for (const [slug, ext] of allExtensionEntries()) {
     if (SPEC_EXTENSIONS[slug]) continue;
     for (const sub of ext.subsections) {
       if (sub.toLowerCase() === lower) {
@@ -332,6 +361,10 @@ export async function addExtension(params: {
   const resolvedSubsections = customSubsections ??
     specExt?.subsections ?? [...DEFAULT_CUSTOM_SUBSECTIONS];
 
+  /* Resolve target project early so dedup is per-project */
+  const targetPath = params.projectPath ?? getActiveProject()?.path;
+  const projectExts = getProjectExtensions(targetPath);
+
   /* Ambiguous subsection check (WRITE-17) — simulateAmbiguous is a test seam */
   if (simulateAmbiguous) {
     throw new Error(
@@ -341,8 +374,8 @@ export async function addExtension(params: {
 
   /* Idempotent: orphan heading — exists in doc but not in metadata (WRITE-18) */
   if (simulateOrphanHeading) {
-    if (!createdExtensions.has(metadataFormat)) {
-      createdExtensions.set(metadataFormat, {
+    if (!projectExts.has(metadataFormat)) {
+      projectExts.set(metadataFormat, {
         name: headingFormat,
         slug: metadataFormat,
         subsections: resolvedSubsections,
@@ -362,8 +395,8 @@ export async function addExtension(params: {
     };
   }
 
-  /* Idempotent: already created in session (WRITE-18) */
-  const existing = createdExtensions.get(metadataFormat);
+  /* Idempotent: already created in this project's session (WRITE-18) */
+  const existing = projectExts.get(metadataFormat);
   if (existing) {
     return {
       created: false,
@@ -399,8 +432,8 @@ export async function addExtension(params: {
   }
   const content = contentLines.join("\n").trimEnd();
 
-  /* Track new extension */
-  createdExtensions.set(metadataFormat, {
+  /* Track new extension (per-project) */
+  projectExts.set(metadataFormat, {
     name: headingFormat,
     slug: metadataFormat,
     subsections: resolvedSubsections,
@@ -411,7 +444,6 @@ export async function addExtension(params: {
   let persisted = false;
   let resultFilePath: string | undefined;
   let persistWarning: string | undefined;
-  const targetPath = params.projectPath ?? getActiveProject()?.path;
   if (targetPath) {
     try {
       let briefContent = await readBrief(targetPath);
@@ -538,7 +570,7 @@ export function getKnownExtensions(): Map<
       subsectionDetails: ext.subsectionDetails,
     });
   }
-  for (const [slug, ext] of createdExtensions) {
+  for (const [slug, ext] of allExtensionEntries()) {
     if (!result.has(slug)) {
       result.set(slug, { name: ext.name, subsections: ext.subsections });
     }
@@ -586,9 +618,9 @@ export async function listExtensions(_options?: {
     });
   }
 
-  /* Include custom extensions from session */
+  /* Include custom extensions from session (across all projects) */
   if (includeProject) {
-    for (const [slug, ext] of createdExtensions) {
+    for (const [slug, ext] of allExtensionEntries()) {
       if (SPEC_EXTENSIONS[slug]) continue;
       extensions.push({
         name: slug,

@@ -97,6 +97,20 @@ describe("TASK-40: Type Intelligence — Type Guide Loading & Resolution", () =>
       const mixed = await getTypeGuide({ type: "Album" });
       expect(lower.guide.metadata.type).toBe(mixed.guide.metadata.type);
     });
+
+    it("type name with spaces: normalised to hyphens before matching [COMPAT-07]", async () => {
+      const hyphenated = await getTypeGuide({ type: "music-release" });
+      const spaced = await getTypeGuide({ type: "music release" });
+      expect(spaced.guide.metadata.type).toBe(hyphenated.guide.metadata.type);
+      expect(spaced.isGeneric).toBeFalsy();
+    });
+
+    it("type name with mixed case and spaces: normalised to lowercase hyphens [COMPAT-07]", async () => {
+      const canonical = await getTypeGuide({ type: "music-release" });
+      const mixed = await getTypeGuide({ type: "Music Release" });
+      expect(mixed.guide.metadata.type).toBe(canonical.guide.metadata.type);
+      expect(mixed.isGeneric).toBeFalsy();
+    });
   });
 
   describe("parent type handling [COMPAT-07]", () => {

@@ -199,7 +199,11 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   brief_reenter_project: async (args) => {
     const result = await generateReentrySummary(
       typed<Parameters<typeof generateReentrySummary>[0]>(
-        remap(args, { path: "projectPath", project_path: "projectPath" }),
+        remap(args, {
+          path: "projectPath",
+          project_path: "projectPath",
+          workspace: "projectPath",
+        }),
       ),
     );
     // Surface nextSteps as a prominent directive block (same as brief_create_project)

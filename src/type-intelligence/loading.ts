@@ -1033,6 +1033,7 @@ export async function getTypeGuide(
 ): Promise<GetTypeGuideResult> {
   const type = String(params.type ?? "")
     .toLowerCase()
+    .replace(/\s+/g, "-")
     .trim();
   const simulateMissing = params.simulateMissing === true;
   const simulateCorrupt = params.simulateCorrupt === true;

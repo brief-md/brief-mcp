@@ -461,6 +461,10 @@ export async function generateReentrySummary(params: {
     detail = "summary",
   } = params;
 
+  if (!projectPath) {
+    throw new Error("projectPath is required for brief_reenter_project");
+  }
+
   // Derive project name from path (handle both / and \ separators)
   const segments = projectPath.replace(/\\/g, "/").split("/");
   const projectName = segments.pop() || "unknown";

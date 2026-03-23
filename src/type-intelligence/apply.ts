@@ -1,6 +1,7 @@
 // src/type-intelligence/apply.ts — WP4: Apply type guide (auto-install extensions & ontologies)
 
 import { addExtension } from "../extension/creation.js"; // check-rules-ignore
+import { readBrief, writeBrief } from "../io/project-state.js"; // check-rules-ignore
 import { getTypeGuide } from "./loading.js"; // check-rules-ignore
 
 export async function applyTypeGuide(params: {
@@ -97,8 +98,17 @@ export async function applyTypeGuide(params: {
     );
   }
 
-  // Type guide is resolved via **Type:** field — no separate metadata field needed.
-  // The **Type:** value IS the type guide lookup key (exact → alias → generic).
+  // Update **Type:** field in BRIEF.md to reflect the applied type guide
+  try {
+    let briefContent = await readBrief(projectPath);
+    const typeRe = /^\*\*Type:\*\*\s*.*$/m;
+    if (typeRe.test(briefContent)) {
+      briefContent = briefContent.replace(typeRe, `**Type:** ${type}`);
+    }
+    await writeBrief(projectPath, briefContent);
+  } catch {
+    warnings.push("Failed to update **Type:** field in BRIEF.md");
+  }
 
   return {
     applied: true,

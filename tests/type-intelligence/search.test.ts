@@ -44,6 +44,16 @@ describe("WP2: brief_suggest_type_guides — Type Guide Search & Suggestion", ()
       const result = await suggestTypeGuides({ query: "film" });
       expect(result.hasExactMatch).toBe(true);
     });
+
+    it("spaces in query normalised to hyphens for exact match", async () => {
+      await loadGuides();
+      const result = await suggestTypeGuides({ query: "music release" });
+      expect(result.candidates.length).toBeGreaterThanOrEqual(1);
+      const top = result.candidates[0];
+      expect(top.type).toBe("music-release");
+      expect(top.matchType).toBe("exact");
+      expect(top.relevanceScore).toBe(1.0);
+    });
   });
 
   describe("alias match", () => {

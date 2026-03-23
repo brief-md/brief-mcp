@@ -183,6 +183,16 @@ describe("TASK-23: Workspace — Re-Entry & Tutorial", () => {
       expect(result.tutorialDismissed).toBe(false);
     });
   });
+
+  describe("missing projectPath [ARCH-06]", () => {
+    it("throws a clear error when projectPath is undefined", async () => {
+      await expect(
+        generateReentrySummary(
+          {} as Parameters<typeof generateReentrySummary>[0],
+        ),
+      ).rejects.toThrow("projectPath is required");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

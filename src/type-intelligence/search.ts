@@ -68,7 +68,7 @@ export async function suggestTypeGuides(params: {
 
   const guides = getLoadedGuides();
   const aliasIndex = getAliasIndex();
-  const normalizedQuery = query.toLowerCase().trim();
+  const normalizedQuery = query.toLowerCase().replace(/\s+/g, "-").trim();
 
   // Track which types have already been matched (for dedup)
   const matchedTypes = new Set<string>();

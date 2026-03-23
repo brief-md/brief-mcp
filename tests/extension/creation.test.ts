@@ -302,3 +302,59 @@ describe("TASK-43: Property Tests", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cross-project extension independence
+// ---------------------------------------------------------------------------
+
+describe("cross-project extension independence", () => {
+  beforeEach(() => {
+    _resetState();
+    vi.clearAllMocks();
+  });
+
+  it("same extension on different projects: both created independently", async () => {
+    const r1 = await addExtension({
+      extensionName: "SONIC ARTS",
+      projectPath: "/project-a",
+    });
+    expect(r1.created).toBe(true);
+
+    const r2 = await addExtension({
+      extensionName: "SONIC ARTS",
+      projectPath: "/project-b",
+    });
+    expect(r2.created).toBe(true);
+    expect(r2.alreadyExists).toBeFalsy();
+  });
+
+  it("same extension on same project: idempotent", async () => {
+    await addExtension({
+      extensionName: "SONIC ARTS",
+      projectPath: "/project-a",
+    });
+    const r2 = await addExtension({
+      extensionName: "SONIC ARTS",
+      projectPath: "/project-a",
+    });
+    expect(r2.alreadyExists).toBe(true);
+  });
+
+  it("extensions on different projects do not interfere with each other", async () => {
+    await addExtension({
+      extensionName: "CUSTOM DOMAIN",
+      projectPath: "/project-a",
+    });
+    await addExtension({
+      extensionName: "ANOTHER EXT",
+      projectPath: "/project-b",
+    });
+
+    // Adding ANOTHER EXT to project-a should succeed (not "already exists")
+    const r = await addExtension({
+      extensionName: "ANOTHER EXT",
+      projectPath: "/project-a",
+    });
+    expect(r.created).toBe(true);
+  });
+});
