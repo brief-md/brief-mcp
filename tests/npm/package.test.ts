@@ -38,11 +38,11 @@ describe("TASK-55: npm Package — Canonical Test Location [T55-02]", () => {
   });
 
   describe("package.json core fields [OSS-05]", () => {
-    it("name field: brief-mcp [OSS-05]", () => {
+    it("name field: @brief-md/mcp [OSS-05]", () => {
       const pkg = JSON.parse(
         fs.readFileSync(path.join(ROOT, "package.json"), "utf-8"),
       );
-      expect(pkg.name).toBe("brief-mcp");
+      expect(pkg.name).toBe("@brief-md/mcp");
     });
 
     it("version field: valid semver [OSS-01]", () => {

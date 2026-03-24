@@ -1,5 +1,5 @@
 {
-  "name": "brief-mcp",
+  "name": "@brief-md/mcp",
   "version": "0.1.0",
   "description": "MCP server for BRIEF.md project context management",
   "license": "MIT",

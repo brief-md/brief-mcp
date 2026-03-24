@@ -1,5 +1,5 @@
 [![CI](https://github.com/brief-md/brief-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/brief-md/brief-mcp/actions)
-[![npm](https://img.shields.io/npm/v/brief-mcp)](https://www.npmjs.com/package/brief-mcp)
+[![npm](https://img.shields.io/npm/v/@brief-md/mcp)](https://www.npmjs.com/package/@brief-md/mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # brief-mcp
@@ -40,13 +40,13 @@ README explains how a project works. BRIEF.md captures what it is and why it exi
 ## Installation
 
 ```bash
-npm install -g brief-mcp
+npm install -g @brief-md/mcp
 ```
 
 Or use directly with npx:
 
 ```bash
-npx brief-mcp
+npx @brief-md/mcp
 ```
 
 ## Quick Start
@@ -60,7 +60,7 @@ npx brief-mcp
   "mcpServers": {
     "brief-mcp": {
       "command": "npx",
-      "args": ["-y", "brief-mcp"]
+      "args": ["-y", "@brief-md/mcp"]
     }
   }
 }
@@ -69,7 +69,7 @@ npx brief-mcp
 **Claude Code**:
 
 ```bash
-claude mcp add brief-mcp -- npx --yes brief-mcp
+claude mcp add brief-mcp -- npx --yes @brief-md/mcp
 ```
 
 **Cursor** — Settings > MCP Servers, add:
@@ -78,7 +78,7 @@ claude mcp add brief-mcp -- npx --yes brief-mcp
 {
   "brief-mcp": {
     "command": "npx",
-    "args": ["-y", "brief-mcp"]
+    "args": ["-y", "@brief-md/mcp"]
   }
 }
 ```

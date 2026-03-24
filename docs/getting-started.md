@@ -17,13 +17,13 @@ Because BRIEF.md is just a markdown file in your project folder, it works across
 Install globally:
 
 ```bash
-npm install -g brief-mcp
+npm install -g @brief-md/mcp
 ```
 
 Or run directly without installing:
 
 ```bash
-npx brief-mcp
+npx @brief-md/mcp
 ```
 
 ## MCP Client Setup
@@ -39,7 +39,7 @@ Add the following to your `claude_desktop_config.json`:
   "mcpServers": {
     "brief-mcp": {
       "command": "npx",
-      "args": ["-y", "brief-mcp"]
+      "args": ["-y", "@brief-md/mcp"]
     }
   }
 }
@@ -54,7 +54,7 @@ The config file is located at:
 Run the following command:
 
 ```bash
-claude mcp add brief-mcp -- npx --yes brief-mcp
+claude mcp add brief-mcp -- npx --yes @brief-md/mcp
 ```
 
 This registers brief-mcp as an MCP server that Claude Code will spawn automatically.
@@ -64,15 +64,15 @@ This registers brief-mcp as an MCP server that Claude Code will spawn automatica
 1. Open **Settings** > **MCP Servers**
 2. Add a new stdio server:
    - **Command**: `npx`
-   - **Args**: `["-y", "brief-mcp"]`
+   - **Args**: `["-y", "@brief-md/mcp"]`
 
 ### Windsurf
 
-Configuration is similar to Cursor. Add an stdio MCP server with command `npx` and args `["-y", "brief-mcp"]` through the MCP settings interface.
+Configuration is similar to Cursor. Add an stdio MCP server with command `npx` and args `["-y", "@brief-md/mcp"]` through the MCP settings interface.
 
 ### Generic stdio Client
 
-Spawn `npx brief-mcp` as a subprocess and communicate via stdin/stdout using JSON-RPC messages following the MCP protocol. The server reads JSON-RPC requests from stdin and writes responses to stdout.
+Spawn `npx @brief-md/mcp` as a subprocess and communicate via stdin/stdout using JSON-RPC messages following the MCP protocol. The server reads JSON-RPC requests from stdin and writes responses to stdout.
 
 ## First Project Walkthrough
 

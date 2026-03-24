@@ -239,7 +239,7 @@ export async function initWizard(options?: {
       mcpServers: {
         "brief-mcp": {
           command: "npx",
-          args: ["--yes", "brief-mcp"],
+          args: ["--yes", "@brief-md/mcp"],
         },
       },
     };
@@ -260,7 +260,7 @@ export async function initWizard(options?: {
       mcpServers: {
         "brief-mcp": {
           command: "npx",
-          args: ["--yes", "brief-mcp"],
+          args: ["--yes", "@brief-md/mcp"],
         },
       },
     };

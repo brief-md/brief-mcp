@@ -126,11 +126,11 @@ jobs:
 #
 # Claude Desktop:
 #   1. Add to claude_desktop_config.json:
-#      { "mcpServers": { "brief": { "command": "npx", "args": ["--yes", "brief-mcp"] } } }
+#      { "mcpServers": { "brief": { "command": "npx", "args": ["--yes", "@brief-md/mcp"] } } }
 #   2. Verify server starts and responds to tool calls.
 #   Minimum compatible version: Claude Desktop 1.0+
 #
 # Claude Code:
-#   1. Run: claude mcp add brief-mcp -- npx --yes brief-mcp
+#   1. Run: claude mcp add brief-mcp -- npx --yes @brief-md/mcp
 #   2. Verify server starts and responds to tool calls.
 #   Minimum compatible version: Claude Code 1.0+

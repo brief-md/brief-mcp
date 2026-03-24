@@ -26,14 +26,14 @@ node --version  # Check current version
 - **Claude Code**: Run `claude mcp list` to verify brief-mcp is registered
 - **Cursor/Windsurf**: Check the MCP server settings in the IDE
 
-Ensure the command is `npx` and the args include `"-y"` and `"brief-mcp"`:
+Ensure the command is `npx` and the args include `"-y"` and `"@brief-md/mcp"`:
 
 ```json
 {
   "mcpServers": {
     "brief-mcp": {
       "command": "npx",
-      "args": ["-y", "brief-mcp"]
+      "args": ["-y", "@brief-md/mcp"]
     }
   }
 }
@@ -139,13 +139,13 @@ When investigating issues, enable debug logging for more detailed output.
 ### Via environment variable
 
 ```bash
-BRIEF_LOG_LEVEL=debug npx brief-mcp
+BRIEF_LOG_LEVEL=debug npx @brief-md/mcp
 ```
 
 ### Via CLI flag
 
 ```bash
-npx brief-mcp --verbose
+npx @brief-md/mcp --verbose
 ```
 
 ### Via config file
@@ -170,7 +170,7 @@ Debug logs are written to stderr (not stdout, which is reserved for the MCP prot
 For maximum detail, use `"trace"` level:
 
 ```bash
-BRIEF_LOG_LEVEL=trace npx brief-mcp
+BRIEF_LOG_LEVEL=trace npx @brief-md/mcp
 ```
 
 This includes all debug output plus low-level protocol messages.
