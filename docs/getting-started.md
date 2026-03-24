@@ -14,6 +14,8 @@ Because BRIEF.md is just a markdown file in your project folder, it works across
 
 ## Installation
 
+> **Important:** The npm package is `@brief-md/mcp`, not `brief-mcp`. The unscoped `brief-mcp` on npm is an unrelated project.
+
 Install globally:
 
 ```bash

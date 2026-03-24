@@ -39,6 +39,8 @@ README explains how a project works. BRIEF.md captures what it is and why it exi
 
 ## Installation
 
+> **Important:** The npm package is `@brief-md/mcp`, not `brief-mcp`. The unscoped `brief-mcp` on npm is an unrelated project.
+
 ```bash
 npm install -g @brief-md/mcp
 ```
